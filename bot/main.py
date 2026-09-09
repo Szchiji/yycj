@@ -40,6 +40,9 @@ dp.update.middleware(ErrorLogMiddleware())
 register_handlers(dp)
 scheduler = AsyncIOScheduler()
 
+_ready = False
+_startup_error: str | None = None
+
 
 async def job_expire_sessions() -> None:
     try:
@@ -58,46 +61,63 @@ async def job_daily_credit() -> None:
         logger.exception("daily credit failed")
 
 
+async def _startup() -> None:
+    global _ready, _startup_error
+    try:
+        if not settings.bot_token:
+            raise RuntimeError("请设置环境变量 BOT_TOKEN")
+        logging.getLogger().setLevel(settings.log_level.upper())
+
+        await connect_db()
+        logger.info("Database connected")
+
+        if not scheduler.running:
+            scheduler.add_job(
+                job_expire_sessions,
+                "interval",
+                minutes=5,
+                id="expire_sessions",
+                replace_existing=True,
+            )
+            scheduler.add_job(
+                job_daily_credit,
+                "cron",
+                hour=0,
+                minute=5,
+                id="daily_credit",
+                replace_existing=True,
+            )
+            scheduler.start()
+
+        if settings.use_webhook:
+            await bot.set_webhook(
+                url=settings.webhook_url,
+                secret_token=settings.webhook_secret or None,
+                drop_pending_updates=True,
+                allowed_updates=dp.resolve_used_update_types(),
+            )
+            me = await bot.get_me()
+            logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
+        else:
+            logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
+
+        _ready = True
+        _startup_error = None
+    except Exception as exc:
+        _startup_error = str(exc)
+        logger.exception("Startup failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    if not settings.bot_token:
-        raise RuntimeError("请设置环境变量 BOT_TOKEN")
-    logging.getLogger().setLevel(settings.log_level.upper())
-    await connect_db()
-    logger.info("Database connected")
-
-    if not scheduler.running:
-        scheduler.add_job(
-            job_expire_sessions,
-            "interval",
-            minutes=5,
-            id="expire_sessions",
-            replace_existing=True,
-        )
-        scheduler.add_job(
-            job_daily_credit,
-            "cron",
-            hour=0,
-            minute=5,
-            id="daily_credit",
-            replace_existing=True,
-        )
-        scheduler.start()
-
-    if settings.use_webhook:
-        await bot.set_webhook(
-            url=settings.webhook_url,
-            secret_token=settings.webhook_secret or None,
-            drop_pending_updates=True,
-            allowed_updates=dp.resolve_used_update_types(),
-        )
-        me = await bot.get_me()
-        logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
-    else:
-        logger.warning("WEBHOOK_HOST 未配置：HTTP 仅健康检查；本地请走 polling")
-
+    task = asyncio.create_task(_startup())
     yield
-
+    if not task.done():
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
     if scheduler.running:
         scheduler.shutdown(wait=False)
     if settings.use_webhook:
@@ -118,7 +138,9 @@ async def root() -> dict:
     return {
         "ok": True,
         "service": "yueying-cheji",
+        "ready": _ready,
         "mode": "webhook" if settings.use_webhook else "idle",
+        "error": _startup_error,
     }
 
 
@@ -132,6 +154,8 @@ async def telegram_webhook(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ):
+    if not _ready:
+        raise HTTPException(status_code=503, detail=_startup_error or "starting")
     if settings.webhook_secret and x_telegram_bot_api_secret_token != settings.webhook_secret:
         raise HTTPException(status_code=403, detail="invalid secret")
     data = await request.json()
@@ -179,7 +203,9 @@ def main() -> None:
 
     port = int(os.environ.get("PORT") or settings.port or 8080)
 
-    if settings.use_webhook:
+    if settings.use_webhook or os.environ.get("PORT"):
+        if not settings.use_webhook:
+            logger.warning("PORT 已注入但 WEBHOOK_HOST 为空，仍启动 HTTP 服务")
         uvicorn.run(
             app,
             host="0.0.0.0",

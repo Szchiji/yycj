@@ -26,7 +26,12 @@ async def connect_db() -> None:
     settings = get_settings()
     url = settings.normalized_database_url()
     _engine = create_async_engine(
-        url, pool_pre_ping=True, pool_size=5, max_overflow=10, pool_recycle=300
+        url,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=300,
+        connect_args={"timeout": 15},
     )
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     async with _engine.begin() as conn:
