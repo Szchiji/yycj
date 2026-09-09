@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -15,8 +17,29 @@ from sqlalchemy.ext.asyncio import (
 from bot.config import get_settings
 from bot.models import Base
 
+logger = logging.getLogger(__name__)
+
 _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+
+# create_all 不会给已有表加列；启动时幂等补齐（PostgreSQL）。
+_ALTER_STATEMENTS = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS district VARCHAR(64)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_lat DOUBLE PRECISION",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_lng DOUBLE PRECISION",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_label VARCHAR(128)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS media JSONB DEFAULT '[]'::jsonb",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS publisher_role VARCHAR(16)",
+]
+
+
+async def _ensure_columns(conn) -> None:
+    for stmt in _ALTER_STATEMENTS:
+        try:
+            await conn.execute(text(stmt))
+        except Exception:
+            logger.exception("ensure column failed: %s", stmt)
 
 
 async def connect_db() -> None:
@@ -36,6 +59,7 @@ async def connect_db() -> None:
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_columns(conn)
 
 
 async def close_db() -> None:

@@ -113,13 +113,20 @@ async def _startup() -> None:
         await connect_db()
         logger.info("Database connected")
 
+        try:
+            from bot.services import home_service
+            seed = await home_service.seed_demo_if_empty()
+            if seed.get("seeded"):
+                logger.info("Demo seed: %s", seed.get("lamp_ids"))
+        except Exception:
+            logger.exception("demo seed skipped")
+
         # 预热 Redis / 打出内存回退警告
         await anti_brush.allow("__warmup__", limit=1, window_sec=1)
 
         _schedule_jobs()
 
         if settings.use_webhook:
-            # drop_pending_updates=False：部署重启不丢用户消息
             await bot.set_webhook(
                 url=settings.webhook_url,
                 secret_token=settings.webhook_secret or None,
@@ -186,7 +193,6 @@ async def healthz() -> PlainTextResponse:
 
 @app.get("/app")
 async def miniapp_redirect():
-    """无尾斜杠时跳到 /app/，由 StaticFiles(html=True) 提供 index.html。"""
     if not MINIAPP_DIR.is_dir():
         raise HTTPException(status_code=404, detail="miniapp missing")
     return RedirectResponse(url="/app/")
@@ -207,7 +213,6 @@ async def telegram_webhook(
     return JSONResponse({"ok": True})
 
 
-# 静态资源（js/css/admin.html）；html=True 让子路径也可回落
 if MINIAPP_DIR.is_dir():
     app.mount(
         "/app",

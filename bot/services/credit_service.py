@@ -43,6 +43,7 @@ def _user_to_dict(u: User) -> Dict[str, Any]:
         "total_earned": u.total_earned,
         "total_deducted": u.total_deducted,
         "is_shadowed": u.is_shadowed,
+        "role": getattr(u, "role", None),
         "created_at": u.created_at,
         "updated_at": u.updated_at,
         "last_recovery_at": u.last_recovery_at,
@@ -89,6 +90,26 @@ async def ensure_user(
             shadow_days=0,
         )
         s.add(user)
+        await s.flush()
+        return _user_to_dict(user)
+
+
+
+async def set_user_role(user_id: int, role: str) -> Dict[str, Any]:
+    """设置 Mini App 身份：teacher / guest / merchant。"""
+    from bot.models import UserRole
+
+    allowed = {UserRole.TEACHER.value, UserRole.GUEST.value, UserRole.MERCHANT.value}
+    if role not in allowed:
+        raise ValueError("role 须为 teacher / guest / merchant")
+    await ensure_user(user_id)
+    async with session_scope() as s:
+        res = await s.execute(select(User).where(User.user_id == user_id))
+        user = res.scalar_one_or_none()
+        if not user:
+            raise RuntimeError("用户不存在")
+        user.role = role
+        user.updated_at = datetime.utcnow()
         await s.flush()
         return _user_to_dict(user)
 
