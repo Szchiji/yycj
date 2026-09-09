@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Union
 
 from aiogram import Bot, F, Router
@@ -11,15 +12,33 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu, session_accept_kb, session_end_kb
 from bot.services import anti_brush, search_service, session_service
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="session")
 
+# Old + new reply-keyboard labels so menu taps never hit the DB filter.
 MENU_TEXTS = {
+    # search
     "🔍 搜索灯笼",
+    "🔍 搜索",
+    # mine
     "🌕 我的月影",
+    "🌕 我的",
+    # publish
     "✨ 点亮灯笼",
+    "✨ 发布",
+    # report
     "📝 月影报告",
+    "📝 报告",
+    # credit / reputation
     "🌸 兰花信用",
+    "🌸 口碑",
+    # help
     "❓ 帮助",
+    # homepage webapp button variants
+    "📱 打开首页",
+    "打开首页",
+    # cancel
     "取消",
 }
 
@@ -31,9 +50,17 @@ class ActiveSessionFilter(BaseFilter):
         user = message.from_user
         if not user:
             return False
-        if message.text and (message.text in MENU_TEXTS or message.text.startswith("/")):
+        text = message.text or ""
+        # Keep startswith('/') for slash commands; Command objects also carry text.
+        if text and (text in MENU_TEXTS or text.startswith("/")):
             return False
-        sess = await session_service.get_active_for_user(user.id)
+        try:
+            sess = await session_service.get_active_for_user(user.id)
+        except Exception:
+            logger.exception(
+                "ActiveSessionFilter: get_active_for_user failed for user_id=%s", user.id
+            )
+            return False
         if not sess:
             return False
         return {"active_session": sess}
