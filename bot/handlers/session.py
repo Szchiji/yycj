@@ -2,13 +2,41 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Union
+
 from aiogram import Bot, F, Router
+from aiogram.filters import BaseFilter
 from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards import main_menu, session_accept_kb, session_end_kb
 from bot.services import anti_brush, search_service, session_service
 
 router = Router(name="session")
+
+MENU_TEXTS = {
+    "🔍 搜索灯笼",
+    "🌕 我的月影",
+    "✨ 点亮灯笼",
+    "📝 月影报告",
+    "🌸 兰花信用",
+    "❓ 帮助",
+    "取消",
+}
+
+
+class ActiveSessionFilter(BaseFilter):
+    """仅当用户有进行中的月影会话时匹配，并把会话注入 handler。"""
+
+    async def __call__(self, message: Message) -> Union[bool, Dict[str, Any]]:
+        user = message.from_user
+        if not user:
+            return False
+        if message.text and (message.text in MENU_TEXTS or message.text.startswith("/")):
+            return False
+        sess = await session_service.get_active_for_user(user.id)
+        if not sess:
+            return False
+        return {"active_session": sess}
 
 
 @router.callback_query(F.data.startswith("session_request:"))
@@ -36,13 +64,13 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     await cb.answer("已发送邀请")
     if cb.message:
         await cb.message.answer(
-            f"已向灯笼主人发送月影会话邀请。\n会话码：`{sess['session_id'][:8]}`",
+            f"已向灯笼主人发送月影会话邀请。\n会话码：<code>{sess['session_id'][:8]}</code>",
             reply_markup=main_menu(),
         )
     try:
         await bot.send_message(
             lamp["user_id"],
-            f"🌕 有人想就你的灯笼 **{lamp.get('title')}** 发起匿名月影会话。\n"
+            f"🌕 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
             f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
             reply_markup=session_accept_kb(sess["session_id"]),
         )
@@ -103,16 +131,15 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
     delta = (data or {}).get("settle_delta", 0)
-    text = f"🔚 月影会话已结束。\n本次兰花分变动：`{delta:+d}`"
+    text = f"🔚 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
     if cb.message:
         await cb.message.answer(text, reply_markup=main_menu())
-    if data:
-        peer = session_service.peer_id(data, cb.from_user.id) if cb.from_user else None
-        if peer:
-            try:
-                await bot.send_message(peer, text, reply_markup=main_menu())
-            except Exception:
-                pass
+    if data and cb.from_user:
+        peer = session_service.peer_id(data, cb.from_user.id)
+        try:
+            await bot.send_message(peer, text, reply_markup=main_menu())
+        except Exception:
+            pass
 
 
 @router.callback_query(F.data.startswith("session_praise:"))
@@ -124,35 +151,35 @@ async def praise_session(cb: CallbackQuery) -> None:
     await cb.answer("已记录好评，结束时结算加成")
 
 
-@router.message(F.text | F.photo | F.video | F.document | F.voice | F.sticker)
-async def relay_message(message: Message, bot: Bot) -> None:
+@router.message(ActiveSessionFilter(), F.text | F.photo | F.video | F.document | F.voice | F.sticker)
+async def relay_message(message: Message, bot: Bot, active_session: dict) -> None:
+    """仅活跃会话中转。"""
     user = message.from_user
     if not user:
         return
-    if message.text in {
-        "🔍 搜索灯笼", "🌕 我的月影", "✨ 点亮灯笼", "📝 月影报告", "🌸 兰花信用", "❓ 帮助", "取消"
-    }:
-        return
 
-    sess = await session_service.get_active_for_user(user.id)
-    if not sess:
-        return
-
+    sess = active_session
     peer = session_service.peer_id(sess, user.id)
     name = session_service.anon_name(sess, user.id)
     media = bool(message.photo or message.video or message.document or message.voice)
     await session_service.bump_activity(sess["session_id"], media=media)
 
-    prefix = f"👤 **{name}**：\n"
+    prefix = f"👤 <b>{name}</b>：\n"
     try:
         if message.text:
-            await bot.send_message(peer, prefix + message.text)
+            await bot.send_message(peer, prefix + message.text, parse_mode=None)
         elif message.photo:
-            await bot.send_photo(peer, message.photo[-1].file_id, caption=prefix + (message.caption or ""))
+            await bot.send_photo(
+                peer, message.photo[-1].file_id, caption=(prefix + (message.caption or ""))
+            )
         elif message.video:
-            await bot.send_video(peer, message.video.file_id, caption=prefix + (message.caption or ""))
+            await bot.send_video(
+                peer, message.video.file_id, caption=(prefix + (message.caption or ""))
+            )
         elif message.document:
-            await bot.send_document(peer, message.document.file_id, caption=prefix + (message.caption or ""))
+            await bot.send_document(
+                peer, message.document.file_id, caption=(prefix + (message.caption or ""))
+            )
         elif message.voice:
             await bot.send_voice(peer, message.voice.file_id, caption=prefix)
         elif message.sticker:
