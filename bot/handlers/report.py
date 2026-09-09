@@ -27,7 +27,7 @@ class ReportForm(StatesGroup):
 @router.message(F.text == "📝 月影报告")
 async def report_start(message: Message, state: FSMContext) -> None:
     user = message.from_user
-    if user and not anti_brush.check_report_rate(user.id):
+    if user and not await anti_brush.check_report_rate(user.id):
         await message.answer("报告过于频繁，请稍后再试。")
         return
     await state.set_state(ReportForm.lamp_id)
