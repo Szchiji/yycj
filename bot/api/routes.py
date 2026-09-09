@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -16,10 +18,14 @@ from bot.db import session_scope
 from bot.models import Post, PostStatus, Report, ReportStatus
 from bot.services import anti_brush, credit_service, search_service, session_service
 from bot.services import admin_ops
+from bot.services.admin_ops import AdminActionError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["api"])
+
+# Telegram file_id 常见字符；亦接受 tg:file_id: 前缀
+_FILE_ID_RE = re.compile(r"^(?:tg:file_id:)?[A-Za-z0-9_\-]{10,256}$")
 
 
 # ---------- schemas ----------
@@ -42,6 +48,7 @@ class PostCreateBody(BaseModel):
     price_text: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     description: str = ""
+    # 公网 https 图片 URL，和/或 Telegram file_id 字符串（WebApp 难以直传二进制时的折中）
     photos: List[str] = Field(default_factory=list)
 
 
@@ -79,6 +86,49 @@ def _ser_lamp(lamp: Dict[str, Any]) -> Dict[str, Any]:
     # Mini App 不暴露主人真实 ID
     out.pop("user_id", None)
     return out
+
+
+def _normalize_photos(raw: List[str] | None) -> List[str]:
+    """
+    规范化投稿图片字段（写入 Lamp.photos JSONB）。
+
+    接受：
+    - 公网 http(s) URL
+    - Telegram file_id（或 tg:file_id:<id>）
+
+    不接受：data:base64（体积过大）、本地路径。
+    WebApp 真·相册上传仍受限；完整 file_id 推荐走 Bot FSM 投稿。
+    """
+    out: List[str] = []
+    for item in raw or []:
+        s = (item or "").strip()
+        if not s:
+            continue
+        if s.lower().startswith("data:"):
+            raise HTTPException(status_code=400, detail="不支持 base64 内嵌图片，请用公网 URL 或 file_id")
+        if s.startswith("http://") or s.startswith("https://"):
+            parsed = urlparse(s)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise HTTPException(status_code=400, detail=f"无效图片 URL：{s[:64]}")
+            if len(s) > 1024:
+                raise HTTPException(status_code=400, detail="图片 URL 过长")
+            out.append(s)
+            continue
+        if _FILE_ID_RE.match(s):
+            # 统一存原始 file_id（去掉可选前缀）
+            fid = s.split(":", 2)[-1] if s.lower().startswith("tg:file_id:") else s
+            out.append(fid)
+            continue
+        raise HTTPException(
+            status_code=400,
+            detail="photos 仅支持 https URL 或 Telegram file_id（可用 tg:file_id: 前缀）",
+        )
+    return out[:3]
+
+
+def _admin_http_error(exc: AdminActionError) -> HTTPException:
+    code = 404 if exc.code == "not_found" else 409
+    return HTTPException(status_code=code, detail=str(exc))
 
 
 # ---------- auth / me ----------
@@ -229,6 +279,8 @@ async def api_create_post(
     if desc and await anti_brush.text_too_similar(user_id, desc):
         raise HTTPException(status_code=400, detail="内容与近期投稿过于相似")
 
+    photos = _normalize_photos(body.photos)
+
     lamp_data = {
         "city": (body.city or "").strip()[:32] or "未知",
         "title": (body.title or "").strip()[:64] or "未命名",
@@ -236,7 +288,7 @@ async def api_create_post(
         "price": body.price,
         "price_text": (body.price_text or (str(body.price) if body.price else "面议"))[:32],
         "description": desc[:2000],
-        "photos": list(body.photos or [])[:3],
+        "photos": photos,
     }
     post_id = str(uuid.uuid4())
     async with session_scope() as s:
@@ -254,6 +306,7 @@ async def api_create_post(
         from bot.main import bot
         from bot.keyboards import admin_post_kb
 
+        photo_hint = f"\n图片：{len(photos)} 张" if photos else "\n图片：无（可用 Bot 补传）"
         card = (
             f"🆕 新投稿（Mini App） <code>{post_id[:8]}</code>\n"
             f"用户：{user_id}\n"
@@ -261,6 +314,7 @@ async def api_create_post(
             f"标题：{lamp_data['title']}\n"
             f"价位：{lamp_data.get('price_text')}\n"
             f"{(lamp_data.get('description') or '')[:300]}"
+            f"{photo_hint}"
         )
         for admin_id in get_settings().admin_id_list:
             try:
@@ -270,7 +324,7 @@ async def api_create_post(
     except Exception:
         logger.exception("notify admins of post failed")
 
-    return {"ok": True, "post_id": post_id, "status": PostStatus.PENDING.value}
+    return {"ok": True, "post_id": post_id, "status": PostStatus.PENDING.value, "photos": photos}
 
 
 @router.post("/reports")
@@ -334,6 +388,32 @@ async def api_admin_pending_posts(
     return {"ok": True, "items": items}
 
 
+@router.post("/admin/posts/{post_id}/approve")
+async def api_admin_approve_post(
+    post_id: str,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    try:
+        result = await admin_ops.approve_post(post_id, notify=True)
+    except AdminActionError as exc:
+        raise _admin_http_error(exc) from exc
+    result["reviewed_by"] = admin_id
+    return result
+
+
+@router.post("/admin/posts/{post_id}/reject")
+async def api_admin_reject_post(
+    post_id: str,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    try:
+        result = await admin_ops.reject_post(post_id, notify=True)
+    except AdminActionError as exc:
+        raise _admin_http_error(exc) from exc
+    result["reviewed_by"] = admin_id
+    return result
+
+
 @router.get("/admin/reports/pending")
 async def api_admin_pending_reports(
     limit: int = Query(default=50, ge=1, le=200),
@@ -343,6 +423,32 @@ async def api_admin_pending_reports(
     for it in items:
         it["created_at"] = _ser_dt(it.get("created_at"))
     return {"ok": True, "items": items}
+
+
+@router.post("/admin/reports/{report_id}/accept")
+async def api_admin_accept_report(
+    report_id: str,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    try:
+        result = await admin_ops.accept_report(report_id, notify=True)
+    except AdminActionError as exc:
+        raise _admin_http_error(exc) from exc
+    result["reviewed_by"] = admin_id
+    return result
+
+
+@router.post("/admin/reports/{report_id}/reject")
+async def api_admin_reject_report(
+    report_id: str,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    try:
+        result = await admin_ops.reject_report(report_id, notify=True)
+    except AdminActionError as exc:
+        raise _admin_http_error(exc) from exc
+    result["reviewed_by"] = admin_id
+    return result
 
 
 @router.post("/admin/credit/adjust")
@@ -372,3 +478,22 @@ async def api_admin_shadow_list(
 ) -> Dict[str, Any]:
     items = await admin_ops.list_shadowed_users(limit=limit)
     return {"ok": True, "items": [_ser_user(x) for x in items]}
+
+
+@router.get("/admin/sessions/{session_id}/messages")
+async def api_admin_session_messages(
+    session_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    _: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    sess = await session_service.get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    msgs = await session_service.list_messages_for_admin(session_id, limit=limit)
+    for m in msgs:
+        m["created_at"] = _ser_dt(m.get("created_at"))
+    out_sess = dict(sess)
+    for k in ("created_at", "expire_at", "last_activity", "ended_at", "messages_purge_at"):
+        if k in out_sess:
+            out_sess[k] = _ser_dt(out_sess.get(k))
+    return {"ok": True, "session": out_sess, "messages": msgs, "count": len(msgs)}
