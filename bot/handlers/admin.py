@@ -30,7 +30,9 @@ async def admin_help(message: Message) -> None:
         "管理员命令：\n"
         "审核通过投稿/报告请直接点通知按钮。\n"
         "/admin — 本帮助\n"
-        "/session_messages <session_id> — 查看会话落库消息（ADMIN_IDS）"
+        "/session_messages <session_id> — 查看会话落库消息（ADMIN_IDS）\n"
+        "HTTP：/api/admin/posts/pending · /api/admin/reports/pending · "
+        "/api/admin/credit/adjust · /api/admin/shadow"
     )
 
 
@@ -103,7 +105,13 @@ async def post_ok(cb: CallbackQuery, bot: Bot) -> None:
         authenticity_score=80,
     )
     await search_service.approve_lamp(lamp["lamp_id"])
-    await credit_service.settle_lanhua(user_id, 15, "post_approved", "灯笼审核通过", post_id)
+    await credit_service.settle_lanhua(
+        user_id,
+        credit_service.DELTA_POST_APPROVED,
+        "post_approved",
+        "灯笼审核通过",
+        post_id,
+    )
     await cb.answer("已通过")
     if cb.message:
         await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已通过上架")
@@ -158,16 +166,26 @@ async def report_ok(cb: CallbackQuery, bot: Bot) -> None:
     if lamp:
         await search_service.reject_lamp(lamp_id)
         await credit_service.settle_lanhua(
-            lamp["user_id"], -30, "report_accepted", "报告成立，灯笼下架", report_id
+            lamp["user_id"],
+            credit_service.DELTA_REPORT_VALID_TARGET,
+            "report_accepted",
+            "报告成立，灯笼下架",
+            report_id,
         )
-    await credit_service.settle_lanhua(reporter_id, 10, "report_reward", "有效报告奖励", report_id)
+    await credit_service.settle_lanhua(
+        reporter_id,
+        credit_service.DELTA_REPORT_VALID_REPORTER,
+        "report_reward",
+        "有效报告奖励",
+        report_id,
+    )
     await cb.answer("已采纳")
     if cb.message:
         await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已采纳并处理")
 
 
 @router.callback_query(F.data.startswith("admin_report_no:"))
-async def report_no(cb: CallbackQuery) -> None:
+async def report_no(cb: CallbackQuery, bot: Bot) -> None:
     if not cb.from_user or not _is_admin(cb.from_user.id) or not cb.data:
         await cb.answer("无权限", show_alert=True)
         return
@@ -180,6 +198,23 @@ async def report_no(cb: CallbackQuery) -> None:
             return
         rep.status = ReportStatus.REJECTED.value
         rep.reviewed_at = datetime.utcnow()
+        reporter_id = rep.reporter_id
+
+    # 驳回视为无效/恶意报告：扣举报人信用并记流水
+    await credit_service.settle_lanhua(
+        reporter_id,
+        credit_service.DELTA_MALICIOUS_REPORT,
+        "report_rejected",
+        "无效或恶意报告驳回",
+        report_id,
+    )
     await cb.answer("已驳回")
     if cb.message:
-        await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已驳回")
+        await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已驳回（举报人信用已结算）")
+    try:
+        await bot.send_message(
+            reporter_id,
+            f"你的月影报告未通过审核，兰花分变动：{credit_service.DELTA_MALICIOUS_REPORT:+d}",
+        )
+    except Exception:
+        pass
