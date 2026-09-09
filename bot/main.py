@@ -1,4 +1,4 @@
-"""月影车姬入口：Webhook（FastAPI）+ 可选本地 polling。"""
+"""月影车姬入口：Webhook（FastAPI）+ Mini App API/静态 + 可选本地 polling。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -15,8 +16,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
+from bot.api import api_router
 from bot.config import get_settings
 from bot.db import close_db, connect_db
 from bot.handlers import register_handlers
@@ -42,6 +45,8 @@ scheduler = AsyncIOScheduler()
 
 _ready = False
 _startup_error: str | None = None
+
+MINIAPP_DIR = Path(__file__).resolve().parent.parent / "miniapp"
 
 
 async def job_expire_sessions() -> None:
@@ -125,6 +130,11 @@ async def _startup() -> None:
         else:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
 
+        if settings.webapp_url:
+            logger.info("WEBAPP_URL=%s", settings.webapp_url)
+        if MINIAPP_DIR.is_dir():
+            logger.info("Mini App static: %s -> /app", MINIAPP_DIR)
+
         _ready = True
         _startup_error = None
     except Exception as exc:
@@ -156,6 +166,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="月影车姬", lifespan=lifespan)
+app.include_router(api_router)
 
 
 @app.get("/")
@@ -165,6 +176,7 @@ async def root() -> dict:
         "service": "yueying-cheji",
         "ready": _ready,
         "mode": "webhook" if settings.use_webhook else "idle",
+        "miniapp": "/app" if MINIAPP_DIR.is_dir() else None,
         "error": _startup_error,
     }
 
@@ -172,6 +184,14 @@ async def root() -> dict:
 @app.get("/health")
 async def healthz() -> PlainTextResponse:
     return PlainTextResponse("ok")
+
+
+@app.get("/app")
+async def miniapp_redirect():
+    """无尾斜杠时跳到 /app/，由 StaticFiles(html=True) 提供 index.html。"""
+    if not MINIAPP_DIR.is_dir():
+        raise HTTPException(status_code=404, detail="miniapp missing")
+    return RedirectResponse(url="/app/")
 
 
 @app.post(settings.webhook_path or "/webhook")
@@ -187,6 +207,15 @@ async def telegram_webhook(
     update = Update.model_validate(data, context={"bot": bot})
     await dp.feed_update(bot, update)
     return JSONResponse({"ok": True})
+
+
+# 静态资源（js/css/admin.html）；html=True 让子路径也可回落
+if MINIAPP_DIR.is_dir():
+    app.mount(
+        "/app",
+        StaticFiles(directory=str(MINIAPP_DIR), html=True),
+        name="miniapp",
+    )
 
 
 async def run_polling() -> None:
