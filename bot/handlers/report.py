@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -14,7 +13,7 @@ from bot.config import get_settings
 from bot.db import session_scope
 from bot.keyboards import admin_report_kb, cancel_kb, main_menu
 from bot.models import Report, ReportStatus
-from bot.services import anti_brush, credit_service, search_service
+from bot.services import anti_brush, search_service
 
 router = Router(name="report")
 
@@ -33,8 +32,7 @@ async def report_start(message: Message, state: FSMContext) -> None:
         return
     await state.set_state(ReportForm.lamp_id)
     await message.answer(
-        "请输入要报告的灯笼 ID（卡片下方会话按钮关联的 id，或完整 UUID）：\n"
-        "也可从灯笼卡片点「举报」。",
+        "请输入要报告的灯笼 ID（卡片下方的 UUID，或点灯笼「举报」）：",
         reply_markup=cancel_kb(),
     )
 
@@ -49,26 +47,26 @@ async def report_from_card(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer()
     if cb.message:
         await cb.message.answer(
-            "请选择/输入原因（如：虚假信息、盗图、态度恶劣、其他）：",
+            "请输入原因（如：虚假信息、盗图、态度恶劣、其他）：",
             reply_markup=cancel_kb(),
         )
 
 
-@router.message(ReportForm.lamp_id)
+@router.message(ReportForm.lamp_id, F.text)
 async def report_lamp_id(message: Message, state: FSMContext) -> None:
     await state.update_data(lamp_id=(message.text or "").strip())
     await state.set_state(ReportForm.reason)
     await message.answer("请输入原因（如：虚假信息、盗图、态度恶劣）：")
 
 
-@router.message(ReportForm.reason)
+@router.message(ReportForm.reason, F.text)
 async def report_reason(message: Message, state: FSMContext) -> None:
     await state.update_data(reason=(message.text or "").strip()[:64])
     await state.set_state(ReportForm.description)
     await message.answer("请补充说明（可附细节，发送「无」跳过）：")
 
 
-@router.message(ReportForm.description)
+@router.message(ReportForm.description, F.text)
 async def report_done(message: Message, state: FSMContext, bot: Bot) -> None:
     data = await state.get_data()
     await state.clear()
@@ -98,8 +96,8 @@ async def report_done(message: Message, state: FSMContext, bot: Bot) -> None:
     settings = get_settings()
     title = (lamp or {}).get("title") if lamp else "-"
     card = (
-        f"⚠️ 新报告 `{report_id[:8]}`\n"
-        f"灯笼：{lamp_id[:8]}… {title}\n"
+        f"⚠️ 新报告 <code>{report_id[:8]}</code>\n"
+        f"灯笼：<code>{lamp_id[:8]}</code>… {title}\n"
         f"举报人：{user.id}\n"
         f"原因：{data.get('reason')}\n"
         f"{desc[:300]}"

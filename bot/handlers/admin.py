@@ -66,7 +66,7 @@ async def post_ok(cb: CallbackQuery, bot: Bot) -> None:
     if cb.message:
         await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已通过上架")
     try:
-        await bot.send_message(user_id, f"你的灯笼 **{lamp['title']}** 已通过审核并上架。")
+        await bot.send_message(user_id, f"你的灯笼 <b>{lamp['title']}</b> 已通过审核并上架。")
     except Exception:
         pass
 
