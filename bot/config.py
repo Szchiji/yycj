@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,6 +21,12 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/yueying"
 
+    # Redis（可选；未设置时防刷回退内存并打警告日志）
+    redis_url: str = ""
+
+    # 会话消息保留小时数（结束后再过这么久才清理正文/行）
+    message_retention_hours: int = 24
+
     webhook_host: str = ""
     webhook_path: str = "/webhook"
     webhook_secret: str = ""
@@ -31,12 +37,30 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     port: int = 8080
 
-    @field_validator("bot_token", "webhook_secret", "webhook_host", "database_url", mode="before")
+    @field_validator(
+        "bot_token",
+        "webhook_secret",
+        "webhook_host",
+        "database_url",
+        "redis_url",
+        mode="before",
+    )
     @classmethod
     def strip_str(cls, v):
         if v is None:
             return ""
         return str(v).strip()
+
+    @field_validator("message_retention_hours", mode="before")
+    @classmethod
+    def coerce_retention(cls, v):
+        if v is None or v == "":
+            return 24
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return 24
+        return max(1, n)
 
     @property
     def admin_id_list(self) -> List[int]:
@@ -70,6 +94,10 @@ class Settings(BaseSettings):
         if url.startswith("postgresql://") and "+asyncpg" not in url:
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
+
+    def normalized_redis_url(self) -> Optional[str]:
+        url = (self.redis_url or "").strip()
+        return url or None
 
 
 @lru_cache
