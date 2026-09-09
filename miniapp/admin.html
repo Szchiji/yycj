@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬 · 管理</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css" />
+  <script src="./telegram-web-app.js"></script>
+  <!-- CDN fallback if local SDK missing: https://telegram.org/js/telegram-web-app.js -->
+  <link rel="stylesheet" href="./styles.css?v=20260910" />
 </head>
 <body>
   <header class="topbar">
@@ -78,6 +79,6 @@
       </section>
     </div>
   </main>
-  <script src="./admin.js"></script>
+  <script src="./admin.js?v=20260910"></script>
 </body>
 </html>
