@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from bot.db import session_scope
 from bot.models import CreditHistory, CreditTier, User, tier_from_score
@@ -163,8 +163,8 @@ def format_credit_card(user: Dict[str, Any]) -> str:
     tier = user.get("tier", "新月")
     shadowed = user.get("is_shadowed")
     lines = [
-        f"🌸 **兰花令 · {tier}**",
-        f"信用分：`{score}` / 1000",
+        f"🌸 <b>兰花令 · {tier}</b>",
+        f"信用分：<code>{score}</code> / 1000",
         f"累计获得：{user.get('total_earned', 0)}  ·  累计扣除：{user.get('total_deducted', 0)}",
     ]
     if shadowed:

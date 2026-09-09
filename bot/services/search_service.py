@@ -177,11 +177,14 @@ def format_lamp_card(lamp: Dict[str, Any]) -> str:
     tags = " · ".join(lamp.get("tags") or []) or "无标签"
     price = lamp.get("price_text") or (str(lamp.get("price")) if lamp.get("price") else "面议")
     auth = lamp.get("authenticity_score", 80)
+    title = lamp.get("title") or "未命名灯笼"
+    city = lamp.get("city") or "未知"
     lines = [
-        f"🌕 **{lamp.get('title', '未命名灯笼')}**",
-        f"📍 {lamp.get('city', '未知')}  |  💰 {price}",
+        f"🌕 <b>{title}</b>",
+        f"📍 {city}  |  💰 {price}",
         f"🏷 {tags}",
         f"✅ 真实度 {auth}%",
+        f"<code>{lamp.get('lamp_id', '')}</code>",
     ]
     desc = (lamp.get("description") or "").strip()
     if desc:
