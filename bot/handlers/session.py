@@ -19,24 +19,24 @@ router = Router(name="session")
 # Old + new reply-keyboard labels so menu taps never hit the DB filter.
 MENU_TEXTS = {
     # search
-    "\U0001f50d 搜索灯笼",
-    "\U0001f50d 搜索",
+    "🔍 搜索灯笼",
+    "🔍 搜索",
     # mine
-    "\U0001f315 我的月影",
-    "\U0001f315 我的",
+    "🌕 我的月影",
+    "🌕 我的",
     # publish
     "✨ 点亮灯笼",
     "✨ 发布",
     # report
-    "\U0001f4dd 月影报告",
-    "\U0001f4dd 报告",
+    "📝 月影报告",
+    "📝 报告",
     # credit / reputation
-    "\U0001f338 兰花信用",
-    "\U0001f338 口碑",
+    "🌸 兰花信用",
+    "🌸 口碑",
     # help
     "❓ 帮助",
     # homepage webapp button variants
-    "\U0001f4f1 打开首页",
+    "📱 打开首页",
     "打开首页",
     # cancel
     "取消",
@@ -97,7 +97,7 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     try:
         await bot.send_message(
             lamp["user_id"],
-            f"\U0001f315 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
+            f"🌕 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
             f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
             reply_markup=session_accept_kb(sess["session_id"]),
         )
@@ -120,7 +120,7 @@ async def accept_session(cb: CallbackQuery, bot: Bot) -> None:
         return
     await cb.answer("已接受")
     text = (
-        "\U0001f315 月影会话已开启。\n"
+        "🌕 月影会话已开启。\n"
         "直接在此对话框发消息即可匿名中转。\n"
         "可用按钮结束会话或好评。"
     )
@@ -158,7 +158,7 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
     delta = (data or {}).get("settle_delta", 0)
-    text = f"\U0001f51a 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
+    text = f"🔚 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
     if cb.message:
         await cb.message.answer(text, reply_markup=main_menu())
     if data and cb.from_user:
@@ -238,7 +238,7 @@ async def relay_message(message: Message, bot: Bot, active_session: dict) -> Non
             file_id=message.sticker.file_id,
         )
 
-    prefix = f"\U0001f464 <b>{name}</b>：\n"
+    prefix = f"👤 <b>{name}</b>：\n"
     try:
         if message.text:
             await bot.send_message(peer, prefix + message.text, parse_mode=None)
