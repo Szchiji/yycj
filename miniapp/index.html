@@ -78,7 +78,12 @@
         <div class="card">
           <h3>我的身份</h3>
           <p class="muted hint">浏览默认是客人；发布时再选老师/商家。</p>
+          <label>聊天代称（仅会话显示，不公开账号）</label>
           <div class="row">
+            <input id="guestNick" maxlength="16" placeholder="例如：小明" style="flex:1;margin:0" />
+            <button class="btn" id="btnSaveNick" type="button">保存</button>
+          </div>
+          <div class="row" style="margin-top:8px">
             <button class="btn" data-switch="guest" type="button">客人</button>
             <button class="btn" data-switch="teacher" type="button">老师</button>
             <button class="btn" data-switch="merchant" type="button">商家</button>
