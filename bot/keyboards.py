@@ -16,7 +16,7 @@ from bot.config import get_settings
 
 def main_menu() -> ReplyKeyboardMarkup:
     b = ReplyKeyboardBuilder()
-    webapp = (get_settings().webapp_url or "").strip()
+    webapp = get_settings().normalized_webapp_url
     if webapp:
         b.row(
             KeyboardButton(
@@ -28,6 +28,24 @@ def main_menu() -> ReplyKeyboardMarkup:
     b.row(KeyboardButton(text="✨ 发布"), KeyboardButton(text="📝 报告"))
     b.row(KeyboardButton(text="🌸 口碑"), KeyboardButton(text="❓ 帮助"))
     return b.as_markup(resize_keyboard=True)
+
+
+def admin_webapp_kb() -> InlineKeyboardMarkup | None:
+    """Inline WebApp button to admin.html (admins only)."""
+    webapp = get_settings().normalized_webapp_url
+    if not webapp:
+        return None
+    admin_url = f"{webapp}admin.html"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🛠 管理后台",
+                    web_app=WebAppInfo(url=admin_url),
+                )
+            ]
+        ]
+    )
 
 
 def search_filters_kb() -> InlineKeyboardMarkup:

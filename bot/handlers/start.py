@@ -7,7 +7,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from bot.config import get_settings
-from bot.keyboards import main_menu
+from bot.keyboards import admin_webapp_kb, main_menu
 from bot.services import credit_service
 
 router = Router(name="start")
@@ -16,14 +16,12 @@ HELP_TEXT = """🌕 <b>月影车姬</b>
 月下寻花，影中见真
 
 <b>功能</b>
-• 📱 打开首页 — 进入新版 Mini App（推荐）
+• 点左下角「首页」或键盘「📱 打开首页」— 进入 Mini App（推荐）
 • 🔍 搜索 — 城市 / 价位 / 关键词
 • ✨ 发布 — 投稿，管理员审核后上架
 • 💬 月影会话 — 匿名中转，结束后结算兰花分
 • 📝 报告 — 异常反馈
 • 🌸 口碑 — 等级与遮蔽状态
-
-点「打开首页」进入新版 Mini App。
 
 发送城市或关键词即可直接搜索，例如：
 <code>台北 大学生</code> / <code>深圳 5000</code>
@@ -40,14 +38,23 @@ async def cmd_start(message: Message) -> None:
         username=user.username,
         full_name=user.full_name,
     )
+    settings = get_settings()
     extra = ""
-    if (get_settings().webapp_url or "").strip():
-        extra = "\n请点主菜单 <b>打开首页</b> 进入新版 Mini App。"
+    if settings.normalized_webapp_url:
+        extra = (
+            "\n请点左下角「首页」或键盘「📱 打开首页」进入 Mini App。"
+        )
     await message.answer(
         "欢迎来到 <b>月影车姬</b> 🌕\n月下寻花，影中见真。\n\n"
         f"请选择功能，或直接发送搜索词。{extra}",
         reply_markup=main_menu(),
     )
+    if settings.is_admin(user.id):
+        kb = admin_webapp_kb()
+        await message.answer(
+            "🛠 管理员：点下方「管理后台」打开控制台，或发送 /admin。",
+            reply_markup=kb,
+        )
 
 
 @router.message(Command("help"))
