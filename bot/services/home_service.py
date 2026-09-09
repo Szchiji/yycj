@@ -12,6 +12,7 @@ from sqlalchemy import and_, or_, select
 from bot.db import session_scope
 from bot.models import HomepagePin, Lamp, LampStatus, Review, ReviewStatus, SiteSettings
 from bot.services import search_service
+from bot.services import home_feed
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +33,17 @@ SCORING_RULES = {
 
 def _settings_to_dict(row: SiteSettings) -> Dict[str, Any]:
     cities = list(row.enabled_cities or []) or list(DEFAULT_CITIES)
+    ops = home_feed.merge_ops(getattr(row, "ops_config", None) or {})
     return {
         "announcement_text": row.announcement_text or "",
         "announcement_enabled": bool(row.announcement_enabled),
         "enabled_cities": cities,
+        "ops": ops,
+        "home_feed_page_size": ops["home_feed_page_size"],
+        "chat_cta_label": ops["chat_cta_label"],
+        "bot_welcome_text": ops["bot_welcome_text"],
+        "media_max_count": ops["media_max_count"],
+        "review_require_audit": ops["review_require_audit"],
         "updated_at": row.updated_at,
     }
 
@@ -61,6 +69,7 @@ async def update_settings(
     announcement_text: Optional[str] = None,
     announcement_enabled: Optional[bool] = None,
     enabled_cities: Optional[List[str]] = None,
+    ops_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     async with session_scope() as s:
         res = await s.execute(select(SiteSettings).where(SiteSettings.key == SETTINGS_KEY))
@@ -76,6 +85,9 @@ async def update_settings(
         if enabled_cities is not None:
             cleaned = [c.strip()[:32] for c in enabled_cities if (c or "").strip()]
             row.enabled_cities = cleaned[:50] or list(DEFAULT_CITIES)
+        if ops_config is not None:
+            merged = home_feed.merge_ops({**(getattr(row, "ops_config", None) or {}), **ops_config})
+            row.ops_config = merged
         row.updated_at = datetime.utcnow()
         await s.flush()
         return _settings_to_dict(row)
@@ -113,7 +125,7 @@ async def list_all_pins() -> List[Dict[str, Any]]:
 async def add_pin(lamp_id: str, *, sort_order: int = 0, expires_at: Optional[datetime] = None, expires_hours: Optional[int] = None, created_by: Optional[int] = None) -> Dict[str, Any]:
     lamp = await search_service.get_lamp(lamp_id)
     if not lamp:
-        raise ValueError("灯笼不存在")
+        raise ValueError("资料不存在")
     if expires_hours is not None and expires_at is None:
         expires_at = datetime.utcnow() + timedelta(hours=max(1, int(expires_hours)))
     async with session_scope() as s:
@@ -239,3 +251,10 @@ async def seed_demo_if_empty() -> Dict[str, Any]:
         await add_pin(created[0], sort_order=0, expires_hours=72 * 24, created_by=0)
     logger.info("Seeded %s demo lamps for 月影车姬", len(created))
     return {"seeded": True, "lamp_ids": created}
+
+
+# 卡片置顶 / 运营配置（委托 home_feed）
+set_feed_pin = home_feed.set_feed_pin
+list_feed_pins = home_feed.list_feed_pins
+list_approved_lamps_brief = home_feed.list_approved_lamps_brief
+DEFAULT_OPS = home_feed.DEFAULT_OPS
