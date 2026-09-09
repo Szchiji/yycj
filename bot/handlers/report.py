@@ -24,7 +24,7 @@ class ReportForm(StatesGroup):
     description = State()
 
 
-@router.message(F.text == "📝 月影报告")
+@router.message(F.text.in_({"📝 月影报告", "📝 报告"}))
 async def report_start(message: Message, state: FSMContext) -> None:
     user = message.from_user
     if user and not await anti_brush.check_report_rate(user.id):
