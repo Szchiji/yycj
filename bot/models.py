@@ -122,7 +122,7 @@ class Session(Base):
     lamp_id: Mapped[str] = mapped_column(String(36), index=True)
     user_a_id: Mapped[int] = mapped_column(BigInteger, index=True)
     user_b_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    anonymous_a: Mapped[str] = mapped_column(String(32, default="月影人 A"))
+    anonymous_a: Mapped[str] = mapped_column(String(32), default="月影人 A")
     anonymous_b: Mapped[str] = mapped_column(String(32), default="月影人 B")
     status: Mapped[str] = mapped_column(String(16), default=SessionStatus.PENDING.value, index=True)
     message_count: Mapped[int] = mapped_column(Integer, default=0)
