@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -14,8 +13,7 @@ from bot.config import get_settings
 from bot.db import session_scope
 from bot.keyboards import admin_post_kb, cancel_kb, main_menu
 from bot.models import Post, PostStatus
-from bot.services import anti_brush, credit_service, search_service
-from sqlalchemy import select
+from bot.services import anti_brush, credit_service
 
 router = Router(name="post")
 
@@ -45,27 +43,32 @@ async def post_start(message: Message, state: FSMContext) -> None:
     await message.answer("请输入城市（如：台北、深圳、香港）：", reply_markup=cancel_kb())
 
 
-@router.message(F.text == "取消")
-async def cancel_any(message: Message, state: FSMContext) -> None:
+@router.message(PostForm.city, F.text == "取消")
+@router.message(PostForm.title, F.text == "取消")
+@router.message(PostForm.price, F.text == "取消")
+@router.message(PostForm.tags, F.text == "取消")
+@router.message(PostForm.description, F.text == "取消")
+@router.message(PostForm.photos, F.text == "取消")
+async def cancel_post(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer("已取消。", reply_markup=main_menu())
 
 
-@router.message(PostForm.city)
+@router.message(PostForm.city, F.text)
 async def post_city(message: Message, state: FSMContext) -> None:
     await state.update_data(city=(message.text or "").strip()[:32])
     await state.set_state(PostForm.title)
     await message.answer("请输入标题 / 花名：")
 
 
-@router.message(PostForm.title)
+@router.message(PostForm.title, F.text)
 async def post_title(message: Message, state: FSMContext) -> None:
     await state.update_data(title=(message.text or "").strip()[:64])
     await state.set_state(PostForm.price)
     await message.answer("请输入价位（数字或文字，如 6000 / 面议）：")
 
 
-@router.message(PostForm.price)
+@router.message(PostForm.price, F.text)
 async def post_price(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     digits = "".join(c for c in text if c.isdigit())
@@ -75,7 +78,7 @@ async def post_price(message: Message, state: FSMContext) -> None:
     await message.answer("请输入标签，空格分隔（如：大学生 KH 真实照）：")
 
 
-@router.message(PostForm.tags)
+@router.message(PostForm.tags, F.text)
 async def post_tags(message: Message, state: FSMContext) -> None:
     tags = [t for t in (message.text or "").replace("，", " ").split() if t][:12]
     await state.update_data(tags=tags)
@@ -83,7 +86,7 @@ async def post_tags(message: Message, state: FSMContext) -> None:
     await message.answer("请输入简介描述：")
 
 
-@router.message(PostForm.description)
+@router.message(PostForm.description, F.text)
 async def post_desc(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
     if message.from_user and anti_brush.text_too_similar(message.from_user.id, text):
@@ -145,13 +148,13 @@ async def post_photos_done(message: Message, state: FSMContext, bot: Bot) -> Non
 
     settings = get_settings()
     card = (
-        f"🆕 新投稿 `{post_id[:8]}`\n"
+        f"🆕 新投稿 <code>{post_id[:8]}</code>\n"
         f"用户：{user.id} @{user.username or '-'}\n"
         f"城市：{lamp_data['city']}\n"
         f"标题：{lamp_data['title']}\n"
         f"价位：{lamp_data.get('price_text')}\n"
         f"标签：{' '.join(lamp_data.get('tags') or [])}\n"
-        f"{lamp_data.get('description', '')[:300]}"
+        f"{(lamp_data.get('description') or '')[:300]}"
     )
     for admin_id in settings.admin_id_list:
         try:
