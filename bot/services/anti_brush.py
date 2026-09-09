@@ -1,91 +1,70 @@
-"""防刷：频率限制、文本重复检测。"""
+"""简易防刷：频率限制 + 文本相似度。"""
 
 from __future__ import annotations
 
-import hashlib
+import re
 import time
-from collections import defaultdict
-from typing import Dict, Tuple
+from collections import defaultdict, deque
+from typing import Deque, Dict, Tuple
 
-_post_times: Dict[int, list] = defaultdict(list)
-_report_times: Dict[int, list] = defaultdict(list)
-_session_times: Dict[int, list] = defaultdict(list)
-_text_hashes: Dict[str, float] = {}
+# 内存级滑动窗口（单进程 webhook 足够；多实例可换 Redis）
+_hits: Dict[str, Deque[float]] = defaultdict(deque)
+_recent_text: Dict[int, Deque[str]] = defaultdict(lambda: deque(maxlen=20))
 
 
-def _prune(times: list, window_sec: int) -> list:
+def _prune(q: Deque[float], window: float) -> None:
     now = time.time()
-    return [t for t in times if now - t < window_sec]
+    while q and now - q[0] > window:
+        q.popleft()
 
 
-def can_post(user_id: int, score: int, window_sec: int = 86400) -> Tuple[bool, str]:
-    times = _prune(_post_times[user_id], window_sec)
-    _post_times[user_id] = times
-    limit = 2 if score < 400 else 5
-    if len(times) >= limit:
-        return False, f"今日投稿已达上限（{limit} 条），请明日再来。"
-    return True, ""
+def allow(key: str, limit: int, window_sec: float) -> bool:
+    q = _hits[key]
+    _prune(q, window_sec)
+    if len(q) >= limit:
+        return False
+    q.append(time.time())
+    return True
 
 
-def record_post(user_id: int) -> None:
-    _post_times[user_id].append(time.time())
+def check_post_rate(user_id: int) -> bool:
+    return allow(f"post:{user_id}", limit=3, window_sec=3600)
 
 
-def can_report(user_id: int, window_sec: int = 21600) -> Tuple[bool, str]:
-    times = _prune(_report_times[user_id], window_sec)
-    _report_times[user_id] = times
-    if len(times) >= 3:
-        return False, "报告过于频繁，请 6 小时后再试。"
-    return True, ""
+def check_report_rate(user_id: int) -> bool:
+    return allow(f"report:{user_id}", limit=5, window_sec=3600)
 
 
-def record_report(user_id: int) -> None:
-    _report_times[user_id].append(time.time())
+def check_search_rate(user_id: int) -> bool:
+    return allow(f"search:{user_id}", limit=30, window_sec=60)
 
 
-def can_start_session(user_id: int, score: int, window_sec: int = 86400) -> Tuple[bool, str]:
-    times = _prune(_session_times[user_id], window_sec)
-    _session_times[user_id] = times
-    limit = 2 if score < 500 else 6
-    if len(times) >= limit:
-        return False, f"今日发起会话已达上限（{limit} 场）。"
-    return True, ""
+def check_session_request_rate(user_id: int) -> bool:
+    return allow(f"sessreq:{user_id}", limit=5, window_sec=3600)
 
 
-def record_session(user_id: int) -> None:
-    _session_times[user_id].append(time.time())
+def _normalize(text: str) -> str:
+    t = text.lower().strip()
+    t = re.sub(r"\s+", "", t)
+    return t
 
 
-def text_similarity_hash(text: str) -> str:
-    normalized = "".join(text.lower().split())
-    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+def text_too_similar(user_id: int, text: str, threshold: float = 0.85) -> bool:
+    """字符 bigram Jaccard 近似。"""
+    norm = _normalize(text)
+    if len(norm) < 8:
+        _recent_text[user_id].append(norm)
+        return False
 
+    def grams(s: str) -> set:
+        return {s[i : i + 2] for i in range(len(s) - 1)} or {s}
 
-def is_duplicate_text(text: str, ttl_sec: int = 86400) -> bool:
-    h = text_similarity_hash(text)
-    now = time.time()
-    expired = [k for k, t in _text_hashes.items() if now - t > ttl_sec]
-    for k in expired:
-        del _text_hashes[k]
-    if h in _text_hashes:
-        return True
-    _text_hashes[h] = now
+    g1 = grams(norm)
+    for old in _recent_text[user_id]:
+        g2 = grams(old)
+        inter = len(g1 & g2)
+        union = len(g1 | g2) or 1
+        if inter / union >= threshold:
+            return True
+    _recent_text[user_id].append(norm)
     return False
-
-
-def brush_factor_for_session(
-    user_id: int,
-    duration_minutes: float,
-    message_count: int,
-    score: int,
-) -> float:
-    """返回 0~0.8 的防刷系数 F。"""
-    f = 0.0
-    times = _prune(_session_times[user_id], 86400)
-    if len(times) >= 3:
-        f += 0.3
-    if duration_minutes < 8 and message_count < 8:
-        f += 0.4
-    if score < 300:
-        f += 0.2
-    return min(0.8, f)

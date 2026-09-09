@@ -1,0 +1,134 @@
+"""搜索灯笼（替代原 AI 媒婆）。"""
+
+from __future__ import annotations
+
+from aiogram import F, Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
+
+from bot.keyboards import lamp_actions_kb, main_menu, search_filters_kb
+from bot.services import anti_brush, credit_service, search_service
+
+router = Router(name="search")
+
+
+class SearchState(StatesGroup):
+    waiting_query = State()
+
+
+def _filters_from_data(data: dict) -> dict:
+    return {
+        "city": data.get("city"),
+        "price_min": data.get("price_min"),
+        "price_max": data.get("price_max"),
+    }
+
+
+async def _run_search(message: Message, query: str, filters: dict | None = None) -> None:
+    user = message.from_user
+    if user and not anti_brush.check_search_rate(user.id):
+        await message.answer("搜索太频繁，请稍后再试。")
+        return
+
+    filters = filters or {}
+    lamps = await search_service.search_lamps(
+        keyword=query or None,
+        city=filters.get("city"),
+        price_min=filters.get("price_min"),
+        price_max=filters.get("price_max"),
+        limit=12,
+    )
+    if not lamps:
+        await message.answer(
+            "没有找到符合的灯笼。\n可换关键词，或点下方筛选城市/价位。",
+            reply_markup=search_filters_kb(),
+        )
+        return
+
+    await message.answer(f"🔍 找到 **{len(lamps)}** 盏灯笼：")
+    for lamp in lamps:
+        await message.answer(
+            search_service.format_lamp_card(lamp),
+            reply_markup=lamp_actions_kb(lamp["lamp_id"]),
+        )
+
+
+@router.message(F.text == "🔍 搜索灯笼")
+@router.message(Command("search"))
+async def search_entry(message: Message, state: FSMContext) -> None:
+    await state.set_state(SearchState.waiting_query)
+    await message.answer(
+        "请输入关键词，例如：\n"
+        "• `台北 大学生`\n"
+        "• `深圳 5000`\n"
+        "• `香港 KH`\n\n"
+        "也可先点筛选：",
+        reply_markup=search_filters_kb(),
+    )
+
+
+@router.callback_query(F.data.startswith("search_city:"))
+async def filter_city(cb: CallbackQuery, state: FSMContext) -> None:
+    city = cb.data.split(":", 1)[1]
+    await state.update_data(city=city)
+    await cb.answer(f"已选城市：{city}")
+    if cb.message:
+        await cb.message.answer(f"已筛选城市 **{city}**，请输入关键词或再选价位。")
+
+
+@router.callback_query(F.data.startswith("search_price:"))
+async def filter_price(cb: CallbackQuery, state: FSMContext) -> None:
+    rng = cb.data.split(":", 1)[1]
+    lo, hi = rng.split("-")
+    await state.update_data(price_min=int(lo), price_max=int(hi))
+    await cb.answer(f"价位 {lo}-{hi}")
+    if cb.message:
+        await cb.message.answer(f"已筛选价位 **{lo} ~ {hi}**，请输入关键词继续搜索。")
+
+
+@router.callback_query(F.data == "search_clear")
+async def filter_clear(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await cb.answer("已清除筛选")
+    if cb.message:
+        await cb.message.answer("筛选已清空，请重新输入关键词。", reply_markup=search_filters_kb())
+
+
+@router.message(SearchState.waiting_query, F.text)
+async def search_query(message: Message, state: FSMContext) -> None:
+    if not message.text or message.text in {
+        "🔍 搜索灯笼", "🌕 我的月影", "✨ 点亮灯笼", "📝 月影报告", "🌸 兰花信用", "❓ 帮助", "取消"
+    }:
+        await state.clear()
+        return
+    data = await state.get_data()
+    await _run_search(message, message.text.strip(), _filters_from_data(data))
+    await state.clear()
+
+
+@router.message(F.text.regexp(r".{2,}"))
+async def quick_search(message: Message, state: FSMContext) -> None:
+    """主菜单外的自由文本：若无占用 FSM，当作搜索。"""
+    if not message.text:
+        return
+    if message.text.startswith("/"):
+        return
+    menu = {
+        "🔍 搜索灯笼", "🌕 我的月影", "✨ 点亮灯笼", "📝 月影报告", "🌸 兰花信用", "❓ 帮助", "取消"
+    }
+    if message.text in menu:
+        return
+    current = await state.get_state()
+    if current is not None:
+        return
+    from bot.services import session_service
+
+    user = message.from_user
+    if user:
+        active = await session_service.get_active_for_user(user.id)
+        if active:
+            return
+        await credit_service.ensure_user(user.id, username=user.username, full_name=user.full_name)
+    await _run_search(message, message.text.strip())
