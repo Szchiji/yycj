@@ -13,10 +13,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import Update
+from aiogram.types import MenuButtonWebApp, Update, WebAppInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from bot.api import api_router
@@ -138,8 +138,19 @@ async def _startup() -> None:
         else:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
 
-        if settings.webapp_url:
-            logger.info("WEBAPP_URL=%s", settings.webapp_url)
+        webapp = settings.normalized_webapp_url
+        if webapp:
+            logger.info("WEBAPP_URL=%s (normalized=%s)", settings.webapp_url, webapp)
+            try:
+                await bot.set_chat_menu_button(
+                    menu_button=MenuButtonWebApp(
+                        text="首页",
+                        web_app=WebAppInfo(url=webapp),
+                    )
+                )
+                logger.info("Chat menu button set -> %s", webapp)
+            except Exception:
+                logger.exception("set_chat_menu_button failed")
         if MINIAPP_DIR.is_dir():
             logger.info("Mini App static: %s -> /app", MINIAPP_DIR)
 
@@ -192,10 +203,12 @@ async def healthz() -> PlainTextResponse:
 
 
 @app.get("/app")
-async def miniapp_redirect():
-    if not MINIAPP_DIR.is_dir():
+async def miniapp_index():
+    """Serve index.html at /app with 200 (no 307). Trailing-slash redirect drops Telegram initData."""
+    index = MINIAPP_DIR / "index.html"
+    if not index.is_file():
         raise HTTPException(status_code=404, detail="miniapp missing")
-    return RedirectResponse(url="/app/")
+    return FileResponse(index)
 
 
 @app.post(settings.webhook_path or "/webhook")
@@ -231,6 +244,18 @@ async def run_polling() -> None:
     _schedule_jobs()
     me = await bot.get_me()
     logger.info("Polling mode | Bot @%s", me.username)
+    webapp = settings.normalized_webapp_url
+    if webapp:
+        try:
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="首页",
+                    web_app=WebAppInfo(url=webapp),
+                )
+            )
+            logger.info("Chat menu button set -> %s", webapp)
+        except Exception:
+            logger.exception("set_chat_menu_button failed")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
