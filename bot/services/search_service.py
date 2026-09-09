@@ -46,6 +46,8 @@ def _lamp_to_dict(lamp: Lamp) -> Dict[str, Any]:
         "approx_lng": getattr(lamp, "approx_lng", None),
         "approx_label": getattr(lamp, "approx_label", None),
         "publisher_role": getattr(lamp, "publisher_role", None),
+        "feed_pinned": bool(getattr(lamp, "feed_pinned", False)),
+        "feed_pin_order": int(getattr(lamp, "feed_pin_order", 0) or 0),
         "authenticity_score": lamp.authenticity_score,
         "credit_boost": lamp.credit_boost,
         "status": lamp.status,
@@ -133,12 +135,14 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                 like = f"%{kw}%"
                 conditions.append(or_(Lamp.title.ilike(like), Lamp.description.ilike(like), Lamp.city.ilike(like)))
         off = max(0, int(offset or 0))
-        stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.authenticity_score.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
+        stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.authenticity_score.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
         res = await s.execute(stmt)
         items = [_lamp_to_dict(x) for x in res.scalars().all()]
     enriched = [attach_fuzzy_distance(x, lat, lng) for x in items]
     if lat is not None and lng is not None:
-        enriched.sort(key=lambda x: x.get("_distance_km") if x.get("_distance_km") is not None else 1e9)
+        enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, x.get("_distance_km") if x.get("_distance_km") is not None else 1e9))
+    else:
+        enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, -(x.get("authenticity_score") or 0)))
     for x in enriched:
         x.pop("_distance_km", None)
     return enriched
