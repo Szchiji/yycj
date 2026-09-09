@@ -37,16 +37,47 @@
       </section>
 
       <section class="card admin-primary">
-        <h3>公告</h3>
-        <input id="annText" placeholder="首页滚动公告，一行即可" />
-        <label class="row"><input type="checkbox" id="annOn" checked /> 显示</label>
-        <button class="btn primary block" id="btnAnn" type="button">保存公告</button>
+        <h3>卡片置顶</h3>
+        <p class="muted hint">置顶会出现在首页卡片流最上方，带「置顶」标记（不是轮播）。</p>
+        <div id="adminFeedPins"></div>
+        <label>已通过的资料</label>
+        <select id="feedPinLampId"><option value="">选择资料…</option></select>
+        <div class="row">
+          <button class="btn primary" id="btnFeedPinAdd" type="button">添加置顶</button>
+          <button class="btn danger" id="btnFeedPinDel" type="button">取消置顶</button>
+        </div>
       </section>
 
       <section class="card admin-primary">
-        <h3>开放城市</h3>
+        <h3>精选轮播</h3>
+        <p class="muted hint">横向精选条，与卡片置顶互不影响。</p>
+        <div id="adminPins"></div>
+        <label>已通过的资料</label>
+        <select id="pinLampId"><option value="">选择资料…</option></select>
+        <label>过期小时（默认 72，空=不过期）</label>
+        <input id="pinHours" type="number" value="72" />
+        <div class="row">
+          <button class="btn primary" id="btnPin" type="button">上轮播</button>
+        </div>
+      </section>
+
+      <section class="card admin-primary">
+        <h3>运营设置</h3>
+        <label>公告</label>
+        <input id="annText" placeholder="首页滚动公告" />
+        <label class="row"><input type="checkbox" id="annOn" checked /> 显示公告</label>
+        <label>开放城市（逗号分隔）</label>
         <input id="citiesInput" placeholder="台北,深圳,香港" />
-        <button class="btn primary block" id="btnCities" type="button">保存城市</button>
+        <label>首页每次加载条数</label>
+        <input id="opsPageSize" type="number" min="1" max="50" value="3" />
+        <label>聊天按钮文案</label>
+        <input id="opsCta" value="想聊聊" maxlength="32" />
+        <label>Bot /start 欢迎语（可空=默认）</label>
+        <textarea id="opsWelcome" rows="3" placeholder="留空则用默认三行欢迎语"></textarea>
+        <label>发布媒体上限（1-9）</label>
+        <input id="opsMediaMax" type="number" min="1" max="9" value="9" />
+        <label class="row"><input type="checkbox" id="opsReviewAudit" checked /> 评价需审核后展示</label>
+        <button class="btn primary block" id="btnOpsSave" type="button">保存设置</button>
       </section>
 
       <details class="card admin-more">
@@ -55,13 +86,6 @@
         <div id="adminReports"></div>
         <h3>遮蔽名单</h3>
         <div id="adminShadow"></div>
-        <h3>精选</h3>
-        <div id="adminPins"></div>
-        <label>资料 ID</label>
-        <input id="pinLampId" />
-        <label>过期小时（空=不过期）</label>
-        <input id="pinHours" type="number" value="72" />
-        <button class="btn primary" id="btnPin" type="button">置顶</button>
         <h3>调整口碑分</h3>
         <form id="adjForm">
           <label>用户 ID</label>
