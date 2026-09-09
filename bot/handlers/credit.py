@@ -6,7 +6,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from bot.keyboards import main_menu
+from bot.keyboards import remove_kb
 from bot.services import credit_service
 
 router = Router(name="credit")
@@ -28,4 +28,5 @@ async def show_credit(message: Message) -> None:
             t = h["time"].strftime("%m-%d %H:%M") if h.get("time") else ""
             sign = "+" if h["delta"] >= 0 else ""
             lines.append(f"<code>{t}</code> {sign}{h['delta']} · {h['reason']}")
-    await message.answer("\n".join(lines), reply_markup=main_menu())
+    lines.append("\n请点左下角「首页」进入 Mini App。")
+    await message.answer("\n".join(lines), reply_markup=remove_kb())
