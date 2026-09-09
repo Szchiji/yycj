@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,10 +19,9 @@ class Settings(BaseSettings):
     bot_token: str = ""
     admin_ids: str = ""
 
-    # Postgres：推荐 postgresql+asyncpg://...
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/yueying"
 
-    webhook_host: str = ""  # https://xxx.up.railway.app
+    webhook_host: str = ""
     webhook_path: str = "/webhook"
     webhook_secret: str = ""
 
@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     env: str = "development"
     log_level: str = "INFO"
     port: int = 8080
+
+    @field_validator("bot_token", "webhook_secret", "webhook_host", "database_url", mode="before")
+    @classmethod
+    def strip_str(cls, v):
+        if v is None:
+            return ""
+        return str(v).strip()
 
     @property
     def admin_id_list(self) -> List[int]:
@@ -56,7 +63,7 @@ class Settings(BaseSettings):
         return bool(self.webhook_host and self.bot_token)
 
     def normalized_database_url(self) -> str:
-        """把 Railway 常见 postgres:// 转成 asyncpg 驱动。"""
+        """Railway 常见 postgres:// → postgresql+asyncpg://。"""
         url = self.database_url.strip()
         if url.startswith("postgres://"):
             url = "postgresql://" + url[len("postgres://") :]
