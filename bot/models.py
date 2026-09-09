@@ -59,6 +59,19 @@ class ReportStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class UserRole(str, Enum):
+    TEACHER = "teacher"
+    GUEST = "guest"
+    MERCHANT = "merchant"
+
+
+class ReviewStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    BRUSH = "brush"  # 刷评
+
+
 def tier_from_score(score: int) -> CreditTier:
     if score < 200:
         return CreditTier.DARK
@@ -86,6 +99,8 @@ class User(Base):
     total_earned: Mapped[int] = mapped_column(Integer, default=0)
     total_deducted: Mapped[int] = mapped_column(Integer, default=0)
     is_shadowed: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Mini App 身份：teacher / guest / merchant（可空兼容旧用户）
+    role: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -106,6 +121,13 @@ class Lamp(Base):
     price_text: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     description: Mapped[str] = mapped_column(Text, default="")
     photos: Mapped[list] = mapped_column(JSONB, default=list)
+    # 新区/大致位置/媒体（image|video）/发布者角色
+    district: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    approx_lat: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    approx_lng: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    approx_label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    media: Mapped[list] = mapped_column(JSONB, default=list)  # [{type,url}]
+    publisher_role: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     authenticity_score: Mapped[int] = mapped_column(Integer, default=80)
     credit_boost: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default=LampStatus.PENDING.value, index=True)
@@ -134,7 +156,6 @@ class Session(Base):
     expire_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    # 结束后 MESSAGE_RETENTION_HOURS 再清理 SessionMessage
     messages_purge_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, nullable=True, index=True
     )
@@ -152,7 +173,6 @@ class SessionMessage(Base):
         ForeignKey("sessions.session_id", ondelete="CASCADE"),
         index=True,
     )
-    # A / B：相对会话双方
     from_role: Mapped[str] = mapped_column(String(8))
     content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -199,3 +219,53 @@ class CreditHistory(Base):
     delta: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String(256))
     related_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+
+
+class SiteSettings(Base):
+    """单行站点配置（announcement / enabled_cities）。"""
+
+    __tablename__ = "site_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True, default="default")
+    announcement_text: Mapped[str] = mapped_column(Text, default="")
+    announcement_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled_cities: Mapped[list] = mapped_column(JSONB, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class HomepagePin(Base):
+    """首页精选轮播（管理员手动置顶 + 可选过期）。"""
+
+    __tablename__ = "homepage_pins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+
+
+class Review(Base):
+    """客人评价（会话结束后提交，管理员审核后展示）。"""
+
+    __tablename__ = "reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    review_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    target_user_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+    guest_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    stars: Mapped[int] = mapped_column(Integer, default=5)
+    text: Mapped[str] = mapped_column(Text, default="")
+    photos: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(
+        String(16), default=ReviewStatus.PENDING.value, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    review_note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
