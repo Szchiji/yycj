@@ -1,16 +1,20 @@
-"""匿名月影会话：创建、中转映射、过期与结算。"""
+"""匿名月影会话：创建、中转映射、过期与结算、消息落库。"""
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select, update
 
+from bot.config import get_settings
 from bot.db import session_scope
-from bot.models import Session, SessionStatus
+from bot.models import Session, SessionMessage, SessionStatus
 from bot.services import credit_service
+
+logger = logging.getLogger(__name__)
 
 
 def _to_dict(row: Session) -> Dict[str, Any]:
@@ -30,8 +34,27 @@ def _to_dict(row: Session) -> Dict[str, Any]:
         "expire_at": row.expire_at,
         "last_activity": row.last_activity,
         "ended_at": row.ended_at,
+        "messages_purge_at": row.messages_purge_at,
         "quality_score": row.quality_score,
     }
+
+
+def _msg_to_dict(row: SessionMessage) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "session_id": row.session_id,
+        "from_role": row.from_role,
+        "content": row.content,
+        "media_type": row.media_type,
+        "file_id": row.file_id,
+        "created_at": row.created_at,
+    }
+
+
+def role_for_user(session: Dict[str, Any], user_id: int) -> str:
+    if session["user_a_id"] == user_id:
+        return "A"
+    return "B"
 
 
 async def create_request(lamp_id: str, user_a_id: int, user_b_id: int) -> Dict[str, Any]:
@@ -93,6 +116,8 @@ async def reject(session_id: str) -> None:
         if row and row.status == SessionStatus.PENDING.value:
             row.status = SessionStatus.ENDED.value
             row.ended_at = datetime.utcnow()
+            hours = get_settings().message_retention_hours
+            row.messages_purge_at = row.ended_at + timedelta(hours=hours)
 
 
 async def bump_activity(session_id: str, *, media: bool = False) -> None:
@@ -105,6 +130,75 @@ async def bump_activity(session_id: str, *, media: bool = False) -> None:
         if media:
             row.media_count = int(row.media_count or 0) + 1
         row.last_activity = datetime.utcnow()
+
+
+async def save_message(
+    session_id: str,
+    from_role: str,
+    *,
+    content: Optional[str] = None,
+    media_type: Optional[str] = None,
+    file_id: Optional[str] = None,
+) -> None:
+    """中转时持久化完整消息正文 / 媒体元数据。"""
+    async with session_scope() as s:
+        s.add(
+            SessionMessage(
+                session_id=session_id,
+                from_role=(from_role or "?")[:8],
+                content=content,
+                media_type=(media_type or None),
+                file_id=(file_id or None),
+            )
+        )
+
+
+async def list_messages_for_admin(
+    session_id: str, *, limit: int = 200
+) -> List[Dict[str, Any]]:
+    """管理员可读：按时间列出某会话消息（调用方需校验 ADMIN_IDS）。"""
+    async with session_scope() as s:
+        res = await s.execute(
+            select(SessionMessage)
+            .where(SessionMessage.session_id == session_id)
+            .order_by(SessionMessage.created_at.asc(), SessionMessage.id.asc())
+            .limit(max(1, min(limit, 1000)))
+        )
+        rows = res.scalars().all()
+        return [_msg_to_dict(r) for r in rows]
+
+
+async def purge_expired_messages() -> int:
+    """删除已到 messages_purge_at 的会话消息行（先清空正文再删行）。"""
+    now = datetime.utcnow()
+    async with session_scope() as s:
+        res = await s.execute(
+            select(Session.session_id).where(
+                Session.status == SessionStatus.ENDED.value,
+                Session.messages_purge_at.is_not(None),
+                Session.messages_purge_at <= now,
+            )
+        )
+        sids = [row[0] for row in res.all()]
+        if not sids:
+            return 0
+
+        await s.execute(
+            update(SessionMessage)
+            .where(SessionMessage.session_id.in_(sids))
+            .values(content=None, file_id=None)
+        )
+        result = await s.execute(
+            delete(SessionMessage).where(SessionMessage.session_id.in_(sids))
+        )
+        await s.execute(
+            update(Session)
+            .where(Session.session_id.in_(sids))
+            .values(messages_purge_at=None)
+        )
+        deleted = int(result.rowcount or 0)
+        logger.info("Purged %s session messages for %s sessions", deleted, len(sids))
+        return deleted
 
 
 async def mark_praise(session_id: str) -> None:
@@ -132,6 +226,8 @@ async def end_session(session_id: str, settle: bool = True) -> Optional[Dict[str
         was_active = row.status == SessionStatus.ACTIVE.value
         row.status = SessionStatus.ENDED.value
         row.ended_at = datetime.utcnow()
+        hours = get_settings().message_retention_hours
+        row.messages_purge_at = row.ended_at + timedelta(hours=hours)
         data = _to_dict(row)
 
     if settle and was_active:
