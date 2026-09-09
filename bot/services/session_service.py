@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from sqlalchemy import or_, select
 
@@ -129,11 +129,12 @@ async def end_session(session_id: str, settle: bool = True) -> Optional[Dict[str
         row = res.scalar_one_or_none()
         if not row or row.status == SessionStatus.ENDED.value:
             return None
+        was_active = row.status == SessionStatus.ACTIVE.value
         row.status = SessionStatus.ENDED.value
         row.ended_at = datetime.utcnow()
         data = _to_dict(row)
 
-    if settle:
+    if settle and was_active:
         created = data.get("created_at") or datetime.utcnow()
         ended = data.get("ended_at") or datetime.utcnow()
         duration = max(0.0, (ended - created).total_seconds() / 60.0)
@@ -153,29 +154,30 @@ async def end_session(session_id: str, settle: bool = True) -> Optional[Dict[str
                 related_id=data["session_id"],
             )
         data["settle_delta"] = delta
+    else:
+        data["settle_delta"] = 0
     return data
 
 
 async def expire_old_sessions() -> int:
+    """超时结束：先查出 id，再走 end_session 统一收尾与结算。"""
     now = datetime.utcnow()
     async with session_scope() as s:
         res = await s.execute(
-            select(Session).where(
+            select(Session.session_id).where(
                 Session.status.in_([SessionStatus.PENDING.value, SessionStatus.ACTIVE.value]),
                 Session.expire_at.is_not(None),
                 Session.expire_at < now,
             )
         )
-        rows = list(res.scalars().all())
-        ids = [r.session_id for r in rows]
-        for r in rows:
-            r.status = SessionStatus.ENDED.value
-            r.ended_at = now
-        await s.flush()
+        ids = [row[0] for row in res.all()]
 
+    count = 0
     for sid in ids:
-        await end_session(sid, settle=True)
-    return len(ids)
+        data = await end_session(sid, settle=True)
+        if data is not None:
+            count += 1
+    return count
 
 
 def peer_id(session: Dict[str, Any], user_id: int) -> int:
