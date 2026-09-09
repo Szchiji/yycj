@@ -3,19 +3,48 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import BaseFilter, Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.state import State, StatesGroup, default_state
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards import lamp_actions_kb, main_menu, search_filters_kb
-from bot.services import anti_brush, credit_service, search_service
+from bot.keyboards import lamp_actions_kb, search_filters_kb
+from bot.services import anti_brush, credit_service, search_service, session_service
 
 router = Router(name="search")
+
+MENU_TEXTS = {
+    "🔍 搜索灯笼",
+    "🌕 我的月影",
+    "✨ 点亮灯笼",
+    "📝 月影报告",
+    "🌸 兰花信用",
+    "❓ 帮助",
+    "取消",
+}
 
 
 class SearchState(StatesGroup):
     waiting_query = State()
+
+
+class FreeTextSearchFilter(BaseFilter):
+    """默认状态下、无活跃会话、非菜单的自由文本 → 搜索。"""
+
+    async def __call__(self, message: Message, state: FSMContext) -> bool:
+        if not message.text or len(message.text.strip()) < 2:
+            return False
+        if message.text.startswith("/") or message.text in MENU_TEXTS:
+            return False
+        current = await state.get_state()
+        if current is not None:
+            return False
+        user = message.from_user
+        if user:
+            active = await session_service.get_active_for_user(user.id)
+            if active:
+                return False
+        return True
 
 
 def _filters_from_data(data: dict) -> dict:
@@ -47,7 +76,7 @@ async def _run_search(message: Message, query: str, filters: dict | None = None)
         )
         return
 
-    await message.answer(f"🔍 找到 **{len(lamps)}** 盏灯笼：")
+    await message.answer(f"🔍 找到 <b>{len(lamps)}</b> 盏灯笼：")
     for lamp in lamps:
         await message.answer(
             search_service.format_lamp_card(lamp),
@@ -61,9 +90,9 @@ async def search_entry(message: Message, state: FSMContext) -> None:
     await state.set_state(SearchState.waiting_query)
     await message.answer(
         "请输入关键词，例如：\n"
-        "• `台北 大学生`\n"
-        "• `深圳 5000`\n"
-        "• `香港 KH`\n\n"
+        "• <code>台北 大学生</code>\n"
+        "• <code>深圳 5000</code>\n"
+        "• <code>香港 KH</code>\n\n"
         "也可先点筛选：",
         reply_markup=search_filters_kb(),
     )
@@ -71,21 +100,29 @@ async def search_entry(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("search_city:"))
 async def filter_city(cb: CallbackQuery, state: FSMContext) -> None:
+    if not cb.data:
+        await cb.answer()
+        return
     city = cb.data.split(":", 1)[1]
     await state.update_data(city=city)
+    await state.set_state(SearchState.waiting_query)
     await cb.answer(f"已选城市：{city}")
     if cb.message:
-        await cb.message.answer(f"已筛选城市 **{city}**，请输入关键词或再选价位。")
+        await cb.message.answer(f"已筛选城市 <b>{city}</b>，请输入关键词或再选价位。")
 
 
 @router.callback_query(F.data.startswith("search_price:"))
 async def filter_price(cb: CallbackQuery, state: FSMContext) -> None:
+    if not cb.data:
+        await cb.answer()
+        return
     rng = cb.data.split(":", 1)[1]
     lo, hi = rng.split("-")
     await state.update_data(price_min=int(lo), price_max=int(hi))
+    await state.set_state(SearchState.waiting_query)
     await cb.answer(f"价位 {lo}-{hi}")
     if cb.message:
-        await cb.message.answer(f"已筛选价位 **{lo} ~ {hi}**，请输入关键词继续搜索。")
+        await cb.message.answer(f"已筛选价位 <b>{lo} ~ {hi}</b>，请输入关键词继续搜索。")
 
 
 @router.callback_query(F.data == "search_clear")
@@ -98,9 +135,7 @@ async def filter_clear(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(SearchState.waiting_query, F.text)
 async def search_query(message: Message, state: FSMContext) -> None:
-    if not message.text or message.text in {
-        "🔍 搜索灯笼", "🌕 我的月影", "✨ 点亮灯笼", "📝 月影报告", "🌸 兰花信用", "❓ 帮助", "取消"
-    }:
+    if not message.text or message.text in MENU_TEXTS:
         await state.clear()
         return
     data = await state.get_data()
@@ -108,27 +143,9 @@ async def search_query(message: Message, state: FSMContext) -> None:
     await state.clear()
 
 
-@router.message(F.text.regexp(r".{2,}"))
+@router.message(StateFilter(default_state), FreeTextSearchFilter())
 async def quick_search(message: Message, state: FSMContext) -> None:
-    """主菜单外的自由文本：若无占用 FSM，当作搜索。"""
-    if not message.text:
-        return
-    if message.text.startswith("/"):
-        return
-    menu = {
-        "🔍 搜索灯笼", "🌕 我的月影", "✨ 点亮灯笼", "📝 月影报告", "🌸 兰花信用", "❓ 帮助", "取消"
-    }
-    if message.text in menu:
-        return
-    current = await state.get_state()
-    if current is not None:
-        return
-    from bot.services import session_service
-
     user = message.from_user
     if user:
-        active = await session_service.get_active_for_user(user.id)
-        if active:
-            return
         await credit_service.ensure_user(user.id, username=user.username, full_name=user.full_name)
-    await _run_search(message, message.text.strip())
+    await _run_search(message, (message.text or "").strip())

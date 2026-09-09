@@ -11,10 +11,10 @@ from bot.services import credit_service
 
 router = Router(name="start")
 
-HELP_TEXT = """🌕 **月影车姬**
+HELP_TEXT = """🌕 <b>月影车姬</b>
 月下寻花，影中见真
 
-**功能**
+<b>功能</b>
 • 🔍 搜索灯笼 — 城市 / 价位 / 关键词
 • ✨ 点亮灯笼 — 投稿，管理员审核后上架
 • 💬 月影会话 — 匿名中转，结束后结算兰花分
@@ -22,7 +22,7 @@ HELP_TEXT = """🌕 **月影车姬**
 • 🌸 兰花信用 — 等级与遮蔽状态
 
 发送城市或关键词即可直接搜索，例如：
-`台北 大学生` / `深圳 5000`
+<code>台北 大学生</code> / <code>深圳 5000</code>
 """
 
 
@@ -37,7 +37,7 @@ async def cmd_start(message: Message) -> None:
         full_name=user.full_name,
     )
     await message.answer(
-        "欢迎来到 **月影车姬** 🌕\n月下寻花，影中见真。\n\n请选择功能，或直接发送搜索词。",
+        "欢迎来到 <b>月影车姬</b> 🌕\n月下寻花，影中见真。\n\n请选择功能，或直接发送搜索词。",
         reply_markup=main_menu(),
     )
 

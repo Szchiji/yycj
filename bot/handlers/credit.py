@@ -20,12 +20,12 @@ async def show_credit(message: Message) -> None:
         return
     u = await credit_service.ensure_user(user.id, username=user.username, full_name=user.full_name)
     hist = await credit_service.history(user.id, limit=8)
-    lines = [credit_service.format_credit_card(u), "", "**近期流水**"]
+    lines = [credit_service.format_credit_card(u), "", "<b>近期流水</b>"]
     if not hist:
         lines.append("暂无记录")
     else:
         for h in hist:
             t = h["time"].strftime("%m-%d %H:%M") if h.get("time") else ""
             sign = "+" if h["delta"] >= 0 else ""
-            lines.append(f"`{t}` {sign}{h['delta']} · {h['reason']}")
+            lines.append(f"<code>{t}</code> {sign}{h['delta']} · {h['reason']}")
     await message.answer("\n".join(lines), reply_markup=main_menu())
