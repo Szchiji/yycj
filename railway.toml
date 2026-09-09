@@ -1,5 +1,7 @@
 [build]
 builder = "NIXPACKS"
+# 不要写 /nixpacks.toml（绝对路径会找不到），相对路径即可
+# nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
 startCommand = "python -m bot.main"
