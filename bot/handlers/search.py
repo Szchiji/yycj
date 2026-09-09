@@ -15,11 +15,18 @@ router = Router(name="search")
 
 MENU_TEXTS = {
     "🔍 搜索灯笼",
+    "🔍 搜索",
     "🌕 我的月影",
+    "🌕 我的",
     "✨ 点亮灯笼",
+    "✨ 发布",
     "📝 月影报告",
+    "📝 报告",
     "🌸 兰花信用",
+    "🌸 口碑",
     "❓ 帮助",
+    "📱 打开首页",
+    "📱 打开月影 Mini App",
     "取消",
 }
 
@@ -84,7 +91,7 @@ async def _run_search(message: Message, query: str, filters: dict | None = None)
         )
 
 
-@router.message(F.text == "🔍 搜索灯笼")
+@router.message(F.text.in_({"🔍 搜索灯笼", "🔍 搜索"}))
 @router.message(Command("search"))
 async def search_entry(message: Message, state: FSMContext) -> None:
     await state.set_state(SearchState.waiting_query)
