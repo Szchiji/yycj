@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>月影车姬 · 管理控制台</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🛠 管理控制台</h1>
+    <div class="sub">仅 ADMIN_IDS · 审核 / 遮蔽 / 信用 / 会话消息</div>
+    <div id="status" class="meta" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px">
+      <a class="btn" href="./index.html">← 返回 Mini App</a>
+      <button class="btn" id="btnRefresh" type="button">刷新全部</button>
+    </div>
+  </header>
+  <main>
+    <div id="gate" class="card">正在校验管理员身份…</div>
+
+    <div id="console" class="hidden">
+      <section class="card">
+        <h3>信用调整</h3>
+        <form id="adjForm">
+          <label>用户 Telegram ID</label>
+          <input id="adjUser" type="number" required />
+          <label>Δ 分值（可负）</label>
+          <input id="adjDelta" type="number" required />
+          <label>备注</label>
+          <input id="adjNote" placeholder="原因说明" />
+          <button class="btn primary" type="submit">提交调整</button>
+        </form>
+      </section>
+
+      <section>
+        <h3>待审投稿</h3>
+        <div id="adminPosts"></div>
+      </section>
+
+      <section>
+        <h3>待审报告</h3>
+        <div id="adminReports"></div>
+      </section>
+
+      <section>
+        <h3>遮蔽名单</h3>
+        <div id="adminShadow"></div>
+      </section>
+
+      <section class="card">
+        <h3>会话消息查询</h3>
+        <label>session_id</label>
+        <input id="sessId" placeholder="完整 UUID" />
+        <button class="btn primary" id="btnSess" type="button">查询</button>
+        <div id="sessOut" style="margin-top:10px"></div>
+      </section>
+    </div>
+
+    <p class="footer-note">审核动作走 <code>/api/admin/posts|reports/…</code>，与 Bot 内联按钮共用 <code>admin_ops</code> 业务逻辑；用户通知为 best-effort。</p>
+  </main>
+  <script src="./admin.js"></script>
+</body>
+</html>

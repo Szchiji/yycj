@@ -51,7 +51,7 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     if lamp["user_id"] == cb.from_user.id:
         await cb.answer("不能与自己发起会话", show_alert=True)
         return
-    if not anti_brush.check_session_request_rate(cb.from_user.id):
+    if not await anti_brush.check_session_request_rate(cb.from_user.id):
         await cb.answer("请求过于频繁", show_alert=True)
         return
 
@@ -153,7 +153,7 @@ async def praise_session(cb: CallbackQuery) -> None:
 
 @router.message(ActiveSessionFilter(), F.text | F.photo | F.video | F.document | F.voice | F.sticker)
 async def relay_message(message: Message, bot: Bot, active_session: dict) -> None:
-    """仅活跃会话中转。"""
+    """仅活跃会话中转，并落库完整消息。"""
     user = message.from_user
     if not user:
         return
@@ -161,8 +161,55 @@ async def relay_message(message: Message, bot: Bot, active_session: dict) -> Non
     sess = active_session
     peer = session_service.peer_id(sess, user.id)
     name = session_service.anon_name(sess, user.id)
+    role = session_service.role_for_user(sess, user.id)
     media = bool(message.photo or message.video or message.document or message.voice)
     await session_service.bump_activity(sess["session_id"], media=media)
+
+    # 持久化
+    if message.text:
+        await session_service.save_message(
+            sess["session_id"], role, content=message.text, media_type="text"
+        )
+    elif message.photo:
+        await session_service.save_message(
+            sess["session_id"],
+            role,
+            content=message.caption,
+            media_type="photo",
+            file_id=message.photo[-1].file_id,
+        )
+    elif message.video:
+        await session_service.save_message(
+            sess["session_id"],
+            role,
+            content=message.caption,
+            media_type="video",
+            file_id=message.video.file_id,
+        )
+    elif message.document:
+        await session_service.save_message(
+            sess["session_id"],
+            role,
+            content=message.caption,
+            media_type="document",
+            file_id=message.document.file_id,
+        )
+    elif message.voice:
+        await session_service.save_message(
+            sess["session_id"],
+            role,
+            content=None,
+            media_type="voice",
+            file_id=message.voice.file_id,
+        )
+    elif message.sticker:
+        await session_service.save_message(
+            sess["session_id"],
+            role,
+            content="[贴纸]",
+            media_type="sticker",
+            file_id=message.sticker.file_id,
+        )
 
     prefix = f"👤 <b>{name}</b>：\n"
     try:

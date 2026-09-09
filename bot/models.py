@@ -11,6 +11,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -133,7 +134,30 @@ class Session(Base):
     expire_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # 结束后 MESSAGE_RETENTION_HOURS 再清理 SessionMessage
+    messages_purge_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, index=True
+    )
     quality_score: Mapped[int] = mapped_column(Integer, default=50)
+
+
+class SessionMessage(Base):
+    """会话中转消息落库（管理员可读；到期清理）。"""
+
+    __tablename__ = "session_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("sessions.session_id", ondelete="CASCADE"),
+        index=True,
+    )
+    # A / B：相对会话双方
+    from_role: Mapped[str] = mapped_column(String(8))
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    media_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    file_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
 
 
 class Post(Base):

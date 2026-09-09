@@ -6,6 +6,7 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
+from bot.config import get_settings
 from bot.keyboards import main_menu
 from bot.services import credit_service
 
@@ -20,6 +21,7 @@ HELP_TEXT = """🌕 <b>月影车姬</b>
 • 💬 月影会话 — 匿名中转，结束后结算兰花分
 • 📝 月影报告 — 异常反馈
 • 🌸 兰花信用 — 等级与遮蔽状态
+• 📱 Mini App — 配置 <code>WEBAPP_URL</code> 后主菜单可打开
 
 发送城市或关键词即可直接搜索，例如：
 <code>台北 大学生</code> / <code>深圳 5000</code>
@@ -36,8 +38,12 @@ async def cmd_start(message: Message) -> None:
         username=user.username,
         full_name=user.full_name,
     )
+    extra = ""
+    if (get_settings().webapp_url or "").strip():
+        extra = "\n主菜单可打开 <b>月影 Mini App</b>。"
     await message.answer(
-        "欢迎来到 <b>月影车姬</b> 🌕\n月下寻花，影中见真。\n\n请选择功能，或直接发送搜索词。",
+        "欢迎来到 <b>月影车姬</b> 🌕\n月下寻花，影中见真。\n\n"
+        f"请选择功能，或直接发送搜索词。{extra}",
         reply_markup=main_menu(),
     )
 

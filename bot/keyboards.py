@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    WebAppInfo,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+
+from bot.config import get_settings
 
 
 def main_menu() -> ReplyKeyboardMarkup:
@@ -11,6 +19,14 @@ def main_menu() -> ReplyKeyboardMarkup:
     b.row(KeyboardButton(text="🔍 搜索灯笼"), KeyboardButton(text="🌕 我的月影"))
     b.row(KeyboardButton(text="✨ 点亮灯笼"), KeyboardButton(text="📝 月影报告"))
     b.row(KeyboardButton(text="🌸 兰花信用"), KeyboardButton(text="❓ 帮助"))
+    webapp = (get_settings().webapp_url or "").strip()
+    if webapp:
+        b.row(
+            KeyboardButton(
+                text="📱 打开月影 Mini App",
+                web_app=WebAppInfo(url=webapp),
+            )
+        )
     return b.as_markup(resize_keyboard=True)
 
 

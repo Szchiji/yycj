@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>月影车姬 Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🌕 月影车姬</h1>
+    <div class="sub">月下寻花，影中见真 · Mini App</div>
+    <div id="status" class="meta" style="margin-top:8px"></div>
+    <div id="adminLinkWrap" class="hidden" style="margin-top:8px">
+      <a class="btn" href="./admin.html">打开管理控制台 →</a>
+    </div>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab active" data-panel="credit">信用</button>
+      <button class="tab" data-panel="search">搜索</button>
+      <button class="tab" data-panel="post">点亮</button>
+      <button class="tab" data-panel="report">报告</button>
+      <button class="tab" data-panel="detail">详情</button>
+      <button class="tab hidden" id="adminTab" data-panel="admin">管理</button>
+    </div>
+
+    <section id="panel-credit" class="panel">
+      <div id="creditCard" class="card"></div>
+      <h2 style="font-size:1rem">近期流水</h2>
+      <div id="history"></div>
+    </section>
+
+    <section id="panel-search" class="panel hidden">
+      <div class="card">
+        <label>关键词</label>
+        <input id="q" placeholder="例如：大学生 / 真实照" />
+        <label>城市</label>
+        <input id="city" placeholder="例如：台北、深圳" />
+        <button class="btn primary" id="btnSearch" type="button">搜索灯笼</button>
+      </div>
+      <div id="lampList"></div>
+    </section>
+
+    <section id="panel-post" class="panel hidden">
+      <form id="postForm" class="card">
+        <label>城市</label>
+        <input id="postCity" required maxlength="32" />
+        <label>标题 / 花名</label>
+        <input id="postTitle" required maxlength="64" />
+        <label>价位</label>
+        <input id="postPrice" placeholder="6000 / 面议" />
+        <label>标签（空格分隔）</label>
+        <input id="postTags" placeholder="大学生 KH 真实照" />
+        <label>简介</label>
+        <textarea id="postDesc" rows="4" maxlength="2000"></textarea>
+        <label>图片 URL 1（可选，公网 https）</label>
+        <input id="postPhoto1" type="url" placeholder="https://… 或 Telegram file_id" />
+        <label>图片 URL 2</label>
+        <input id="postPhoto2" type="url" placeholder="可选" />
+        <label>图片 URL 3</label>
+        <input id="postPhoto3" type="url" placeholder="可选" />
+        <p class="meta">说明：Telegram WebApp 不易直传相册得到可用 file_id。推荐公网可达图片 URL；需要原生 Telegram 图请用 Bot「点亮灯笼」FSM 发图。亦可粘贴已知 file_id。</p>
+        <button class="btn primary" type="submit">提交审核</button>
+      </form>
+    </section>
+
+    <section id="panel-report" class="panel hidden">
+      <form id="reportForm" class="card">
+        <label>灯笼 ID</label>
+        <input id="reportLampId" required />
+        <label>原因</label>
+        <input id="reportReason" required placeholder="虚假信息 / 盗图 / 其他" />
+        <label>说明</label>
+        <textarea id="reportDesc" rows="3" maxlength="2000"></textarea>
+        <button class="btn primary" type="submit">提交报告</button>
+      </form>
+    </section>
+
+    <section id="panel-detail" class="panel hidden">
+      <div id="detail"><p class="meta">从搜索结果打开详情</p></div>
+    </section>
+
+    <section id="panel-admin" class="panel hidden">
+      <div class="card">
+        <p>完整管理控制台（审核按钮、遮蔽、会话消息）请打开：</p>
+        <a class="btn primary" href="./admin.html">/app/admin.html</a>
+      </div>
+      <div class="card">
+        <h3>信用调整（快捷）</h3>
+        <form id="adjForm">
+          <label>用户 Telegram ID</label>
+          <input id="adjUser" type="number" required />
+          <label>Δ 分值（可负）</label>
+          <input id="adjDelta" type="number" required />
+          <label>备注</label>
+          <input id="adjNote" placeholder="原因说明" />
+          <button class="btn primary" type="submit">提交调整</button>
+        </form>
+      </div>
+      <h3>待审投稿</h3>
+      <div id="adminPosts"></div>
+      <h3>待审报告</h3>
+      <div id="adminReports"></div>
+      <h3>遮蔽名单</h3>
+      <div id="adminShadow"></div>
+    </section>
+
+    <p class="footer-note">数据经 Bot 服务端校验 Telegram <code>initData</code> HMAC。不在页面存储密钥。</p>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

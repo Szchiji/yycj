@@ -36,7 +36,7 @@ async def post_start(message: Message, state: FSMContext) -> None:
     if u.get("is_shadowed"):
         await message.answer("你处于月影遮蔽中，暂时无法点亮灯笼。")
         return
-    if not anti_brush.check_post_rate(user.id):
+    if not await anti_brush.check_post_rate(user.id):
         await message.answer("投稿过于频繁，请一小时后再试。")
         return
     await state.set_state(PostForm.city)
@@ -89,7 +89,7 @@ async def post_tags(message: Message, state: FSMContext) -> None:
 @router.message(PostForm.description, F.text)
 async def post_desc(message: Message, state: FSMContext) -> None:
     text = (message.text or "").strip()
-    if message.from_user and anti_brush.text_too_similar(message.from_user.id, text):
+    if message.from_user and await anti_brush.text_too_similar(message.from_user.id, text):
         await message.answer("内容与近期投稿过于相似，请修改后再试。")
         return
     await state.update_data(description=text[:2000], photos=[])
