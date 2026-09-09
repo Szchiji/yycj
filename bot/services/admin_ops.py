@@ -108,16 +108,24 @@ async def approve_post(post_id: str, *, notify: bool = True) -> Dict[str, Any]:
         post.reviewed_at = datetime.utcnow()
         user_id = post.user_id
 
+    media = list(data.get("media") or [])
+    photos = list(data.get("photos") or [])
     lamp = await search_service.create_lamp_from_post(
         user_id=user_id,
         city=data.get("city") or "未知",
         title=data.get("title") or "未命名",
-        tags=list(data.get("tags") or []),
+        tags=list(data.get("tags") or [])[:5],
         price=data.get("price"),
         price_text=data.get("price_text"),
         description=data.get("description") or "",
-        photos=list(data.get("photos") or []),
+        photos=photos,
         authenticity_score=80,
+        district=data.get("district"),
+        approx_lat=data.get("approx_lat"),
+        approx_lng=data.get("approx_lng"),
+        approx_label=data.get("approx_label"),
+        media=media,
+        publisher_role=data.get("publisher_role"),
     )
     await search_service.approve_lamp(lamp["lamp_id"])
     await credit_service.settle_lanhua(
@@ -248,3 +256,26 @@ async def reject_report(report_id: str, *, notify: bool = True) -> Dict[str, Any
         "status": ReportStatus.REJECTED.value,
         "reporter_id": reporter_id,
     }
+
+
+
+async def approve_post_and_pin(
+    post_id: str,
+    *,
+    expires_hours: int | None = 72,
+    sort_order: int = 0,
+    notify: bool = True,
+    admin_id: int | None = None,
+) -> Dict[str, Any]:
+    """通过投稿并置顶到首页精选。"""
+    from bot.services import home_service
+
+    result = await approve_post(post_id, notify=notify)
+    pin = await home_service.add_pin(
+        result["lamp_id"],
+        sort_order=sort_order,
+        expires_hours=expires_hours,
+        created_by=admin_id,
+    )
+    result["pin"] = pin
+    return result
