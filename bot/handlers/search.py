@@ -92,6 +92,15 @@ async def _run_search(message: Message, query: str, filters: dict | None = None)
 
 
 @router.message(F.text.in_({"🔍 搜索灯笼", "🔍 搜索"}))
+async def search_redirect(message: Message) -> None:
+    from bot.keyboards import remove_kb
+    await message.answer(
+        "🔍 搜索请点左下角「首页」打开 Mini App。\n"
+        "也可直接发送关键词，例如 <code>台北 大学生</code>。",
+        reply_markup=remove_kb(),
+    )
+
+
 @router.message(Command("search"))
 async def search_entry(message: Message, state: FSMContext) -> None:
     await state.set_state(SearchState.waiting_query)
