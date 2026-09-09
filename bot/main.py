@@ -13,7 +13,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import MenuButtonWebApp, Update, WebAppInfo
+from aiogram.types import BotCommand, MenuButtonWebApp, Update, WebAppInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
@@ -151,6 +151,17 @@ async def _startup() -> None:
                 logger.info("Chat menu button set -> %s", webapp)
             except Exception:
                 logger.exception("set_chat_menu_button failed")
+        try:
+            await bot.set_my_commands(
+                [
+                    BotCommand(command="start", description="打开欢迎"),
+                    BotCommand(command="help", description="使用说明"),
+                    BotCommand(command="admin", description="管理后台（管理员）"),
+                ]
+            )
+            logger.info("Bot commands set: /start /help /admin")
+        except Exception:
+            logger.exception("set_my_commands failed")
         if MINIAPP_DIR.is_dir():
             logger.info("Mini App static: %s -> /app", MINIAPP_DIR)
 
@@ -256,6 +267,16 @@ async def run_polling() -> None:
             logger.info("Chat menu button set -> %s", webapp)
         except Exception:
             logger.exception("set_chat_menu_button failed")
+    try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description="打开欢迎"),
+                BotCommand(command="help", description="使用说明"),
+                BotCommand(command="admin", description="管理后台（管理员）"),
+            ]
+        )
+    except Exception:
+        logger.exception("set_my_commands failed")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
