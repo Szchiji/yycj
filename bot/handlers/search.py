@@ -57,7 +57,7 @@ def _filters_from_data(data: dict) -> dict:
 
 async def _run_search(message: Message, query: str, filters: dict | None = None) -> None:
     user = message.from_user
-    if user and not anti_brush.check_search_rate(user.id):
+    if user and not await anti_brush.check_search_rate(user.id):
         await message.answer("搜索太频繁，请稍后再试。")
         return
 
