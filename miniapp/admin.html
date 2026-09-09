@@ -3,87 +3,102 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>月影车姬 · 管理</title>
+  <title>管理</title>
   <script src="./telegram-web-app.js"></script>
-  <!-- CDN fallback if local SDK missing -->
   <script>
   if (!(window.Telegram && window.Telegram.WebApp)) {
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260910" />
+  <link rel="stylesheet" href="./styles.css?v=20260910c" />
 </head>
 <body>
   <header class="topbar">
     <div>
-      <h1>🛠 月影车姬管理</h1>
+      <h1>管理</h1>
       <div id="status" class="muted"></div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html">← Mini App</a>
+      <a class="btn" href="./index.html?v=20260910c">← 首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
   <main>
-    <div id="gate" class="card">正在校验管理员身份…</div>
+    <div id="gate" class="card">正在校验…</div>
     <div id="console" class="hidden">
-      <div class="admin-tabs">
-        <button class="btn tab active" data-tab="posts" type="button">资料审核</button>
-        <button class="btn tab" data-tab="reviews" type="button">评价审核</button>
-        <button class="btn tab" data-tab="reports" type="button">举报</button>
-        <button class="btn tab" data-tab="homeops" type="button">首页运营</button>
-      </div>
-      <section id="tab-posts">
-        <h3>待审资料</h3>
+      <section class="card admin-primary">
+        <h3>待审列表</h3>
         <div id="adminPosts"></div>
+        <div id="adminReviews" style="margin-top:12px"></div>
       </section>
-      <section id="tab-reviews" class="hidden">
-        <h3>待审评价</h3>
-        <div id="adminReviews"></div>
+
+      <section class="card admin-primary">
+        <button class="btn primary block big" id="btnSeed" type="button">一键填充演示数据</button>
       </section>
-      <section id="tab-reports" class="hidden">
-        <h3>待审举报</h3>
+
+      <section class="card admin-primary">
+        <h3>卡片置顶</h3>
+        <p class="muted hint">置顶会出现在首页卡片流最上方，带「置顶」标记（不是轮播）。</p>
+        <div id="adminFeedPins"></div>
+        <label>已通过的资料</label>
+        <select id="feedPinLampId"><option value="">选择资料…</option></select>
+        <div class="row">
+          <button class="btn primary" id="btnFeedPinAdd" type="button">添加置顶</button>
+          <button class="btn danger" id="btnFeedPinDel" type="button">取消置顶</button>
+        </div>
+      </section>
+
+      <section class="card admin-primary">
+        <h3>精选轮播</h3>
+        <p class="muted hint">横向精选条，与卡片置顶互不影响。</p>
+        <div id="adminPins"></div>
+        <label>已通过的资料</label>
+        <select id="pinLampId"><option value="">选择资料…</option></select>
+        <label>过期小时（默认 72，空=不过期）</label>
+        <input id="pinHours" type="number" value="72" />
+        <div class="row">
+          <button class="btn primary" id="btnPin" type="button">上轮播</button>
+        </div>
+      </section>
+
+      <section class="card admin-primary">
+        <h3>运营设置</h3>
+        <label>公告</label>
+        <input id="annText" placeholder="首页滚动公告" />
+        <label class="row"><input type="checkbox" id="annOn" checked /> 显示公告</label>
+        <label>开放城市（逗号分隔）</label>
+        <input id="citiesInput" placeholder="台北,深圳,香港" />
+        <label>首页每次加载条数</label>
+        <input id="opsPageSize" type="number" min="1" max="50" value="3" />
+        <label>聊天按钮文案</label>
+        <input id="opsCta" value="想聊聊" maxlength="32" />
+        <label>Bot /start 欢迎语（可空=默认）</label>
+        <textarea id="opsWelcome" rows="3" placeholder="留空则用默认三行欢迎语"></textarea>
+        <label>发布媒体上限（1-9）</label>
+        <input id="opsMediaMax" type="number" min="1" max="9" value="9" />
+        <label class="row"><input type="checkbox" id="opsReviewAudit" checked /> 评价需审核后展示</label>
+        <button class="btn primary block" id="btnOpsSave" type="button">保存设置</button>
+      </section>
+
+      <details class="card admin-more">
+        <summary><strong>更多</strong></summary>
+        <h3>举报</h3>
         <div id="adminReports"></div>
         <h3>遮蔽名单</h3>
         <div id="adminShadow"></div>
-      </section>
-      <section id="tab-homeops" class="hidden">
-        <div class="card">
-          <h3>滚动公告</h3>
-          <textarea id="annText" rows="2"></textarea>
-          <label><input type="checkbox" id="annOn" /> 启用公告</label>
-          <button class="btn primary" id="btnAnn" type="button">保存公告</button>
-        </div>
-        <div class="card">
-          <h3>开放城市（逗号分隔）</h3>
-          <input id="citiesInput" />
-          <button class="btn primary" id="btnCities" type="button">保存城市</button>
-        </div>
-        <div class="card">
-          <h3>精选轮播</h3>
-          <div id="adminPins"></div>
-          <label>新增置顶 lamp_id</label>
-          <input id="pinLampId" />
-          <label>过期小时（可空=不过期）</label>
-          <input id="pinHours" type="number" value="72" />
-          <button class="btn primary" id="btnPin" type="button">添加/更新置顶</button>
-          <button class="btn" id="btnSeed" type="button">种子演示数据（若库空）</button>
-        </div>
-        <div class="card">
-          <h3>信用调整</h3>
-          <form id="adjForm">
-            <label>用户 Telegram ID</label>
-            <input id="adjUser" type="number" required />
-            <label>Δ 分值</label>
-            <input id="adjDelta" type="number" required />
-            <label>备注</label>
-            <input id="adjNote" />
-            <button class="btn primary" type="submit">提交</button>
-          </form>
-        </div>
-      </section>
+        <h3>调整口碑分</h3>
+        <form id="adjForm">
+          <label>用户 ID</label>
+          <input id="adjUser" type="number" required />
+          <label>加减分</label>
+          <input id="adjDelta" type="number" required />
+          <label>备注</label>
+          <input id="adjNote" />
+          <button class="btn primary" type="submit">提交</button>
+        </form>
+      </details>
     </div>
   </main>
-  <script src="./admin.js?v=20260910"></script>
+  <script src="./admin.js?v=20260910c"></script>
 </body>
 </html>

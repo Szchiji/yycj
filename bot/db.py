@@ -31,6 +31,9 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_label VARCHAR(128)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS media JSONB DEFAULT '[]'::jsonb",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS publisher_role VARCHAR(16)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pinned BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pin_order INTEGER DEFAULT 0",
+    "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS ops_config JSONB DEFAULT '{}'::jsonb",
     # sessions: columns added after table already existed in production
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS messages_purge_at TIMESTAMP",
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 50",

@@ -128,6 +128,9 @@ class Lamp(Base):
     approx_label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     media: Mapped[list] = mapped_column(JSONB, default=list)  # [{type,url}]
     publisher_role: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    # 首页卡片流置顶（与精选轮播 HomepagePin 独立）
+    feed_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
+    feed_pin_order: Mapped[int] = mapped_column(Integer, default=0)
     authenticity_score: Mapped[int] = mapped_column(Integer, default=80)
     credit_boost: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default=LampStatus.PENDING.value, index=True)
@@ -231,6 +234,8 @@ class SiteSettings(Base):
     announcement_text: Mapped[str] = mapped_column(Text, default="")
     announcement_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled_cities: Mapped[list] = mapped_column(JSONB, default=list)
+    # 运营可配置项（页大小、CTA、欢迎语等）
+    ops_config: Mapped[dict] = mapped_column(JSONB, default=dict)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )

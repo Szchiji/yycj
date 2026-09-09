@@ -5,28 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260910b" />
+  <link rel="stylesheet" href="./styles.css?v=20260910c" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
 
   <section id="boot" class="boot">
     <div class="boot-card">
-      <h1>🌕 月影车姬</h1>
+      <h1>月影车姬</h1>
       <p id="bootMsg" class="muted">正在连接…</p>
       <button id="bootRetry" class="btn primary block hidden" type="button">重试</button>
     </div>
   </section>
 
-  <section id="gate" class="gate hidden">
-    <div class="gate-card">
-      <h1>🌕 月影车姬</h1>
-      <p class="muted">请选择你的身份（之后可在「我的」切换）</p>
-      <button class="role-btn" data-role="guest" type="button">客人</button>
-      <button class="role-btn" data-role="teacher" type="button">老师</button>
-      <button class="role-btn" data-role="merchant" type="button">商家</button>
-    </div>
-  </section>
+  <!-- 身份门默认隐藏：首次自动设为客人 -->
+  <section id="gate" class="gate hidden" aria-hidden="true"></section>
 
   <div id="app" class="hidden">
     <header class="topbar">
@@ -41,45 +34,56 @@
       <section id="view-home" class="view">
         <div id="announce" class="announce hidden"></div>
         <div id="pins" class="pins"></div>
-        <div id="feed" class="feed"></div>
+        <div id="feed" class="feed feed-one-col"></div>
+        <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
 
       <section id="view-msg" class="view hidden">
         <div class="empty card">
           <h3>消息</h3>
-          <p class="muted">会话在 Bot 中进行。发起「想聊聊」后，请回到 Telegram 对话接受/回复。</p>
+          <p class="muted">会话在 Bot 里进行。点「想聊聊」后回到 Telegram 对话即可。</p>
         </div>
       </section>
 
       <section id="view-publish" class="view hidden">
         <form id="publishForm" class="card form">
-          <h3 id="publishTitle">发布资料</h3>
+          <h3 id="publishTitle">发布</h3>
+          <label>相册（图/视频，最多 9）</label>
+          <input id="pubFiles" type="file" accept="image/*,video/*" multiple />
+          <div id="pubPreview" class="media-preview"></div>
+          <label>称呼</label>
+          <input id="pubTitle" required maxlength="64" placeholder="怎么称呼你" />
           <label>城市</label>
           <select id="pubCity" required></select>
-          <label>称呼</label>
-          <input id="pubTitle" required maxlength="64" placeholder="对外称呼" />
-          <label>价位</label>
-          <input id="pubPrice" placeholder="面议 / 6000+" />
-          <label>区</label>
-          <input id="pubDistrict" maxlength="64" placeholder="例如：南山区" />
-          <label>大致位置（模糊文案）</label>
-          <input id="pubApprox" maxlength="128" placeholder="例如：科技园附近" />
-          <label>自定义标签（空格分隔，最多 5）</label>
-          <input id="pubTags" placeholder="清新 健谈" />
           <label>简介</label>
-          <textarea id="pubDesc" rows="4" maxlength="2000"></textarea>
-          <label>媒体 URL（图/视频，合计≤9，一行一个；视频写 video|URL）</label>
-          <textarea id="pubMedia" rows="4" placeholder="https://…&#10;video|https://…/clip.mp4"></textarea>
-          <p class="hint">TODO：二进制相册上传；当前请用公网 URL 或 file_id。</p>
-          <button class="btn primary block" type="submit">提交审核</button>
+          <textarea id="pubDesc" rows="3" maxlength="2000" placeholder="简单介绍一下"></textarea>
+          <details class="advanced">
+            <summary>更多选填</summary>
+            <label>价位</label>
+            <input id="pubPrice" placeholder="面议 / 6000+" />
+            <label>区</label>
+            <input id="pubDistrict" maxlength="64" placeholder="例如：南山区" />
+            <label>大致位置</label>
+            <input id="pubApprox" maxlength="128" placeholder="例如：科技园附近" />
+            <label>标签（空格分隔，最多 5）</label>
+            <input id="pubTags" placeholder="清新 健谈" />
+            <textarea id="pubMedia" class="hidden" rows="1" aria-hidden="true"></textarea>
+          </details>
+          <button class="btn primary block big" type="submit">提交审核</button>
         </form>
       </section>
 
       <section id="view-me" class="view hidden">
         <div id="meCard" class="card"></div>
         <div class="card">
-          <h3>切换身份</h3>
+          <h3>我的身份</h3>
+          <p class="muted hint">浏览默认是客人；发布时再选老师/商家。</p>
+          <label>聊天代称（仅会话显示，不公开账号）</label>
           <div class="row">
+            <input id="guestNick" maxlength="16" placeholder="例如：小明" style="flex:1;margin:0" />
+            <button class="btn" id="btnSaveNick" type="button">保存</button>
+          </div>
+          <div class="row" style="margin-top:8px">
             <button class="btn" data-switch="guest" type="button">客人</button>
             <button class="btn" data-switch="teacher" type="button">老师</button>
             <button class="btn" data-switch="merchant" type="button">商家</button>
@@ -90,10 +94,8 @@
           <div id="myReviews"></div>
         </div>
         <div class="card hints">
-          <p>· 媒体图+视频合计最多 9 个</p>
-          <p>· 举报结果以 Bot 通知为准</p>
-          <div id="adminEntry" class="hidden" style="margin-top:10px">
-            <a class="btn primary" href="./admin.html">打开管理控制台</a>
+          <div id="adminEntry" class="hidden">
+            <a class="btn primary" href="./admin.html?v=20260910c">管理后台</a>
           </div>
         </div>
       </section>
@@ -111,9 +113,9 @@
           <input id="revStars" type="number" min="1" max="5" value="5" required />
           <label>文字</label>
           <textarea id="revText" rows="3" maxlength="2000"></textarea>
-          <label>可选图片 URL（空格分隔）</label>
+          <label>图片链接（可选，空格分隔）</label>
           <input id="revPhotos" />
-          <button class="btn primary block" type="submit">提交（待管理员审核）</button>
+          <button class="btn primary block" type="submit">提交评价</button>
         </form>
       </section>
     </main>
@@ -142,7 +144,7 @@
     </div>
   </div>
 
-  <script src="./boot-inline.js?v=20260910b"></script>
-  <script src="./app.js?v=20260910b"></script>
+  <script src="./boot-inline.js?v=20260910c"></script>
+  <script src="./app.js?v=20260910c"></script>
 </body>
 </html>

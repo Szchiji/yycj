@@ -57,14 +57,39 @@ def role_for_user(session: Dict[str, Any], user_id: int) -> str:
     return "B"
 
 
-async def create_request(lamp_id: str, user_a_id: int, user_b_id: int) -> Dict[str, Any]:
+def _guest_alias(session_id: str) -> str:
+    """稳定代称：客人 + 短码（无真实身份）。"""
+    code = (session_id or "xxxx").replace("-", "")[:2].upper()
+    return f"客人{code}"
+
+
+def _teacher_alias(lamp_title: Optional[str]) -> str:
+    title = (lamp_title or "").strip()
+    if not title:
+        return "老师"
+    # 称呼过长时截断，避免前缀刷屏
+    return title[:16]
+
+
+async def create_request(
+    lamp_id: str,
+    user_a_id: int,
+    user_b_id: int,
+    *,
+    lamp_title: Optional[str] = None,
+    guest_alias: Optional[str] = None,
+) -> Dict[str, Any]:
     sid = str(uuid.uuid4())
+    anon_a = (guest_alias or "").strip()[:32] or _guest_alias(sid)
+    anon_b = _teacher_alias(lamp_title)
     async with session_scope() as s:
         row = Session(
             session_id=sid,
             lamp_id=lamp_id,
             user_a_id=user_a_id,
             user_b_id=user_b_id,
+            anonymous_a=anon_a,
+            anonymous_b=anon_b,
             status=SessionStatus.PENDING.value,
             expire_at=datetime.utcnow() + timedelta(hours=24),
             last_activity=datetime.utcnow(),
@@ -279,7 +304,7 @@ async def end_session(session_id: str, settle: bool = True) -> Optional[Dict[str
                 uid,
                 delta,
                 action="session_end",
-                reason=f"月影会话结算 ({data['session_id'][:8]})",
+                reason=f"会话结算 ({data['session_id'][:8]})",
                 related_id=data["session_id"],
             )
         data["settle_delta"] = delta
@@ -318,6 +343,7 @@ def peer_id(session: Dict[str, Any], user_id: int) -> int:
 
 
 def anon_name(session: Dict[str, Any], user_id: int) -> str:
+    """中转前缀代称：老师侧用资料称呼；客人侧用客人短码。不含 @username / 真名。"""
     if session["user_a_id"] == user_id:
-        return session.get("anonymous_a") or "月影人 A"
-    return session.get("anonymous_b") or "月影人 B"
+        return (session.get("anonymous_a") or "").strip() or _guest_alias(session.get("session_id") or "")
+    return (session.get("anonymous_b") or "").strip() or "老师"

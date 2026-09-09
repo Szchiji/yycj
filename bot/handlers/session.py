@@ -1,4 +1,4 @@
-"""匿名月影会话。"""
+"""匿名会话。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards import main_menu, session_accept_kb, session_end_kb
+from bot.keyboards import remove_kb, session_accept_kb, session_end_kb
 from bot.services import anti_brush, search_service, session_service
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ MENU_TEXTS = {
 
 
 class ActiveSessionFilter(BaseFilter):
-    """仅当用户有进行中的月影会话时匹配，并把会话注入 handler。"""
+    """仅当用户有进行中的会话时匹配，并把会话注入 handler。"""
 
     async def __call__(self, message: Message) -> Union[bool, Dict[str, Any]]:
         user = message.from_user
@@ -73,7 +73,7 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     lamp_id = cb.data.split(":", 1)[1]
     lamp = await search_service.get_lamp(lamp_id)
     if not lamp or lamp.get("status") != "active":
-        await cb.answer("灯笼不存在或未上架", show_alert=True)
+        await cb.answer("资料不存在或未上架", show_alert=True)
         return
     if lamp["user_id"] == cb.from_user.id:
         await cb.answer("不能与自己发起会话", show_alert=True)
@@ -87,17 +87,17 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
         await cb.answer("你已有进行中的会话，请先结束", show_alert=True)
         return
 
-    sess = await session_service.create_request(lamp_id, cb.from_user.id, lamp["user_id"])
+    sess = await session_service.create_request(lamp_id, cb.from_user.id, lamp["user_id"], lamp_title=lamp.get("title"))
     await cb.answer("已发送邀请")
     if cb.message:
         await cb.message.answer(
-            f"已向灯笼主人发送月影会话邀请。\n会话码：<code>{sess['session_id'][:8]}</code>",
-            reply_markup=main_menu(),
+            f"已向对方发送会话邀请。\n会话码：<code>{sess['session_id'][:8]}</code>",
+            reply_markup=remove_kb(),
         )
     try:
         await bot.send_message(
             lamp["user_id"],
-            f"🌕 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
+            f"🌕 有人想就你的资料 <b>{lamp.get('title')}</b> 发起匿名会话。\n"
             f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
             reply_markup=session_accept_kb(sess["session_id"]),
         )
@@ -120,7 +120,7 @@ async def accept_session(cb: CallbackQuery, bot: Bot) -> None:
         return
     await cb.answer("已接受")
     text = (
-        "🌕 月影会话已开启。\n"
+        "🌕 会话已开启。\n"
         "直接在此对话框发消息即可匿名中转。\n"
         "可用按钮结束会话或好评。"
     )
@@ -142,10 +142,10 @@ async def reject_session(cb: CallbackQuery, bot: Bot) -> None:
     await session_service.reject(sid)
     await cb.answer("已拒绝")
     if cb.message:
-        await cb.message.answer("已拒绝该月影会话。")
+        await cb.message.answer("已拒绝该会话。")
     if sess:
         try:
-            await bot.send_message(sess["user_a_id"], "对方拒绝了月影会话邀请。")
+            await bot.send_message(sess["user_a_id"], "对方拒绝了会话邀请。")
         except Exception:
             pass
 
@@ -158,13 +158,13 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
     delta = (data or {}).get("settle_delta", 0)
-    text = f"🔚 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
+    text = f"🔚 会话已结束。\n本次口碑分变动：<code>{delta:+d}</code>"
     if cb.message:
-        await cb.message.answer(text, reply_markup=main_menu())
+        await cb.message.answer(text, reply_markup=remove_kb())
     if data and cb.from_user:
         peer = session_service.peer_id(data, cb.from_user.id)
         try:
-            await bot.send_message(peer, text, reply_markup=main_menu())
+            await bot.send_message(peer, text, reply_markup=remove_kb())
         except Exception:
             pass
 

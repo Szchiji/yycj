@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     bot_token: str = ""
     admin_ids: str = ""
+    # 媒体上传落盘会话：优先 STORAGE_CHAT_ID，否则第一个 ADMIN_ID
+    storage_chat_id: str = ""
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/yueying"
 
@@ -45,6 +47,7 @@ class Settings(BaseSettings):
         "database_url",
         "redis_url",
         "webapp_url",
+        "storage_chat_id",
         mode="before",
     )
     @classmethod
@@ -71,12 +74,24 @@ class Settings(BaseSettings):
         result: List[int] = []
         for part in self.admin_ids.split(","):
             part = part.strip()
-            if part.isdigit():
+            if part.isdigit() or (part.startswith("-") and part[1:].isdigit()):
                 result.append(int(part))
         return result
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_id_list
+
+    @property
+    def media_storage_chat_id(self) -> Optional[int]:
+        """上传媒体转发目标：STORAGE_CHAT_ID 或第一个 ADMIN_ID。"""
+        raw = (self.storage_chat_id or "").strip()
+        if raw:
+            try:
+                return int(raw)
+            except ValueError:
+                pass
+        admins = self.admin_id_list
+        return admins[0] if admins else None
 
     @property
     def webhook_url(self) -> str:

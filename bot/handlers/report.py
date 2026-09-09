@@ -1,4 +1,4 @@
-"""月影报告。"""
+"""月影报告（Bot 侧兼容入口；主流程在 Mini App）。"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.config import get_settings
 from bot.db import session_scope
-from bot.keyboards import admin_report_kb, cancel_kb, main_menu
+from bot.keyboards import admin_report_kb, remove_kb
 from bot.models import Report, ReportStatus
 from bot.services import anti_brush, search_service
 
@@ -28,12 +28,12 @@ class ReportForm(StatesGroup):
 async def report_start(message: Message, state: FSMContext) -> None:
     user = message.from_user
     if user and not await anti_brush.check_report_rate(user.id):
-        await message.answer("报告过于频繁，请稍后再试。")
+        await message.answer("报告过于频繁，请稍后再试。", reply_markup=remove_kb())
         return
     await state.set_state(ReportForm.lamp_id)
     await message.answer(
-        "请输入要报告的灯笼 ID（卡片下方的 UUID，或点灯笼「举报」）：",
-        reply_markup=cancel_kb(),
+        "请输入要报告的灯笼 ID（或在 Mini App 详情页点「举报」）。\n发送「取消」可退出。",
+        reply_markup=remove_kb(),
     )
 
 
@@ -47,9 +47,17 @@ async def report_from_card(cb: CallbackQuery, state: FSMContext) -> None:
     await cb.answer()
     if cb.message:
         await cb.message.answer(
-            "请输入原因（如：虚假信息、盗图、态度恶劣、其他）：",
-            reply_markup=cancel_kb(),
+            "请输入原因（如：虚假信息、盗图、态度恶劣、其他）。\n发送「取消」可退出。",
+            reply_markup=remove_kb(),
         )
+
+
+@router.message(ReportForm.lamp_id, F.text == "取消")
+@router.message(ReportForm.reason, F.text == "取消")
+@router.message(ReportForm.description, F.text == "取消")
+async def cancel_report(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("已取消。", reply_markup=remove_kb())
 
 
 @router.message(ReportForm.lamp_id, F.text)
@@ -92,7 +100,7 @@ async def report_done(message: Message, state: FSMContext, bot: Bot) -> None:
             )
         )
 
-    await message.answer("报告已提交，管理员将审核。", reply_markup=main_menu())
+    await message.answer("报告已提交，管理员将审核。", reply_markup=remove_kb())
     settings = get_settings()
     title = (lamp or {}).get("title") if lamp else "-"
     card = (

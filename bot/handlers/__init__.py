@@ -1,16 +1,16 @@
-"""注册所有路由。会话中转优先于搜索兜底。"""
+"""注册路由。Bot 薄门：仅 session 中转 + /start + /admin。"""
 
 from __future__ import annotations
 
 from aiogram import Dispatcher
 
-from bot.handlers import admin, credit, post, report, search, session, start
+from bot.handlers import admin, session, start
 
 _registered = False
 
 
 def register_handlers(dp: Dispatcher) -> None:
-    """幂等挂载；顺序：session 最先（消息中转），search 最后（关键词兜底）。"""
+    """幂等挂载；session 优先（消息中转）。搜索/发布等仅走 Mini App。"""
     global _registered
     if _registered:
         return
@@ -20,9 +20,5 @@ def register_handlers(dp: Dispatcher) -> None:
 
     dp.include_router(session.router)
     dp.include_router(start.router)
-    dp.include_router(post.router)
-    dp.include_router(report.router)
-    dp.include_router(credit.router)
     dp.include_router(admin.router)
-    dp.include_router(search.router)
     _registered = True

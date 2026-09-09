@@ -1,33 +1,21 @@
-"""统一键盘。"""
+"""统一键盘。Bot 为薄门：无底部 ReplyKeyboard，仅 MenuButton + Inline。"""
 
 from __future__ import annotations
 
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.config import get_settings
 
 
-def main_menu() -> ReplyKeyboardMarkup:
-    b = ReplyKeyboardBuilder()
-    webapp = get_settings().normalized_webapp_url
-    if webapp:
-        b.row(
-            KeyboardButton(
-                text="📱 打开首页",
-                web_app=WebAppInfo(url=webapp),
-            )
-        )
-    b.row(KeyboardButton(text="🔍 搜索"), KeyboardButton(text="🌕 我的"))
-    b.row(KeyboardButton(text="✨ 发布"), KeyboardButton(text="📝 报告"))
-    b.row(KeyboardButton(text="🌸 口碑"), KeyboardButton(text="❓ 帮助"))
-    return b.as_markup(resize_keyboard=True)
+def remove_kb() -> ReplyKeyboardRemove:
+    """清除历史 ReplyKeyboard。"""
+    return ReplyKeyboardRemove(remove_keyboard=True)
 
 
 def admin_webapp_kb() -> InlineKeyboardMarkup | None:
@@ -102,9 +90,3 @@ def admin_report_kb(report_id: str) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="❌ 驳回", callback_data=f"admin_report_no:{report_id}"),
     )
     return b.as_markup()
-
-
-def cancel_kb() -> ReplyKeyboardMarkup:
-    b = ReplyKeyboardBuilder()
-    b.row(KeyboardButton(text="取消"))
-    return b.as_markup(resize_keyboard=True)

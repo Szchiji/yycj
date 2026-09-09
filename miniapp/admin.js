@@ -8,12 +8,10 @@
 
   const state = { token: localStorage.getItem("yycj_token") || "", isAdmin: false };
   const $ = (s) => document.querySelector(s);
-  const $$ = (s) => Array.from(document.querySelectorAll(s));
 
   function toast(msg, isErr) {
     const el = $("#status");
     el.textContent = msg || "";
-    el.className = isErr ? "muted" : "muted";
     el.style.color = isErr ? "#f31260" : "#3dd68c";
   }
 
@@ -21,6 +19,15 @@
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
     })[c]);
+  }
+
+  function mediaSrc(m) {
+    if (!m) return null;
+    const url = typeof m === "string" ? m : (m.url || m.file_id || "");
+    if (!url) return null;
+    if (String(url).startsWith("http")) return url;
+    if (m.preview_url) return m.preview_url;
+    return `/api/media/file/${encodeURIComponent(url)}`;
   }
 
   async function api(path, opts = {}) {
@@ -54,18 +61,10 @@
     return state.isAdmin;
   }
 
-  function showTab(name) {
-    ["posts", "reviews", "reports", "homeops"].forEach((t) => {
-      $(`#tab-${t}`).classList.toggle("hidden", t !== name);
-    });
-    $$(".admin-tabs .tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  }
-
   function mediaSummary(d) {
     const media = d.media || [];
     const photos = d.photos || [];
-    const n = media.length || photos.length;
-    return `媒体 ${n}`;
+    return `媒体 ${media.length || photos.length}`;
   }
 
   async function refresh() {
@@ -80,12 +79,12 @@
     $("#adminPosts").innerHTML = (posts.items || []).map((p) => {
       const d = p.lamp_data || {};
       const mediaHtml = (d.media || d.photos || []).slice(0, 4).map((m) => {
-        const url = typeof m === "string" ? m : m.url;
-        if (!url || !String(url).startsWith("http")) return "";
+        const src = mediaSrc(m);
+        if (!src) return "";
         const isVid = typeof m === "object" && m.type === "video";
         return isVid
-          ? `<video controls src="${escapeHtml(url)}" style="max-width:100%;border-radius:8px;margin:4px 0"></video>`
-          : `<img src="${escapeHtml(url)}" alt="" style="max-width:100%;border-radius:8px;margin:4px 0" />`;
+          ? `<video controls src="${escapeHtml(src)}" style="max-width:100%;border-radius:8px;margin:4px 0"></video>`
+          : `<img src="${escapeHtml(src)}" alt="" style="max-width:100%;border-radius:8px;margin:4px 0" />`;
       }).join("");
       return `<div class="card">
         <div class="muted">${escapeHtml(p.post_id)}</div>
@@ -97,7 +96,7 @@
         ${mediaHtml}
         <div class="row">
           <button class="btn primary" data-admin="post-ok" data-id="${escapeHtml(p.post_id)}">通过</button>
-          <button class="btn" data-admin="post-pin" data-id="${escapeHtml(p.post_id)}">通过并置顶</button>
+          <button class="btn" data-admin="post-pin" data-id="${escapeHtml(p.post_id)}">通过并上轮播</button>
           <button class="btn danger" data-admin="post-no" data-id="${escapeHtml(p.post_id)}">拒绝</button>
         </div>
       </div>`;
@@ -106,9 +105,8 @@
     $("#adminReviews").innerHTML = (reviews.items || []).map((r) => `
       <div class="card">
         <div class="muted">${escapeHtml(r.review_id)}</div>
-        <div>★${r.stars} · 客人 ${r.guest_id} · 灯笼 <code>${escapeHtml(r.lamp_id)}</code></div>
+        <div>★${r.stars} · 客人 ${r.guest_id} · 资料 <code>${escapeHtml(r.lamp_id)}</code></div>
         <p>${escapeHtml(r.text || "")}</p>
-        <div class="muted">${(r.photos || []).length} 张图</div>
         <div class="row">
           <button class="btn primary" data-admin="rev-ok" data-id="${escapeHtml(r.review_id)}">通过</button>
           <button class="btn danger" data-admin="rev-brush" data-id="${escapeHtml(r.review_id)}">拒绝刷评</button>
@@ -120,7 +118,7 @@
     $("#adminReports").innerHTML = (reports.items || []).map((r) => `
       <div class="card">
         <div class="muted">${escapeHtml(r.report_id)}</div>
-        <div>灯笼 <code>${escapeHtml(r.lamp_id)}</code></div>
+        <div>资料 <code>${escapeHtml(r.lamp_id)}</code></div>
         <div class="muted">举报人 ${r.reporter_id} · ${escapeHtml(r.reason || "")}</div>
         <p>${escapeHtml(r.description || "")}</p>
         <div class="row">
@@ -137,9 +135,14 @@
     `).join("") || "<p class='muted'>无遮蔽用户</p>";
 
     const settings = home.settings || {};
-    $("#annText").value = settings.announcement_text || "";
-    $("#annOn").checked = !!settings.announcement_enabled;
-    $("#citiesInput").value = (settings.enabled_cities || []).join(", ");
+    if ($("#annText")) $("#annText").value = settings.announcement_text || "";
+    if ($("#annOn")) $("#annOn").checked = !!settings.announcement_enabled;
+    if ($("#citiesInput")) $("#citiesInput").value = (settings.enabled_cities || []).join(", ");
+    if ($("#opsPageSize")) $("#opsPageSize").value = settings.home_feed_page_size || 3;
+    if ($("#opsCta")) $("#opsCta").value = settings.chat_cta_label || "想聊聊";
+    if ($("#opsWelcome")) $("#opsWelcome").value = settings.bot_welcome_text || "";
+    if ($("#opsMediaMax")) $("#opsMediaMax").value = settings.media_max_count || 9;
+    if ($("#opsReviewAudit")) $("#opsReviewAudit").checked = settings.review_require_audit !== false;
 
     $("#adminPins").innerHTML = (home.pins || []).map((p) => {
       const l = p.lamp || {};
@@ -151,14 +154,33 @@
         <button class="btn danger" data-admin="pin-del" data-id="${p.id}">移除</button>
       </div>`;
     }).join("") || "<p class='muted'>暂无精选</p>";
+
+    const feedPins = home.feed_pins || [];
+    if ($("#adminFeedPins")) {
+      $("#adminFeedPins").innerHTML = feedPins.map((fp) => `
+        <div class="card row" style="justify-content:space-between">
+          <div><strong>${escapeHtml(fp.title || fp.lamp_id)}</strong>
+            <div class="muted">${escapeHtml(fp.city || "")} · ${escapeHtml(fp.lamp_id)}</div></div>
+          <button class="btn danger" data-admin="feed-unpin" data-id="${escapeHtml(fp.lamp_id)}">取消</button>
+        </div>
+      `).join("") || "<p class='muted'>暂无卡片置顶</p>";
+    }
+
+    const approved = home.approved_lamps || [];
+    const fillSel = (selId) => {
+      const sel = $(selId);
+      if (!sel) return;
+      const opts = [`<option value="">选择资料…</option>`];
+      for (const it of approved) {
+        opts.push(`<option value="${escapeHtml(it.lamp_id)}">${escapeHtml(it.title || it.lamp_id)} · ${escapeHtml(it.city || "")}</option>`);
+      }
+      sel.innerHTML = opts.join("");
+    };
+    fillSel("#pinLampId");
+    fillSel("#feedPinLampId");
   }
 
   document.body.addEventListener("click", async (ev) => {
-    const tab = ev.target.closest(".admin-tabs .tab");
-    if (tab) {
-      showTab(tab.dataset.tab);
-      return;
-    }
     const btn = ev.target.closest("button[data-admin]");
     if (!btn) return;
     const id = btn.dataset.id;
@@ -175,34 +197,15 @@
       if (act === "rep-ok") await api(`/api/admin/reports/${encodeURIComponent(id)}/accept`, { method: "POST", body: "{}" });
       if (act === "rep-no") await api(`/api/admin/reports/${encodeURIComponent(id)}/reject`, { method: "POST", body: "{}" });
       if (act === "pin-del") await api(`/api/admin/homepage/pins/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (act === "feed-unpin") await api("/api/admin/homepage/feed-pins", {
+        method: "POST", body: JSON.stringify({ lamp_id: id, pinned: false }),
+      });
       toast("已处理");
       await refresh();
     } catch (e) { toast(e.message || String(e), true); }
   });
 
-  $("#btnAnn").addEventListener("click", async () => {
-    try {
-      await api("/api/admin/homepage/announcement", {
-        method: "POST",
-        body: JSON.stringify({ text: $("#annText").value, enabled: $("#annOn").checked }),
-      });
-      toast("公告已保存");
-    } catch (e) { toast(e.message || String(e), true); }
-  });
-
-  $("#btnCities").addEventListener("click", async () => {
-    try {
-      const cities = $("#citiesInput").value.split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean);
-      await api("/api/admin/homepage/cities", {
-        method: "POST",
-        body: JSON.stringify({ cities }),
-      });
-      toast("城市已保存");
-      await refresh();
-    } catch (e) { toast(e.message || String(e), true); }
-  });
-
-  $("#btnPin").addEventListener("click", async () => {
+  $("#btnPin")?.addEventListener("click", async () => {
     try {
       const hoursRaw = $("#pinHours").value;
       const body = {
@@ -211,21 +214,20 @@
         expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10),
       };
       await api("/api/admin/homepage/pins", { method: "POST", body: JSON.stringify(body) });
-      toast("置顶已更新");
-      $("#pinLampId").value = "";
+      toast("已上轮播");
       await refresh();
     } catch (e) { toast(e.message || String(e), true); }
   });
 
-  $("#btnSeed").addEventListener("click", async () => {
+  $("#btnSeed")?.addEventListener("click", async () => {
     try {
       const data = await api("/api/admin/seed-demo", { method: "POST", body: "{}" });
-      toast(data.seeded ? "已种子演示数据" : (data.reason || "未种子"));
+      toast(data.seeded ? "演示数据已填充" : (data.reason || "未种子"));
       await refresh();
     } catch (e) { toast(e.message || String(e), true); }
   });
 
-  $("#adjForm").addEventListener("submit", async (ev) => {
+  $("#adjForm")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     try {
       const data = await api("/api/admin/credit/adjust", {
@@ -233,16 +235,57 @@
         body: JSON.stringify({
           user_id: parseInt($("#adjUser").value, 10),
           delta: parseInt($("#adjDelta").value, 10),
-          note: $("#adjNote").value.trim(),
+          note: ($("#adjNote").value || "").trim(),
         }),
       });
       toast(`已调整 → ${data.user.lanhua_score}`);
     } catch (e) { toast(e.message || String(e), true); }
   });
 
-  $("#btnRefresh").addEventListener("click", async () => {
+  $("#btnRefresh")?.addEventListener("click", async () => {
     try { await refresh(); toast("已刷新"); }
     catch (e) { toast(e.message || String(e), true); }
+  });
+
+  $("#btnFeedPinAdd")?.addEventListener("click", async () => {
+    try {
+      const lamp_id = ($("#feedPinLampId")?.value || "").trim();
+      if (!lamp_id) return toast("请选择资料", true);
+      await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id, pinned: true }) });
+      toast("已卡片置顶");
+      await refresh();
+    } catch (e) { toast(e.message || String(e), true); }
+  });
+
+  $("#btnFeedPinDel")?.addEventListener("click", async () => {
+    try {
+      const lamp_id = ($("#feedPinLampId")?.value || "").trim();
+      if (!lamp_id) return toast("请选择资料", true);
+      await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id, pinned: false }) });
+      toast("已取消置顶");
+      await refresh();
+    } catch (e) { toast(e.message || String(e), true); }
+  });
+
+  $("#btnOpsSave")?.addEventListener("click", async () => {
+    try {
+      const cities = ($("#citiesInput").value || "").split(/[,，\s]+/).map((s) => s.trim()).filter(Boolean);
+      await api("/api/admin/homepage/ops", {
+        method: "POST",
+        body: JSON.stringify({
+          announcement_text: $("#annText").value,
+          announcement_enabled: $("#annOn").checked,
+          cities,
+          home_feed_page_size: parseInt($("#opsPageSize").value, 10) || 3,
+          chat_cta_label: $("#opsCta").value || "想聊聊",
+          bot_welcome_text: $("#opsWelcome").value || "",
+          media_max_count: parseInt($("#opsMediaMax").value, 10) || 9,
+          review_require_audit: $("#opsReviewAudit").checked,
+        }),
+      });
+      toast("设置已保存");
+      await refresh();
+    } catch (e) { toast(e.message || String(e), true); }
   });
 
   (async () => {
