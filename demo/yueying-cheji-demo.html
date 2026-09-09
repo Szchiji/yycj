@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>月影车姬 · 完整显示效果演示</title>
+<style>
+  :root {
+    --moon: #c9b8ff;
+    --bg: #0b0a14;
+    --card: #16142a;
+    --text: #f2efff;
+    --muted: #9a94b8;
+    --accent: #a78bfa;
+    --gold: #f5d76e;
+    --ok: #6ee7b7;
+    --danger: #ff6b8a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #07060f, #12101f, #0b0a14);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 12px 50px;
+  }
+  h1 { font-size: 22px; letter-spacing: 2px; margin-bottom: 8px;
+    background: linear-gradient(90deg, #e9e0ff, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { color: var(--muted); font-size: 12px; text-align: center; margin-bottom: 16px; max-width: 480px; }
+  .tabs-top { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center; }
+  .tabs-top button {
+    background: #1a1830; color: #cfc8e8; border: 1px solid #2e2a4a;
+    border-radius: 20px; padding: 7px 12px; font-size: 12px; cursor: pointer;
+  }
+  .tabs-top button.active {
+    background: linear-gradient(135deg, #6d5ae0, #a78bfa); border-color: transparent; color: #fff;
+  }
+  .phone {
+    width: 100%; max-width: 390px; background: var(--bg); border-radius: 32px;
+    overflow: hidden; box-shadow: 0 25px 70px rgba(0,0,0,.55);
+    display: none; flex-direction: column; min-height: 680px; position: relative;
+  }
+  .phone.show { display: flex; }
+  .status-bar {
+    background: linear-gradient(90deg, #1a1630, #221e3c); color: #ddd;
+    padding: 11px 16px; font-size: 12px; display: flex; justify-content: space-between;
+  }
+  .status-bar .bot-name { font-weight: 600; color: var(--moon); }
+  .content { flex: 1; padding: 14px; overflow-y: auto; padding-bottom: 80px; }
+  .card {
+    background: var(--card); border: 1px solid #2e2a4a; border-radius: 16px;
+    padding: 13px 14px; margin-bottom: 11px;
+  }
+  .btn {
+    display: block; width: 100%; text-align: center; padding: 11px; border-radius: 13px;
+    border: none; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 8px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #6d5ae0, #a78bfa); color: #fff;
+  }
+  .btn-ghost { background: transparent; border: 1px solid #3a3658; color: var(--muted); }
+  .welcome-hero { text-align: center; padding: 40px 10px 20px; }
+  .welcome-hero .logo { font-size: 52px; margin-bottom: 10px; }
+  .welcome-hero h2 { font-size: 22px; letter-spacing: 3px; margin-bottom: 8px;
+    background: linear-gradient(90deg, #e9e0ff, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hint { text-align: center; color: #6a6480; font-size: 11px; margin-top: 14px; max-width: 390px; }
+</style>
+</head>
+<body>
+<h1>月影车姬 · UI 演示</h1>
+<p class="subtitle">完整交互版请使用本地 artifacts/yueying-cheji-demo.html<br>本页为仓库精简展示版</p>
+
+<div class="tabs-top">
+  <button class="active" onclick="show('welcome')">欢迎页</button>
+  <button onclick="show('map')">秘境说明</button>
+</div>
+
+<div class="phone show" id="screen-welcome">
+  <div class="status-bar"><span class="bot-name">月影车姬</span><span>22:18</span></div>
+  <div class="content">
+    <div class="welcome-hero">
+      <div class="logo">🌕</div>
+      <h2>月影车姬</h2>
+      <p style="color:var(--muted); font-size:13px; line-height:1.6;">月下寻花，影中见真<br>智能匹配 · 匿名会话 · 兰花信用</p>
+    </div>
+    <div class="card" style="font-size:13px; line-height:1.7; color:#d4c8f5;">
+      ✨ 进入月影秘境，提灯夜游<br>
+      💬 月影媒婆自然语言匹配<br>
+      🔒 匿名月下私语<br>
+      🌕 兰花信用 · 真实度鉴真<br>
+      🌑 月影遮蔽与修行恢复
+    </div>
+    <button class="btn btn-primary" onclick="show('map')">进入月影秘境</button>
+    <button class="btn btn-ghost">查看使用须知</button>
+    <div style="margin-top:16px; text-align:center; font-size:11px; color:var(--muted);">
+      仅公开资源分享 · 不涉及交易 · 请自行验证安全
+    </div>
+  </div>
+</div>
+
+<div class="phone" id="screen-map">
+  <div class="status-bar"><span class="bot-name">月影车姬</span><span>22:18</span></div>
+  <div class="content">
+    <div class="card">
+      <div style="font-size:14px; margin-bottom:8px;">🌕 秘境地图（完整版）</div>
+      <div style="font-size:12px; color:var(--muted); line-height:1.6;">
+        完整交互演示包含：夜游地图、灯笼卡片、媒婆对话、匿名会话、信用月相、投稿、报告、月影遮蔽等 9 个界面。<br><br>
+        请下载仓库旁的完整 demo 或在本地打开 yueying-cheji-demo.html 查看全部效果。
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="show('welcome')">返回欢迎页</button>
+  </div>
+</div>
+
+<p class="hint">仓库：Szchiji/lieyou · 部署请见 README 中的 Railway 步骤</p>
+
+<script>
+function show(name) {
+  document.querySelectorAll('.phone').forEach(p => p.classList.remove('show'));
+  document.getElementById('screen-' + name).classList.add('show');
+  document.querySelectorAll('.tabs-top button').forEach((b,i) => {
+    b.classList.toggle('active', (name==='welcome'&&i===0)||(name==='map'&&i===1));
+  });
+}
+</script>
+</body>
+</html>
