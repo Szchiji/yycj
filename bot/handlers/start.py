@@ -1,9 +1,9 @@
-""" /start。Bot 薄门：欢迎 + 清键盘 + 提醒点左下角首页。"""
+""" /start 与 /help。Bot 薄门：欢迎 + 清键盘 + 提醒点左下角首页。"""
 
 from __future__ import annotations
 
 from aiogram import Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from bot.config import get_settings
@@ -11,6 +11,10 @@ from bot.keyboards import admin_webapp_kb, remove_kb
 from bot.services import credit_service, home_service
 
 router = Router(name="start")
+
+HELP_TEXT = """<b>月影车姬</b>
+点左下角「首页」打开应用。
+管理员可发 /admin。"""
 
 
 @router.message(CommandStart())
@@ -37,3 +41,8 @@ async def cmd_start(message: Message) -> None:
     if settings.is_admin(user.id):
         kb = admin_webapp_kb()
         await message.answer("管理员可点下方打开后台，或发 /admin。", reply_markup=kb)
+
+
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(HELP_TEXT, reply_markup=remove_kb())
