@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 
@@ -32,7 +33,7 @@ logger = logging.getLogger("yueying")
 settings = get_settings()
 bot = Bot(
     token=settings.bot_token or "0:init",
-    default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML),
 )
 dp = Dispatcher(storage=MemoryStorage())
 dp.update.middleware(ErrorLogMiddleware())
@@ -58,18 +59,28 @@ async def job_daily_credit() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     if not settings.bot_token:
         raise RuntimeError("请设置环境变量 BOT_TOKEN")
     logging.getLogger().setLevel(settings.log_level.upper())
     await connect_db()
+    logger.info("Database connected")
 
     if not scheduler.running:
         scheduler.add_job(
-            job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True
+            job_expire_sessions,
+            "interval",
+            minutes=5,
+            id="expire_sessions",
+            replace_existing=True,
         )
         scheduler.add_job(
-            job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True
+            job_daily_credit,
+            "cron",
+            hour=0,
+            minute=5,
+            id="daily_credit",
+            replace_existing=True,
         )
         scheduler.start()
 
@@ -78,11 +89,12 @@ async def lifespan(app: FastAPI):
             url=settings.webhook_url,
             secret_token=settings.webhook_secret or None,
             drop_pending_updates=True,
+            allowed_updates=dp.resolve_used_update_types(),
         )
         me = await bot.get_me()
         logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
     else:
-        logger.warning("WEBHOOK_HOST 未配置，仅启动 HTTP 健康检查；请用 polling 本地调试")
+        logger.warning("WEBHOOK_HOST 未配置：HTTP 仅健康检查；本地请走 polling")
 
     yield
 
@@ -102,7 +114,7 @@ app = FastAPI(title="月影车姬", lifespan=lifespan)
 
 
 @app.get("/")
-async def health() -> dict:
+async def root() -> dict:
     return {
         "ok": True,
         "service": "yueying-cheji",
@@ -129,7 +141,6 @@ async def telegram_webhook(
 
 
 async def run_polling() -> None:
-    """本地开发：不配 WEBHOOK_HOST 时可用。"""
     if not settings.bot_token:
         raise RuntimeError("请设置环境变量 BOT_TOKEN")
     logging.getLogger().setLevel(settings.log_level.upper())
@@ -137,10 +148,19 @@ async def run_polling() -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     if not scheduler.running:
         scheduler.add_job(
-            job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True
+            job_expire_sessions,
+            "interval",
+            minutes=5,
+            id="expire_sessions",
+            replace_existing=True,
         )
         scheduler.add_job(
-            job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True
+            job_daily_credit,
+            "cron",
+            hour=0,
+            minute=5,
+            id="daily_credit",
+            replace_existing=True,
         )
         scheduler.start()
     me = await bot.get_me()
@@ -157,12 +177,13 @@ async def run_polling() -> None:
 def main() -> None:
     import uvicorn
 
+    port = int(os.environ.get("PORT") or settings.port or 8080)
+
     if settings.use_webhook:
-        # 直接传 app 对象，避免 uvicorn 再次 import 模块导致 Router 重复挂载
         uvicorn.run(
             app,
             host="0.0.0.0",
-            port=settings.port,
+            port=port,
             log_level=settings.log_level.lower(),
         )
     else:
