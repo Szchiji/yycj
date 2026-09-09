@@ -39,8 +39,11 @@ main { padding: 12px 16px 80px; max-width: 720px; margin: 0 auto; }
   padding: 8px 14px;
   font-size: .9rem;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 .tab.active, .btn.primary { background: var(--accent); color: #081018; border-color: transparent; font-weight: 600; }
+.btn.danger { background: #3a1524; color: #ffb4c8; border-color: #6b2740; }
 .card {
   background: var(--card);
   border: 1px solid var(--line);
