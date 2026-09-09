@@ -19,6 +19,8 @@ from bot.api.routes_core import (
     PinBody,
     PinReorderBody,
     ApprovePinBody,
+    FeedPinBody,
+    OpsSettingsBody,
     _ser_dt,
     _ser_user,
     _ser_lamp,
@@ -185,8 +187,17 @@ async def api_admin_homepage(_: int = Depends(get_admin_user_id)) -> Dict[str, A
         p["created_at"] = _ser_dt(p.get("created_at"))
         if p.get("lamp"):
             p["lamp"] = _ser_lamp(p["lamp"])
+    feed_pins = await home_service.list_feed_pins()
+    lamps = await home_service.list_approved_lamps_brief(limit=100)
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
-    return {"ok": True, "settings": settings, "pins": pins}
+    return {
+        "ok": True,
+        "settings": settings,
+        "pins": pins,
+        "carousel_pins": pins,
+        "feed_pins": feed_pins,
+        "approved_lamps": lamps,
+    }
 
 @router.post("/admin/homepage/announcement")
 async def api_admin_announcement(
@@ -298,3 +309,40 @@ async def api_admin_session_messages(
         if k in out_sess:
             out_sess[k] = _ser_dt(out_sess.get(k))
     return {"ok": True, "session": out_sess, "messages": msgs, "count": len(msgs)}
+
+
+@router.post("/admin/homepage/feed-pins")
+async def api_admin_set_feed_pin(
+    body: FeedPinBody,
+    _: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    try:
+        data = await home_service.set_feed_pin(body.lamp_id, pinned=body.pinned)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "feed_pin": data}
+
+@router.post("/admin/homepage/ops")
+async def api_admin_ops_settings(
+    body: OpsSettingsBody,
+    _: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    ops = {}
+    if body.home_feed_page_size is not None:
+        ops["home_feed_page_size"] = body.home_feed_page_size
+    if body.chat_cta_label is not None:
+        ops["chat_cta_label"] = body.chat_cta_label
+    if body.bot_welcome_text is not None:
+        ops["bot_welcome_text"] = body.bot_welcome_text
+    if body.media_max_count is not None:
+        ops["media_max_count"] = body.media_max_count
+    if body.review_require_audit is not None:
+        ops["review_require_audit"] = body.review_require_audit
+    settings = await home_service.update_settings(
+        announcement_text=body.announcement_text,
+        announcement_enabled=body.announcement_enabled,
+        enabled_cities=body.cities,
+        ops_config=ops or None,
+    )
+    settings["updated_at"] = _ser_dt(settings.get("updated_at"))
+    return {"ok": True, "settings": settings}
