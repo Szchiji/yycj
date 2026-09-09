@@ -1,12 +1,27 @@
-"""数据模型与常量（与 MongoDB 文档结构对应）。"""
+"""SQLAlchemy ORM 模型与业务常量。"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class CreditTier(str, Enum):
@@ -55,106 +70,108 @@ def tier_from_score(score: int) -> CreditTier:
     return CreditTier.FULL
 
 
-class UserDoc(BaseModel):
-    user_id: int
-    username: Optional[str] = None
-    full_name: Optional[str] = None
-    lanhua_score: int = 100
-    tier: str = CreditTier.NEW.value
-    shadow_days: int = 0
-    shadow_reason: Optional[str] = None
-    recovery_progress: float = 0.0
-    total_earned: int = 0
-    total_deducted: int = 0
-    is_shadowed: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_recovery_at: Optional[datetime] = None
+class User(Base):
+    __tablename__ = "users"
 
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
-
-
-class LampDoc(BaseModel):
-    lamp_id: str
-    user_id: int
-    city: str
-    title: str
-    tags: List[str] = Field(default_factory=list)
-    price: Optional[int] = None
-    price_text: Optional[str] = None
-    description: str = ""
-    photos: List[str] = Field(default_factory=list)
-    authenticity_score: int = 80
-    credit_boost: int = 0
-    status: str = LampStatus.PENDING.value
-    match_score_hint: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    lanhua_score: Mapped[int] = mapped_column(Integer, default=100)
+    tier: Mapped[str] = mapped_column(String(16), default=CreditTier.NEW.value)
+    shadow_days: Mapped[int] = mapped_column(Integer, default=0)
+    shadow_reason: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    recovery_progress: Mapped[float] = mapped_column(Float, default=0.0)
+    total_earned: Mapped[int] = mapped_column(Integer, default=0)
+    total_deducted: Mapped[int] = mapped_column(Integer, default=0)
+    is_shadowed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    last_recovery_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
-class SessionDoc(BaseModel):
-    session_id: str
-    lamp_id: str
-    user_a_id: int
-    user_b_id: int
-    anonymous_a: str = "月影人 A"
-    anonymous_b: str = "月影人 B"
-    status: str = SessionStatus.PENDING.value
-    message_count: int = 0
-    media_count: int = 0
-    has_praise: bool = False
-    reported: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    expire_at: Optional[datetime] = None
-    last_activity: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
-    ai_quality_score: int = 50
+class Lamp(Base):
+    __tablename__ = "lamps"
 
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
-
-
-class PostDoc(BaseModel):
-    post_id: str
-    user_id: int
-    lamp_data: Dict[str, Any]
-    status: str = PostStatus.PENDING.value
-    similarity_score: float = 0.0
-    review_note: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    reviewed_at: Optional[datetime] = None
-
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    city: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(128))
+    tags: Mapped[List[str]] = mapped_column(ARRAY(String), default=list)
+    price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    price_text: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    photos: Mapped[list] = mapped_column(JSONB, default=list)
+    authenticity_score: Mapped[int] = mapped_column(Integer, default=80)
+    credit_boost: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default=LampStatus.PENDING.value, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
-class ReportDoc(BaseModel):
-    report_id: str
-    lamp_id: str
-    reporter_id: int
-    reason: str
-    description: str = ""
-    evidence: List[str] = Field(default_factory=list)
-    status: str = ReportStatus.PENDING.value
-    ai_verdict: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    reviewed_at: Optional[datetime] = None
+class Session(Base):
+    __tablename__ = "sessions"
 
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_a_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    user_b_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    anonymous_a: Mapped[str] = mapped_column(String(32, default="月影人 A"))
+    anonymous_b: Mapped[str] = mapped_column(String(32), default="月影人 B")
+    status: Mapped[str] = mapped_column(String(16), default=SessionStatus.PENDING.value, index=True)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    media_count: Mapped[int] = mapped_column(Integer, default=0)
+    has_praise: Mapped[bool] = mapped_column(Boolean, default=False)
+    reported: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expire_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    last_activity: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    quality_score: Mapped[int] = mapped_column(Integer, default=50)
 
 
-class CreditHistoryDoc(BaseModel):
-    user_id: int
-    time: datetime = Field(default_factory=datetime.utcnow)
-    action: str
-    delta: int
-    reason: str
-    related_id: Optional[str] = None
+class Post(Base):
+    __tablename__ = "posts"
 
-    def to_mongo(self) -> Dict[str, Any]:
-        return self.model_dump()
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    post_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    lamp_data: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default=PostStatus.PENDING.value)
+    similarity_score: Mapped[float] = mapped_column(Float, default=0.0)
+    review_note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    reporter_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    reason: Mapped[str] = mapped_column(String(64))
+    description: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(16), default=ReportStatus.PENDING.value)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class CreditHistory(Base):
+    __tablename__ = "credit_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    action: Mapped[str] = mapped_column(String(64))
+    delta: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(256))
+    related_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
