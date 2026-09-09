@@ -36,6 +36,46 @@
     if (msg) setTimeout(() => el.classList.add("hidden"), 2800);
   }
 
+  function showBoot(msg) {
+    const boot = $("#boot");
+    if (!boot) return;
+    boot.classList.remove("hidden");
+    $("#gate")?.classList.add("hidden");
+    $("#app")?.classList.add("hidden");
+    if (msg != null) {
+      const el = $("#bootMsg");
+      if (el) el.textContent = msg;
+    }
+  }
+
+  function hideBoot() {
+    $("#boot")?.classList.add("hidden");
+    const retry = $("#bootRetry");
+    if (retry) retry.classList.add("hidden");
+  }
+
+  function showBootError(msg) {
+    showBoot(msg || "连接失败，请重试");
+    const retry = $("#bootRetry");
+    if (retry) retry.classList.remove("hidden");
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function waitForInitData(timeoutMs = 3500) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const cur = window.Telegram && window.Telegram.WebApp;
+      const initData = (cur && cur.initData) || "";
+      if (initData) return initData;
+      await sleep(100);
+    }
+    const cur = window.Telegram && window.Telegram.WebApp;
+    return (cur && cur.initData) || "";
+  }
+
   async function api(path, opts = {}) {
     const headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
@@ -61,20 +101,27 @@
   }
 
   async function login() {
-    const initData = (tg && tg.initData) || "";
+    showBoot("正在连接…");
+    const initData = await waitForInitData(3500);
     if (!initData) {
-      toast("请在 Telegram 内打开月影车姬", true);
+      showBootError("未检测到 Telegram 登录信息。请在 Telegram 内通过「打开首页」进入，不要用外部浏览器打开。");
       return false;
     }
-    const data = await api("/api/auth", {
-      method: "POST",
-      body: JSON.stringify({ initData }),
-    });
-    state.token = data.token;
-    state.user = data.user;
-    state.isAdmin = !!data.is_admin;
-    localStorage.setItem("yycj_token", state.token);
-    return true;
+    try {
+      showBoot("正在登录…");
+      const data = await api("/api/auth", {
+        method: "POST",
+        body: JSON.stringify({ initData }),
+      });
+      state.token = data.token;
+      state.user = data.user;
+      state.isAdmin = !!data.is_admin;
+      localStorage.setItem("yycj_token", state.token);
+      return true;
+    } catch (e) {
+      showBootError(`登录失败：${e.message || String(e)}`);
+      return false;
+    }
   }
 
   async function setRole(role) {
@@ -88,6 +135,7 @@
   }
 
   function showGate(show) {
+    hideBoot();
     $("#gate").classList.toggle("hidden", !show);
     $("#app").classList.toggle("hidden", show);
   }
@@ -454,10 +502,11 @@
     await loadMe().catch(() => {});
   }
 
-  (async () => {
+  async function boot() {
     try {
       const ok = await login();
       if (!ok) return;
+      hideBoot();
       if (!state.user || !state.user.role) {
         showGate(true);
         return;
@@ -465,7 +514,17 @@
       showGate(false);
       await afterRole();
     } catch (e) {
-      toast(e.message || String(e), true);
+      showBootError(`启动失败：${e.message || String(e)}`);
     }
-  })();
+  }
+
+  const bootRetry = $("#bootRetry");
+  if (bootRetry) {
+    bootRetry.addEventListener("click", () => {
+      bootRetry.classList.add("hidden");
+      boot();
+    });
+  }
+
+  boot();
 })();

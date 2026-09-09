@@ -27,7 +27,7 @@ class PostForm(StatesGroup):
     photos = State()
 
 
-@router.message(F.text == "✨ 点亮灯笼")
+@router.message(F.text.in_({"✨ 点亮灯笼", "✨ 发布"}))
 async def post_start(message: Message, state: FSMContext) -> None:
     user = message.from_user
     if not user:

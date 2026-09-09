@@ -143,10 +143,10 @@ label { font-size: .85rem; color: var(--muted); }
   font-size: .8rem; padding: 8px;
 }
 .nav-item.active { color: var(--accent); font-weight: 600; }
-.gate {
+.gate, .boot {
   min-height: 100vh; display: grid; place-items: center; padding: 24px;
 }
-.gate-card {
+.gate-card, .boot-card {
   width: 100%; max-width: 360px; background: var(--card);
   border: 1px solid var(--line); border-radius: 18px; padding: 24px; text-align: center;
 }

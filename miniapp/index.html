@@ -4,11 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css" />
+  <script src="./telegram-web-app.js"></script>
+  <!-- CDN fallback if local SDK missing -->
+  <script>
+  if (!(window.Telegram && window.Telegram.WebApp)) {
+    document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
+  }
+  </script>
+  <link rel="stylesheet" href="./styles.css?v=20260910" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
+
+  <section id="boot" class="boot">
+    <div class="boot-card">
+      <h1>🌕 月影车姬</h1>
+      <p id="bootMsg" class="muted">正在连接…</p>
+      <button id="bootRetry" class="btn primary block hidden" type="button">重试</button>
+    </div>
+  </section>
 
   <section id="gate" class="gate hidden">
     <div class="gate-card">
@@ -134,6 +148,7 @@
     </div>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="./boot-inline.js?v=20260910"></script>
+  <script src="./app.js?v=20260910"></script>
 </body>
 </html>
