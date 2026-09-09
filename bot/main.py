@@ -119,10 +119,11 @@ async def _startup() -> None:
         _schedule_jobs()
 
         if settings.use_webhook:
+            # drop_pending_updates=False：部署重启不丢用户消息
             await bot.set_webhook(
                 url=settings.webhook_url,
                 secret_token=settings.webhook_secret or None,
-                drop_pending_updates=True,
+                drop_pending_updates=False,
                 allowed_updates=dp.resolve_used_update_types(),
             )
             me = await bot.get_me()
@@ -154,11 +155,8 @@ async def lifespan(_app: FastAPI):
             pass
     if scheduler.running:
         scheduler.shutdown(wait=False)
-    if settings.use_webhook:
-        try:
-            await bot.delete_webhook(drop_pending_updates=False)
-        except Exception:
-            pass
+    # 注意：Railway 滚动部署时旧实例会先关机。若在此 delete_webhook，
+    # 会清掉新实例刚设好的 webhook，导致 Bot 无响应。生产 webhook 模式勿删。
     await anti_brush.close_redis()
     await close_db()
     await bot.session.close()
