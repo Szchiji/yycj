@@ -3,62 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>月影车姬 · 管理控制台</title>
+  <title>月影车姬 · 管理</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <header>
-    <h1>🛠 管理控制台</h1>
-    <div class="sub">仅 ADMIN_IDS · 审核 / 遮蔽 / 信用 / 会话消息</div>
-    <div id="status" class="meta" style="margin-top:8px"></div>
-    <div class="row" style="margin-top:8px">
-      <a class="btn" href="./index.html">← 返回 Mini App</a>
-      <button class="btn" id="btnRefresh" type="button">刷新全部</button>
+  <header class="topbar">
+    <div>
+      <h1>🛠 月影车姬管理</h1>
+      <div id="status" class="muted"></div>
+    </div>
+    <div class="row">
+      <a class="btn" href="./index.html">← Mini App</a>
+      <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
   <main>
     <div id="gate" class="card">正在校验管理员身份…</div>
-
     <div id="console" class="hidden">
-      <section class="card">
-        <h3>信用调整</h3>
-        <form id="adjForm">
-          <label>用户 Telegram ID</label>
-          <input id="adjUser" type="number" required />
-          <label>Δ 分值（可负）</label>
-          <input id="adjDelta" type="number" required />
-          <label>备注</label>
-          <input id="adjNote" placeholder="原因说明" />
-          <button class="btn primary" type="submit">提交调整</button>
-        </form>
-      </section>
-
-      <section>
-        <h3>待审投稿</h3>
+      <div class="admin-tabs">
+        <button class="btn tab active" data-tab="posts" type="button">资料审核</button>
+        <button class="btn tab" data-tab="reviews" type="button">评价审核</button>
+        <button class="btn tab" data-tab="reports" type="button">举报</button>
+        <button class="btn tab" data-tab="homeops" type="button">首页运营</button>
+      </div>
+      <section id="tab-posts">
+        <h3>待审资料</h3>
         <div id="adminPosts"></div>
       </section>
-
-      <section>
-        <h3>待审报告</h3>
-        <div id="adminReports"></div>
+      <section id="tab-reviews" class="hidden">
+        <h3>待审评价</h3>
+        <div id="adminReviews"></div>
       </section>
-
-      <section>
+      <section id="tab-reports" class="hidden">
+        <h3>待审举报</h3>
+        <div id="adminReports"></div>
         <h3>遮蔽名单</h3>
         <div id="adminShadow"></div>
       </section>
-
-      <section class="card">
-        <h3>会话消息查询</h3>
-        <label>session_id</label>
-        <input id="sessId" placeholder="完整 UUID" />
-        <button class="btn primary" id="btnSess" type="button">查询</button>
-        <div id="sessOut" style="margin-top:10px"></div>
+      <section id="tab-homeops" class="hidden">
+        <div class="card">
+          <h3>滚动公告</h3>
+          <textarea id="annText" rows="2"></textarea>
+          <label><input type="checkbox" id="annOn" /> 启用公告</label>
+          <button class="btn primary" id="btnAnn" type="button">保存公告</button>
+        </div>
+        <div class="card">
+          <h3>开放城市（逗号分隔）</h3>
+          <input id="citiesInput" />
+          <button class="btn primary" id="btnCities" type="button">保存城市</button>
+        </div>
+        <div class="card">
+          <h3>精选轮播</h3>
+          <div id="adminPins"></div>
+          <label>新增置顶 lamp_id</label>
+          <input id="pinLampId" />
+          <label>过期小时（可空=不过期）</label>
+          <input id="pinHours" type="number" value="72" />
+          <button class="btn primary" id="btnPin" type="button">添加/更新置顶</button>
+          <button class="btn" id="btnSeed" type="button">种子演示数据（若库空）</button>
+        </div>
+        <div class="card">
+          <h3>信用调整</h3>
+          <form id="adjForm">
+            <label>用户 Telegram ID</label>
+            <input id="adjUser" type="number" required />
+            <label>Δ 分值</label>
+            <input id="adjDelta" type="number" required />
+            <label>备注</label>
+            <input id="adjNote" />
+            <button class="btn primary" type="submit">提交</button>
+          </form>
+        </div>
       </section>
     </div>
-
-    <p class="footer-note">审核动作走 <code>/api/admin/posts|reports/…</code>，与 Bot 内联按钮共用 <code>admin_ops</code> 业务逻辑；用户通知为 best-effort。</p>
   </main>
   <script src="./admin.js"></script>
 </body>
