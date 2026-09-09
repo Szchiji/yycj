@@ -21,7 +21,7 @@ from bot.config import get_settings
 from bot.db import close_db, connect_db
 from bot.handlers import register_handlers
 from bot.middlewares import ErrorLogMiddleware
-from bot.services import credit_service, session_service
+from bot.services import anti_brush, credit_service, session_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,12 +53,49 @@ async def job_expire_sessions() -> None:
         logger.exception("expire sessions failed")
 
 
+async def job_purge_session_messages() -> None:
+    try:
+        n = await session_service.purge_expired_messages()
+        if n:
+            logger.info("Purged %s session messages", n)
+    except Exception:
+        logger.exception("purge session messages failed")
+
+
 async def job_daily_credit() -> None:
     try:
         n = await credit_service.tick_shadow_daily()
         logger.info("Daily credit tick updated %s users", n)
     except Exception:
         logger.exception("daily credit failed")
+
+
+def _schedule_jobs() -> None:
+    if scheduler.running:
+        return
+    scheduler.add_job(
+        job_expire_sessions,
+        "interval",
+        minutes=5,
+        id="expire_sessions",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        job_purge_session_messages,
+        "interval",
+        minutes=30,
+        id="purge_session_messages",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        job_daily_credit,
+        "cron",
+        hour=0,
+        minute=5,
+        id="daily_credit",
+        replace_existing=True,
+    )
+    scheduler.start()
 
 
 async def _startup() -> None:
@@ -71,23 +108,10 @@ async def _startup() -> None:
         await connect_db()
         logger.info("Database connected")
 
-        if not scheduler.running:
-            scheduler.add_job(
-                job_expire_sessions,
-                "interval",
-                minutes=5,
-                id="expire_sessions",
-                replace_existing=True,
-            )
-            scheduler.add_job(
-                job_daily_credit,
-                "cron",
-                hour=0,
-                minute=5,
-                id="daily_credit",
-                replace_existing=True,
-            )
-            scheduler.start()
+        # 预热 Redis / 打出内存回退警告
+        await anti_brush.allow("__warmup__", limit=1, window_sec=1)
+
+        _schedule_jobs()
 
         if settings.use_webhook:
             await bot.set_webhook(
@@ -125,6 +149,7 @@ async def lifespan(_app: FastAPI):
             await bot.delete_webhook(drop_pending_updates=False)
         except Exception:
             pass
+    await anti_brush.close_redis()
     await close_db()
     await bot.session.close()
     logger.info("Bot stopped")
@@ -169,24 +194,9 @@ async def run_polling() -> None:
         raise RuntimeError("请设置环境变量 BOT_TOKEN")
     logging.getLogger().setLevel(settings.log_level.upper())
     await connect_db()
+    await anti_brush.allow("__warmup__", limit=1, window_sec=1)
     await bot.delete_webhook(drop_pending_updates=True)
-    if not scheduler.running:
-        scheduler.add_job(
-            job_expire_sessions,
-            "interval",
-            minutes=5,
-            id="expire_sessions",
-            replace_existing=True,
-        )
-        scheduler.add_job(
-            job_daily_credit,
-            "cron",
-            hour=0,
-            minute=5,
-            id="daily_credit",
-            replace_existing=True,
-        )
-        scheduler.start()
+    _schedule_jobs()
     me = await bot.get_me()
     logger.info("Polling mode | Bot @%s", me.username)
     try:
@@ -194,6 +204,7 @@ async def run_polling() -> None:
     finally:
         if scheduler.running:
             scheduler.shutdown(wait=False)
+        await anti_brush.close_redis()
         await close_db()
         await bot.session.close()
 
