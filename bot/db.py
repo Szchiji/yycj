@@ -31,6 +31,9 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_label VARCHAR(128)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS media JSONB DEFAULT '[]'::jsonb",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS publisher_role VARCHAR(16)",
+    # sessions: columns added after table already existed in production
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS messages_purge_at TIMESTAMP",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 50",
 ]
 
 
@@ -58,6 +61,7 @@ async def connect_db() -> None:
     )
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     async with _engine.begin() as conn:
+        # Creates missing tables (Review/HomepagePin/SiteSettings/session_messages, etc.)
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_columns(conn)
 

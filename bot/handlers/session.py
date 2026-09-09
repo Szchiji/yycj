@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Union
 
 from aiogram import Bot, F, Router
@@ -11,15 +12,33 @@ from aiogram.types import CallbackQuery, Message
 from bot.keyboards import main_menu, session_accept_kb, session_end_kb
 from bot.services import anti_brush, search_service, session_service
 
+logger = logging.getLogger(__name__)
+
 router = Router(name="session")
 
+# Old + new reply-keyboard labels so menu taps never hit the DB filter.
 MENU_TEXTS = {
-    "🔍 搜索灯笼",
-    "🌕 我的月影",
+    # search
+    "\U0001f50d 搜索灯笼",
+    "\U0001f50d 搜索",
+    # mine
+    "\U0001f315 我的月影",
+    "\U0001f315 我的",
+    # publish
     "✨ 点亮灯笼",
-    "📝 月影报告",
-    "🌸 兰花信用",
+    "✨ 发布",
+    # report
+    "\U0001f4dd 月影报告",
+    "\U0001f4dd 报告",
+    # credit / reputation
+    "\U0001f338 兰花信用",
+    "\U0001f338 口碑",
+    # help
     "❓ 帮助",
+    # homepage webapp button variants
+    "\U0001f4f1 打开首页",
+    "打开首页",
+    # cancel
     "取消",
 }
 
@@ -31,9 +50,17 @@ class ActiveSessionFilter(BaseFilter):
         user = message.from_user
         if not user:
             return False
-        if message.text and (message.text in MENU_TEXTS or message.text.startswith("/")):
+        text = message.text or ""
+        # Keep startswith('/') for slash commands; Command objects also carry text.
+        if text and (text in MENU_TEXTS or text.startswith("/")):
             return False
-        sess = await session_service.get_active_for_user(user.id)
+        try:
+            sess = await session_service.get_active_for_user(user.id)
+        except Exception:
+            logger.exception(
+                "ActiveSessionFilter: get_active_for_user failed for user_id=%s", user.id
+            )
+            return False
         if not sess:
             return False
         return {"active_session": sess}
@@ -70,7 +97,7 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     try:
         await bot.send_message(
             lamp["user_id"],
-            f"🌕 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
+            f"\U0001f315 有人想就你的灯笼 <b>{lamp.get('title')}</b> 发起匿名月影会话。\n"
             f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
             reply_markup=session_accept_kb(sess["session_id"]),
         )
@@ -93,7 +120,7 @@ async def accept_session(cb: CallbackQuery, bot: Bot) -> None:
         return
     await cb.answer("已接受")
     text = (
-        "🌕 月影会话已开启。\n"
+        "\U0001f315 月影会话已开启。\n"
         "直接在此对话框发消息即可匿名中转。\n"
         "可用按钮结束会话或好评。"
     )
@@ -131,7 +158,7 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
     delta = (data or {}).get("settle_delta", 0)
-    text = f"🔚 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
+    text = f"\U0001f51a 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
     if cb.message:
         await cb.message.answer(text, reply_markup=main_menu())
     if data and cb.from_user:
@@ -211,7 +238,7 @@ async def relay_message(message: Message, bot: Bot, active_session: dict) -> Non
             file_id=message.sticker.file_id,
         )
 
-    prefix = f"👤 <b>{name}</b>：\n"
+    prefix = f"\U0001f464 <b>{name}</b>：\n"
     try:
         if message.text:
             await bot.send_message(peer, prefix + message.text, parse_mode=None)
