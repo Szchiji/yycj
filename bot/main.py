@@ -12,7 +12,6 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Update
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler  # noqa: F401 — 保留兼容
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -65,9 +64,14 @@ async def lifespan(app: FastAPI):
     logging.getLogger().setLevel(settings.log_level.upper())
     await connect_db()
 
-    scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions")
-    scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit")
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.add_job(
+            job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True
+        )
+        scheduler.add_job(
+            job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True
+        )
+        scheduler.start()
 
     if settings.use_webhook:
         await bot.set_webhook(
@@ -78,11 +82,12 @@ async def lifespan(app: FastAPI):
         me = await bot.get_me()
         logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
     else:
-        logger.warning("WEBHOOK_HOST 未配置，仅启动 HTTP 健康检查；请用 run_polling 本地调试")
+        logger.warning("WEBHOOK_HOST 未配置，仅启动 HTTP 健康检查；请用 polling 本地调试")
 
     yield
 
-    scheduler.shutdown(wait=False)
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
     if settings.use_webhook:
         try:
             await bot.delete_webhook(drop_pending_updates=False)
@@ -98,7 +103,11 @@ app = FastAPI(title="月影车姬", lifespan=lifespan)
 
 @app.get("/")
 async def health() -> dict:
-    return {"ok": True, "service": "yueying-cheji", "mode": "webhook" if settings.use_webhook else "idle"}
+    return {
+        "ok": True,
+        "service": "yueying-cheji",
+        "mode": "webhook" if settings.use_webhook else "idle",
+    }
 
 
 @app.get("/health")
@@ -126,15 +135,21 @@ async def run_polling() -> None:
     logging.getLogger().setLevel(settings.log_level.upper())
     await connect_db()
     await bot.delete_webhook(drop_pending_updates=True)
-    scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions")
-    scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit")
-    scheduler.start()
+    if not scheduler.running:
+        scheduler.add_job(
+            job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True
+        )
+        scheduler.add_job(
+            job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True
+        )
+        scheduler.start()
     me = await bot.get_me()
     logger.info("Polling mode | Bot @%s", me.username)
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        scheduler.shutdown(wait=False)
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
         await close_db()
         await bot.session.close()
 
@@ -143,8 +158,9 @@ def main() -> None:
     import uvicorn
 
     if settings.use_webhook:
+        # 直接传 app 对象，避免 uvicorn 再次 import 模块导致 Router 重复挂载
         uvicorn.run(
-            "bot.main:app",
+            app,
             host="0.0.0.0",
             port=settings.port,
             log_level=settings.log_level.lower(),
