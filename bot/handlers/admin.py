@@ -1,16 +1,18 @@
-"""管理员审核投稿与报告。"""
+"""管理员审核。"""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy import select
 
 from bot.config import get_settings
-from bot.db import get_db
-from bot.services import credit_service, matchmaker_service
+from bot.db import session_scope
+from bot.models import Post, PostStatus, Report, ReportStatus
+from bot.services import credit_service, search_service
 
 router = Router(name="admin")
 
@@ -21,199 +23,121 @@ def _is_admin(user_id: int) -> bool:
 
 @router.message(Command("admin"))
 async def admin_help(message: Message) -> None:
-    if not _is_admin(message.from_user.id):
+    if not message.from_user or not _is_admin(message.from_user.id):
         return
     await message.answer(
         "管理员命令：\n"
-        "/shadow <user_id> <days> <原因> — 手动遮蔽\n"
-        "/unshadow <user_id> — 解除遮蔽\n"
-        "/score <user_id> — 查看用户信用\n"
-        "投稿/报告审核请使用消息下的按钮。"
+        "审核通过投稿/报告请直接点通知按钮。\n"
+        "/admin — 本帮助"
     )
 
 
 @router.callback_query(F.data.startswith("admin_post_ok:"))
-async def admin_post_ok(callback: CallbackQuery) -> None:
-    if not _is_admin(callback.from_user.id):
-        await callback.answer("无权限", show_alert=True)
+async def post_ok(cb: CallbackQuery, bot: Bot) -> None:
+    if not cb.from_user or not _is_admin(cb.from_user.id) or not cb.data:
+        await cb.answer("无权限", show_alert=True)
         return
-    post_id = callback.data.split(":", 1)[1]
-    db = get_db()
-    post = await db.posts.find_one({"post_id": post_id})
-    if not post:
-        await callback.answer("记录不存在", show_alert=True)
-        return
-    lamp_id = post.get("lamp_id")
-    await matchmaker_service.approve_lamp(lamp_id)
-    await db.posts.update_one(
-        {"post_id": post_id},
-        {"$set": {"status": "approved", "reviewed_at": datetime.utcnow()}},
+    post_id = cb.data.split(":", 1)[1]
+    async with session_scope() as s:
+        res = await s.execute(select(Post).where(Post.post_id == post_id))
+        post = res.scalar_one_or_none()
+        if not post or post.status != PostStatus.PENDING.value:
+            await cb.answer("已处理或不存在")
+            return
+        data = dict(post.lamp_data or {})
+        post.status = PostStatus.APPROVED.value
+        post.reviewed_at = datetime.utcnow()
+        user_id = post.user_id
+
+    lamp = await search_service.create_lamp_from_post(
+        user_id=user_id,
+        city=data.get("city") or "未知",
+        title=data.get("title") or "未命名",
+        tags=list(data.get("tags") or []),
+        price=data.get("price"),
+        price_text=data.get("price_text"),
+        description=data.get("description") or "",
+        photos=list(data.get("photos") or []),
+        authenticity_score=80,
     )
-    reward = 55
-    await credit_service.settle_lanhua(
-        int(post["user_id"]), reward, "post_approved", "优质投稿通过", post_id
-    )
+    await search_service.approve_lamp(lamp["lamp_id"])
+    await credit_service.settle_lanhua(user_id, 15, "post_approved", "灯笼审核通过", post_id)
+    await cb.answer("已通过")
+    if cb.message:
+        await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已通过上架")
     try:
-        await callback.bot.send_message(
-            int(post["user_id"]),
-            f"✨ 你的灯笼已点亮！获得 **{reward}** 兰花令。",
-            parse_mode="Markdown",
-        )
+        await bot.send_message(user_id, f"你的灯笼 **{lamp['title']}** 已通过审核并上架。")
     except Exception:
         pass
-    await callback.message.edit_text((callback.message.text or "") + "\n\n✅ 已通过")
-    await callback.answer("已通过")
 
 
 @router.callback_query(F.data.startswith("admin_post_no:"))
-async def admin_post_no(callback: CallbackQuery) -> None:
-    if not _is_admin(callback.from_user.id):
-        await callback.answer("无权限", show_alert=True)
+async def post_no(cb: CallbackQuery, bot: Bot) -> None:
+    if not cb.from_user or not _is_admin(cb.from_user.id) or not cb.data:
+        await cb.answer("无权限", show_alert=True)
         return
-    post_id = callback.data.split(":", 1)[1]
-    db = get_db()
-    post = await db.posts.find_one({"post_id": post_id})
-    if not post:
-        await callback.answer("记录不存在", show_alert=True)
-        return
-    lamp_id = post.get("lamp_id")
-    if lamp_id:
-        await matchmaker_service.reject_lamp(lamp_id)
-    await db.posts.update_one(
-        {"post_id": post_id},
-        {"$set": {"status": "rejected", "reviewed_at": datetime.utcnow()}},
-    )
-    await credit_service.settle_lanhua(
-        int(post["user_id"]), -25, "post_rejected", "投稿未通过", post_id
-    )
+    post_id = cb.data.split(":", 1)[1]
+    async with session_scope() as s:
+        res = await s.execute(select(Post).where(Post.post_id == post_id))
+        post = res.scalar_one_or_none()
+        if not post or post.status != PostStatus.PENDING.value:
+            await cb.answer("已处理或不存在")
+            return
+        post.status = PostStatus.REJECTED.value
+        post.reviewed_at = datetime.utcnow()
+        user_id = post.user_id
+    await cb.answer("已拒绝")
+    if cb.message:
+        await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已拒绝")
     try:
-        await callback.bot.send_message(
-            int(post["user_id"]),
-            "你的投稿未通过审核，已扣除少量兰花令。请调整后重试。",
-        )
+        await bot.send_message(user_id, "你的灯笼投稿未通过审核。")
     except Exception:
         pass
-    await callback.message.edit_text((callback.message.text or "") + "\n\n❌ 已拒绝")
-    await callback.answer("已拒绝")
 
 
 @router.callback_query(F.data.startswith("admin_report_ok:"))
-async def admin_report_ok(callback: CallbackQuery) -> None:
-    if not _is_admin(callback.from_user.id):
-        await callback.answer("无权限", show_alert=True)
+async def report_ok(cb: CallbackQuery, bot: Bot) -> None:
+    if not cb.from_user or not _is_admin(cb.from_user.id) or not cb.data:
+        await cb.answer("无权限", show_alert=True)
         return
-    report_id = callback.data.split(":", 1)[1]
-    db = get_db()
-    report = await db.reports.find_one({"report_id": report_id})
-    if not report:
-        await callback.answer("记录不存在", show_alert=True)
-        return
-    await db.reports.update_one(
-        {"report_id": report_id},
-        {"$set": {"status": "accepted", "reviewed_at": datetime.utcnow()}},
-    )
-    if report.get("lamp_id"):
-        await db.lamps.update_one(
-            {"lamp_id": report["lamp_id"]},
-            {"$set": {"status": "gray", "updated_at": datetime.utcnow()}},
+    report_id = cb.data.split(":", 1)[1]
+    async with session_scope() as s:
+        res = await s.execute(select(Report).where(Report.report_id == report_id))
+        rep = res.scalar_one_or_none()
+        if not rep or rep.status != ReportStatus.PENDING.value:
+            await cb.answer("已处理或不存在")
+            return
+        rep.status = ReportStatus.ACCEPTED.value
+        rep.reviewed_at = datetime.utcnow()
+        lamp_id = rep.lamp_id
+        reporter_id = rep.reporter_id
+
+    lamp = await search_service.get_lamp(lamp_id)
+    if lamp:
+        await search_service.reject_lamp(lamp_id)
+        await credit_service.settle_lanhua(
+            lamp["user_id"], -30, "report_accepted", "报告成立，灯笼下架", report_id
         )
-    reward = 70
-    await credit_service.settle_lanhua(
-        int(report["reporter_id"]),
-        reward,
-        "report_accepted",
-        "真实报告验证通过",
-        report_id,
-    )
-    try:
-        await callback.bot.send_message(
-            int(report["reporter_id"]),
-            f"你的报告已认定有效，获得 **{reward}** 兰花令。感谢守护月影。",
-            parse_mode="Markdown",
-        )
-    except Exception:
-        pass
-    await callback.message.edit_text((callback.message.text or "") + "\n\n✅ 已认定有效")
-    await callback.answer()
+    await credit_service.settle_lanhua(reporter_id, 10, "report_reward", "有效报告奖励", report_id)
+    await cb.answer("已采纳")
+    if cb.message:
+        await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已采纳并处理")
 
 
 @router.callback_query(F.data.startswith("admin_report_no:"))
-async def admin_report_no(callback: CallbackQuery) -> None:
-    if not _is_admin(callback.from_user.id):
-        await callback.answer("无权限", show_alert=True)
+async def report_no(cb: CallbackQuery) -> None:
+    if not cb.from_user or not _is_admin(cb.from_user.id) or not cb.data:
+        await cb.answer("无权限", show_alert=True)
         return
-    report_id = callback.data.split(":", 1)[1]
-    db = get_db()
-    report = await db.reports.find_one({"report_id": report_id})
-    if not report:
-        await callback.answer("记录不存在", show_alert=True)
-        return
-    await db.reports.update_one(
-        {"report_id": report_id},
-        {"$set": {"status": "rejected", "reviewed_at": datetime.utcnow()}},
-    )
-    await credit_service.settle_lanhua(
-        int(report["reporter_id"]),
-        -60,
-        "report_rejected",
-        "报告被驳回（可能恶意）",
-        report_id,
-    )
-    await credit_service.apply_shadow(int(report["reporter_id"]), 3, "报告被驳回")
-    try:
-        await callback.bot.send_message(
-            int(report["reporter_id"]),
-            "你的报告被驳回，已扣分并进入短期月影遮蔽。请勿恶意举报。",
-        )
-    except Exception:
-        pass
-    await callback.message.edit_text((callback.message.text or "") + "\n\n❌ 已驳回")
-    await callback.answer()
-
-
-@router.message(Command("shadow"))
-async def cmd_shadow(message: Message) -> None:
-    if not _is_admin(message.from_user.id):
-        return
-    parts = (message.text or "").split(maxsplit=3)
-    if len(parts) < 3:
-        await message.answer("用法：/shadow <user_id> <days> [原因]")
-        return
-    uid = int(parts[1])
-    days = int(parts[2])
-    reason = parts[3] if len(parts) > 3 else "管理员裁决"
-    await credit_service.apply_shadow(uid, days, reason)
-    await message.answer(f"已遮蔽用户 {uid}，{days} 天。")
-
-
-@router.message(Command("unshadow"))
-async def cmd_unshadow(message: Message) -> None:
-    if not _is_admin(message.from_user.id):
-        return
-    parts = (message.text or "").split()
-    if len(parts) < 2:
-        await message.answer("用法：/unshadow <user_id>")
-        return
-    uid = int(parts[1])
-    db = get_db()
-    await db.users.update_one(
-        {"user_id": uid},
-        {"$set": {"is_shadowed": False, "shadow_days": 0, "shadow_reason": None}},
-    )
-    await message.answer(f"已解除用户 {uid} 的遮蔽。")
-
-
-@router.message(Command("score"))
-async def cmd_score(message: Message) -> None:
-    if not _is_admin(message.from_user.id):
-        return
-    parts = (message.text or "").split()
-    if len(parts) < 2:
-        await message.answer("用法：/score <user_id>")
-        return
-    uid = int(parts[1])
-    user = await credit_service.ensure_user(uid)
-    await message.answer(
-        f"用户 {uid}\n分数：{user.get('lanhua_score')}\n等级：{user.get('tier')}\n"
-        f"遮蔽：{user.get('is_shadowed')} / {user.get('shadow_days')} 天"
-    )
+    report_id = cb.data.split(":", 1)[1]
+    async with session_scope() as s:
+        res = await s.execute(select(Report).where(Report.report_id == report_id))
+        rep = res.scalar_one_or_none()
+        if not rep or rep.status != ReportStatus.PENDING.value:
+            await cb.answer("已处理或不存在")
+            return
+        rep.status = ReportStatus.REJECTED.value
+        rep.reviewed_at = datetime.utcnow()
+    await cb.answer("已驳回")
+    if cb.message:
+        await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已驳回")
