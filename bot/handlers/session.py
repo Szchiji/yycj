@@ -9,7 +9,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards import main_menu, session_accept_kb, session_end_kb
+from bot.keyboards import remove_kb, session_accept_kb, session_end_kb
 from bot.services import anti_brush, search_service, session_service
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     if cb.message:
         await cb.message.answer(
             f"已向灯笼主人发送月影会话邀请。\n会话码：<code>{sess['session_id'][:8]}</code>",
-            reply_markup=main_menu(),
+            reply_markup=remove_kb(),
         )
     try:
         await bot.send_message(
@@ -160,11 +160,11 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
     delta = (data or {}).get("settle_delta", 0)
     text = f"🔚 月影会话已结束。\n本次兰花分变动：<code>{delta:+d}</code>"
     if cb.message:
-        await cb.message.answer(text, reply_markup=main_menu())
+        await cb.message.answer(text, reply_markup=remove_kb())
     if data and cb.from_user:
         peer = session_service.peer_id(data, cb.from_user.id)
         try:
-            await bot.send_message(peer, text, reply_markup=main_menu())
+            await bot.send_message(peer, text, reply_markup=remove_kb())
         except Exception:
             pass
 
