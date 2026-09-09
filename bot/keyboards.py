@@ -1,94 +1,76 @@
-"""所有 Inline / Reply 键盘。"""
+"""统一键盘。"""
 
 from __future__ import annotations
 
-from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    WebAppInfo,
-)
-
-from bot.config import get_settings
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 
-def main_menu_kb() -> ReplyKeyboardMarkup:
-    settings = get_settings()
-    rows = [
-        [KeyboardButton(text="🌕 进入月影秘境")],
-        [KeyboardButton(text="💬 月影媒婆"), KeyboardButton(text="📜 我的月相")],
-        [KeyboardButton(text="✨ 点亮灯笼"), KeyboardButton(text="🛡️ 月影报告")],
-        [KeyboardButton(text="📖 使用说明")],
-    ]
-    if settings.webapp_url:
-        rows.insert(
-            0,
-            [KeyboardButton(text="🗺️ 打开秘境地图", web_app=WebAppInfo(url=settings.webapp_url))],
-        )
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+def main_menu() -> ReplyKeyboardMarkup:
+    b = ReplyKeyboardBuilder()
+    b.row(KeyboardButton(text="🔍 搜索灯笼"), KeyboardButton(text="🌕 我的月影"))
+    b.row(KeyboardButton(text="✨ 点亮灯笼"), KeyboardButton(text="📝 月影报告"))
+    b.row(KeyboardButton(text="🌸 兰花信用"), KeyboardButton(text="❓ 帮助"))
+    return b.as_markup(resize_keyboard=True)
 
 
-def lamp_actions_kb(lamp_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="提灯月下私语", callback_data=f"moon_chat:{lamp_id}")],
-            [
-                InlineKeyboardButton(text="收藏", callback_data=f"fav:{lamp_id}"),
-                InlineKeyboardButton(text="报告异常", callback_data=f"report:{lamp_id}"),
-            ],
-        ]
+def search_filters_kb() -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    cities = ["台北", "新北", "台中", "高雄", "深圳", "广州", "上海", "香港"]
+    for i in range(0, len(cities), 4):
+        row = [InlineKeyboardButton(text=c, callback_data=f"search_city:{c}") for c in cities[i : i + 4]]
+        b.row(*row)
+    b.row(
+        InlineKeyboardButton(text="💰 3000以下", callback_data="search_price:0-3000"),
+        InlineKeyboardButton(text="💰 3000-6000", callback_data="search_price:3000-6000"),
+        InlineKeyboardButton(text="💰 6000+", callback_data="search_price:6000-999999"),
     )
+    b.row(InlineKeyboardButton(text="🔄 清除筛选", callback_data="search_clear"))
+    return b.as_markup()
 
 
-def consent_kb(session_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="同意", callback_data=f"consent_yes:{session_id}"),
-                InlineKeyboardButton(text="婉拒", callback_data=f"consent_no:{session_id}"),
-            ]
-        ]
+def lamp_actions_kb(lamp_id: str, owner: bool = False) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.row(InlineKeyboardButton(text="💬 发起月影会话", callback_data=f"session_request:{lamp_id}"))
+    b.row(InlineKeyboardButton(text="⚠️ 举报", callback_data=f"report_lamp:{lamp_id}"))
+    return b.as_markup()
+
+
+def session_accept_kb(session_id: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.row(
+        InlineKeyboardButton(text="✅ 接受", callback_data=f"session_accept:{session_id}"),
+        InlineKeyboardButton(text="❌ 拒绝", callback_data=f"session_reject:{session_id}"),
     )
+    return b.as_markup()
 
 
-def session_end_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="结束今夜私语 /end", callback_data="session_end")],
-            [InlineKeyboardButton(text="点赞对方 /praise", callback_data="session_praise")],
-            [InlineKeyboardButton(text="举报 /report", callback_data="session_report")],
-        ]
-    )
+def session_end_kb(session_id: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.row(InlineKeyboardButton(text="🔚 结束会话", callback_data=f"session_end:{session_id}"))
+    b.row(InlineKeyboardButton(text="👍 好评结算", callback_data=f"session_praise:{session_id}"))
+    return b.as_markup()
 
 
 def admin_post_kb(post_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ 通过", callback_data=f"admin_post_ok:{post_id}"),
-                InlineKeyboardButton(text="❌ 拒绝", callback_data=f"admin_post_no:{post_id}"),
-            ]
-        ]
+    b = InlineKeyboardBuilder()
+    b.row(
+        InlineKeyboardButton(text="✅ 通过", callback_data=f"admin_post_ok:{post_id}"),
+        InlineKeyboardButton(text="❌ 拒绝", callback_data=f"admin_post_no:{post_id}"),
     )
+    return b.as_markup()
 
 
 def admin_report_kb(report_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ 认定有效", callback_data=f"admin_report_ok:{report_id}"),
-                InlineKeyboardButton(text="❌ 驳回", callback_data=f"admin_report_no:{report_id}"),
-            ]
-        ]
+    b = InlineKeyboardBuilder()
+    b.row(
+        InlineKeyboardButton(text="✅ 采纳", callback_data=f"admin_report_ok:{report_id}"),
+        InlineKeyboardButton(text="❌ 驳回", callback_data=f"admin_report_no:{report_id}"),
     )
+    return b.as_markup()
 
 
-def credit_menu_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="信用流水", callback_data="credit_history")],
-            [InlineKeyboardButton(text="月下修行任务", callback_data="credit_tasks")],
-            [InlineKeyboardButton(text="查看遮蔽状态", callback_data="credit_shadow")],
-        ]
-    )
+def cancel_kb() -> ReplyKeyboardMarkup:
+    b = ReplyKeyboardBuilder()
+    b.row(KeyboardButton(text="取消"))
+    return b.as_markup(resize_keyboard=True)
