@@ -1,4 +1,4 @@
-"""中间件：错误日志。"""
+"""中间件。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any, Awaitable, Callable, Dict
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("yueying.middleware")
 
 
 class ErrorLogMiddleware(BaseMiddleware):
@@ -21,5 +21,5 @@ class ErrorLogMiddleware(BaseMiddleware):
         try:
             return await handler(event, data)
         except Exception:
-            logger.exception("Handler error on event=%s", type(event).__name__)
+            logger.exception("handler error")
             raise
