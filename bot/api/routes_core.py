@@ -1,3 +1,26 @@
 """月影车姬 API 核心路由（auth/home/lamps/sessions）。"""
-from bot.api.routes_core_base import router  # noqa: F401
+from bot.api.routes_core_base import (  # noqa: F401
+    router,
+    AuthBody,
+    SessionRequestBody,
+    MediaItem,
+    PostCreateBody,
+    ReportCreateBody,
+    CreditAdjustBody,
+    RoleBody,
+    ReviewCreateBody,
+    AnnounceBody,
+    CitiesBody,
+    PinBody,
+    PinReorderBody,
+    ApprovePinBody,
+    FeedPinBody,
+    OpsSettingsBody,
+    _ser_dt,
+    _ser_user,
+    _ser_lamp,
+    _normalize_media,
+    _normalize_one_url,
+    _admin_http_error,
+)
 import bot.api.routes_core_home  # noqa: F401
