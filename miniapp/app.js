@@ -50,7 +50,10 @@
     state.isAdmin = !!data.is_admin;
     localStorage.setItem("yycj_token", state.token);
     renderMe();
-    if (state.isAdmin) $("#adminTab").classList.remove("hidden");
+    if (state.isAdmin) {
+      $("#adminTab").classList.remove("hidden");
+      $("#adminLinkWrap").classList.remove("hidden");
+    }
     toast("已登录");
     return true;
   }
@@ -142,11 +145,18 @@
   async function openDetail(id) {
     const data = await api(`/api/lamps/${encodeURIComponent(id)}`);
     const l = data.lamp;
+    const photos = (l.photos || []).map((p) => {
+      if (String(p).startsWith("http")) {
+        return `<img src="${escapeHtml(p)}" alt="" style="max-width:100%;border-radius:10px;margin:6px 0" />`;
+      }
+      return `<div class="meta">file_id: <code>${escapeHtml(String(p).slice(0, 48))}</code></div>`;
+    }).join("");
     $("#detail").innerHTML = `
       <div class="card">
         <h3>${escapeHtml(l.title || "")}</h3>
         <div class="meta">ID <code>${escapeHtml(l.lamp_id)}</code></div>
         <div class="meta">📍 ${escapeHtml(l.city || "-")} · 💰 ${escapeHtml(l.price_text || l.price || "面议")}</div>
+        ${photos}
         <p>${escapeHtml(l.description || "")}</p>
         <div class="row">
           <button class="btn primary" id="detailSession">发起月影会话</button>
@@ -170,6 +180,13 @@
     if (tg && tg.showAlert) tg.showAlert(data.message || "已发送邀请");
   }
 
+  function collectPhotos() {
+    return [$("#postPhoto1").value, $("#postPhoto2").value, $("#postPhoto3").value]
+      .map((s) => (s || "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+  }
+
   async function submitPost(ev) {
     ev.preventDefault();
     const body = {
@@ -178,12 +195,12 @@
       price_text: $("#postPrice").value.trim(),
       tags: $("#postTags").value.trim().split(/\s+/).filter(Boolean),
       description: $("#postDesc").value.trim(),
-      photos: [],
+      photos: collectPhotos(),
     };
     const digits = (body.price_text || "").replace(/\D/g, "");
     if (digits) body.price = parseInt(digits, 10);
     const data = await api("/api/posts", { method: "POST", body: JSON.stringify(body) });
-    toast(`投稿已提交：${data.post_id.slice(0, 8)}…`);
+    toast(`投稿已提交：${data.post_id.slice(0, 8)}…（图 ${ (data.photos || []).length }）`);
     $("#postForm").reset();
   }
 
@@ -199,6 +216,12 @@
     $("#reportForm").reset();
   }
 
+  async function adminAction(path) {
+    await api(path, { method: "POST", body: "{}" });
+    toast("已处理");
+    await loadAdmin();
+  }
+
   async function loadAdmin() {
     const [posts, reports, shadow] = await Promise.all([
       api("/api/admin/posts/pending"),
@@ -209,9 +232,12 @@
       const d = p.lamp_data || {};
       return `<div class="card"><div class="meta">${escapeHtml(p.post_id)}</div>
         <strong>${escapeHtml(d.title || "")}</strong>
-        <div class="meta">${escapeHtml(d.city || "")} · 用户 ${p.user_id}</div>
+        <div class="meta">${escapeHtml(d.city || "")} · 用户 ${p.user_id} · 图 ${(d.photos || []).length}</div>
         <p>${escapeHtml((d.description || "").slice(0, 160))}</p>
-        <div class="meta">请在 Bot 通知里点通过/拒绝</div></div>`;
+        <div class="row">
+          <button class="btn primary" data-admin="post-ok" data-id="${escapeHtml(p.post_id)}">通过</button>
+          <button class="btn danger" data-admin="post-no" data-id="${escapeHtml(p.post_id)}">拒绝</button>
+        </div></div>`;
     }).join("") || "<p class='meta'>无待审投稿</p>";
 
     $("#adminReports").innerHTML = (reports.items || []).map((r) => `
@@ -219,7 +245,10 @@
       <div>灯笼 <code>${escapeHtml(r.lamp_id)}</code></div>
       <div class="meta">举报人 ${r.reporter_id} · ${escapeHtml(r.reason || "")}</div>
       <p>${escapeHtml((r.description || "").slice(0, 160))}</p>
-      <div class="meta">请在 Bot 通知里点采纳/驳回</div></div>
+      <div class="row">
+        <button class="btn primary" data-admin="rep-ok" data-id="${escapeHtml(r.report_id)}">采纳</button>
+        <button class="btn danger" data-admin="rep-no" data-id="${escapeHtml(r.report_id)}">驳回</button>
+      </div></div>
     `).join("") || "<p class='meta'>无待审报告</p>";
 
     $("#adminShadow").innerHTML = (shadow.items || []).map((u) => `
@@ -276,6 +305,19 @@
         $("#reportLampId").value = id;
         showPanel("report");
       }
+    } catch (e) { toast(e.message || String(e), true); }
+  });
+
+  $("#panel-admin").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-admin]");
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const act = btn.dataset.admin;
+    try {
+      if (act === "post-ok") await adminAction(`/api/admin/posts/${encodeURIComponent(id)}/approve`);
+      if (act === "post-no") await adminAction(`/api/admin/posts/${encodeURIComponent(id)}/reject`);
+      if (act === "rep-ok") await adminAction(`/api/admin/reports/${encodeURIComponent(id)}/accept`);
+      if (act === "rep-no") await adminAction(`/api/admin/reports/${encodeURIComponent(id)}/reject`);
     } catch (e) { toast(e.message || String(e), true); }
   });
 
