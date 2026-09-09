@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -12,7 +13,7 @@ from sqlalchemy import select
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import Post, PostStatus, Report, ReportStatus
-from bot.services import credit_service, search_service
+from bot.services import credit_service, search_service, session_service
 
 router = Router(name="admin")
 
@@ -28,8 +29,49 @@ async def admin_help(message: Message) -> None:
     await message.answer(
         "管理员命令：\n"
         "审核通过投稿/报告请直接点通知按钮。\n"
-        "/admin — 本帮助"
+        "/admin — 本帮助\n"
+        "/session_messages <session_id> — 查看会话落库消息（ADMIN_IDS）"
     )
+
+
+@router.message(Command("session_messages"))
+async def session_messages_cmd(message: Message) -> None:
+    """ADMIN_IDS only：列出某 session_id 的落库消息。"""
+    if not message.from_user or not _is_admin(message.from_user.id):
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer("用法：/session_messages <session_id>")
+        return
+    sid = parts[1].strip()
+    sess = await session_service.get_session(sid)
+    if not sess:
+        await message.answer("会话不存在。请使用完整 session_id。")
+        return
+    msgs = await session_service.list_messages_for_admin(sid, limit=100)
+    if not msgs:
+        await message.answer(f"会话 <code>{escape(sid[:8])}</code>… 暂无落库消息。")
+        return
+    lines = [
+        f"会话 <code>{escape(sid)}</code> 消息 {len(msgs)} 条"
+        f"（status={sess.get('status')}）："
+    ]
+    for m in msgs[:40]:
+        ts = m.get("created_at")
+        ts_s = ts.strftime("%m-%d %H:%M") if hasattr(ts, "strftime") else str(ts or "")
+        role = escape(str(m.get("from_role") or "?"))
+        media = m.get("media_type") or "text"
+        body = (m.get("content") or "")[:120]
+        body = escape(body) if body else ""
+        fid = m.get("file_id")
+        extra = f" file=<code>{escape(str(fid)[:24])}…</code>" if fid else ""
+        lines.append(f"[{ts_s}] {role}/{media}: {body}{extra}")
+    if len(msgs) > 40:
+        lines.append(f"… 另有 {len(msgs) - 40} 条未展开")
+    text = "\n".join(lines)
+    if len(text) > 3500:
+        text = text[:3500] + "\n…"
+    await message.answer(text)
 
 
 @router.callback_query(F.data.startswith("admin_post_ok:"))
