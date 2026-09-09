@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import List, Optional
+from urllib.parse import urlparse, urlunparse
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,6 +44,7 @@ class Settings(BaseSettings):
         "webhook_host",
         "database_url",
         "redis_url",
+        "webapp_url",
         mode="before",
     )
     @classmethod
@@ -85,6 +87,31 @@ class Settings(BaseSettings):
     @property
     def use_webhook(self) -> bool:
         return bool(self.webhook_host and self.bot_token)
+
+    @property
+    def normalized_webapp_url(self) -> str:
+        """Strip WEBAPP_URL and force …/app/ so Telegram Mini App keeps initData.
+
+        FastAPI StaticFiles redirects GET /app → /app/ (307); opening without
+        trailing slash drops initData inside Telegram. Always use the slash form
+        for WebAppInfo.
+        """
+        url = (self.webapp_url or "").strip()
+        if not url:
+            return ""
+        parsed = urlparse(url)
+        path = parsed.path or ""
+        # Path is exactly /app (no trailing slash) → force /app/
+        if path.rstrip("/") == "/app" and not path.endswith("/"):
+            path = "/app/"
+            url = urlunparse(
+                (parsed.scheme, parsed.netloc, path, parsed.params, parsed.query, parsed.fragment)
+            )
+        elif path.rstrip("/") == "/app" and path.endswith("/"):
+            pass
+        elif url.rstrip("/").endswith("/app") and not url.endswith("/"):
+            url = f"{url}/"
+        return url
 
     def normalized_database_url(self) -> str:
         """Railway 常见 postgres:// → postgresql+asyncpg://。"""

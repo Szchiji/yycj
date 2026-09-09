@@ -9,6 +9,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import get_settings
+from bot.keyboards import admin_webapp_kb
 from bot.services import admin_ops, session_service
 from bot.services.admin_ops import AdminActionError
 
@@ -23,10 +24,12 @@ def _is_admin(user_id: int) -> bool:
 async def admin_help(message: Message) -> None:
     if not message.from_user or not _is_admin(message.from_user.id):
         return
+    kb = admin_webapp_kb()
     await message.answer(
         "管理员命令：\n"
+        "点下方「🛠 管理后台」打开 Mini App 控制台。\n"
         "审核可通过 Bot 通知按钮，或 Mini App / HTTP API。\n"
-        "/admin — 本帮助\n"
+        "/admin — 本帮助 + 管理后台入口\n"
         "/session_messages <session_id> — 查看会话落库消息（ADMIN_IDS）\n"
         "HTTP：\n"
         "· GET  /api/admin/posts/pending\n"
@@ -36,7 +39,8 @@ async def admin_help(message: Message) -> None:
         "· POST /api/admin/credit/adjust\n"
         "· GET  /api/admin/shadow\n"
         "· GET  /api/admin/sessions/{id}/messages\n"
-        "控制台：/app/admin.html（仅 ADMIN_IDS）"
+        "控制台：/app/admin.html（仅 ADMIN_IDS）",
+        reply_markup=kb,
     )
 
 
