@@ -224,6 +224,38 @@ def format_credit_card(user: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def compute_heuristic_q(
+    message_count: int,
+    media_count: int,
+    duration_minutes: float = 0.0,
+    reply_balance: float | None = None,
+) -> int:
+    """
+    启发式质量分 Q ∈ [0, 100]（**无 LLM / 无付费模型依赖**；蓝图占位）。
+
+    组成说明（显式、可测）：
+    1. 基础互动（兼容旧式）：min(70, 2·I + 5·M)
+       - I = message_count（原始条数，不在此处封顶；外层 Δ 公式对 I 另有封顶）
+       - M = media_count（图片/语音等）
+    2. 时长加成：min(15, duration_minutes / 8)  → 约 2h 会话 +15
+    3. 回复均衡加成：min(15, 15 · reply_balance)
+       - reply_balance = min(A条,B条) / max(A条,B条) ∈ [0,1]
+       - 未提供时按 0.5 计（中性 +7.5），避免无落库消息时过度惩罚
+
+    有真实 LLM 质量分时：直接用外部 score 替换本函数返回值即可，
+    不必引入新依赖（requirements 中亦不包含付费 LLM SDK）。
+    """
+    i = max(0, int(message_count or 0))
+    m = max(0, int(media_count or 0))
+    d = max(0.0, float(duration_minutes or 0.0))
+    bal = 0.5 if reply_balance is None else max(0.0, min(1.0, float(reply_balance)))
+    base = min(70, 2 * i + 5 * m)
+    dur_bonus = min(15.0, d / 8.0)
+    bal_bonus = min(15.0, 15.0 * bal)
+    q = int(round(base + dur_bonus + bal_bonus))
+    return max(0, min(100, q))
+
+
 def calc_session_delta(
     message_count: int,
     media_count: int,
@@ -231,6 +263,8 @@ def calc_session_delta(
     has_praise: bool,
     reported: bool,
     brush_factor: float = 0.0,
+    reply_balance: float | None = None,
+    quality_score: int | None = None,
 ) -> int:
     """
     会话结算（无 LLM 时的启发式）：
@@ -239,15 +273,21 @@ def calc_session_delta(
 
     - I：消息条数（封顶 80）
     - D：时长分钟（封顶 120）
-    - Q：启发式质量分（无 LLM）。Q = min(100, 2·msg + 5·media)
-      有真实 LLM 质量分时可改为传入 quality_score 替换启发式。
+    - Q：启发式质量分，见 ``compute_heuristic_q``（可用 quality_score 覆盖）
     - Bonus：好评 +12；Penalty：被举报 40；F：刷量因子 [0,0.9]
-    - 最终钳制到 [{SESSION_DELTA_MIN}, {SESSION_DELTA_MAX}] ≈ [-15, +28]
-    """.format(SESSION_DELTA_MIN=SESSION_DELTA_MIN, SESSION_DELTA_MAX=SESSION_DELTA_MAX)
+    - 最终钳制到 [SESSION_DELTA_MIN, SESSION_DELTA_MAX] ≈ [-15, +28]
+    """
     i = min(int(message_count or 0), 80)
     d = min(float(duration_minutes or 0), 120.0)
-    # 启发式 Q（无 LLM）
-    q = min(100, i * 2 + int(media_count or 0) * 5)
+    if quality_score is not None:
+        q = max(0, min(100, int(quality_score))
+    else:
+        q = compute_heuristic_q(
+            message_count=i,
+            media_count=int(media_count or 0),
+            duration_minutes=d,
+            reply_balance=reply_balance,
+        )
     bonus = 12 if has_praise else 0
     penalty = 40 if reported else 0
     f = max(0.0, min(0.9, float(brush_factor or 0.0)))
