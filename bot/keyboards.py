@@ -16,17 +16,17 @@ from bot.config import get_settings
 
 def main_menu() -> ReplyKeyboardMarkup:
     b = ReplyKeyboardBuilder()
-    b.row(KeyboardButton(text="🔍 搜索灯笼"), KeyboardButton(text="🌕 我的月影"))
-    b.row(KeyboardButton(text="✨ 点亮灯笼"), KeyboardButton(text="📝 月影报告"))
-    b.row(KeyboardButton(text="🌸 兰花信用"), KeyboardButton(text="❓ 帮助"))
     webapp = (get_settings().webapp_url or "").strip()
     if webapp:
         b.row(
             KeyboardButton(
-                text="📱 打开月影 Mini App",
+                text="📱 打开首页",
                 web_app=WebAppInfo(url=webapp),
             )
         )
+    b.row(KeyboardButton(text="🔍 搜索"), KeyboardButton(text="🌕 我的"))
+    b.row(KeyboardButton(text="✨ 发布"), KeyboardButton(text="📝 报告"))
+    b.row(KeyboardButton(text="🌸 口碑"), KeyboardButton(text="❓ 帮助"))
     return b.as_markup(resize_keyboard=True)
 
 

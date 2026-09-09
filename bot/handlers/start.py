@@ -16,12 +16,14 @@ HELP_TEXT = """🌕 <b>月影车姬</b>
 月下寻花，影中见真
 
 <b>功能</b>
-• 🔍 搜索灯笼 — 城市 / 价位 / 关键词
-• ✨ 点亮灯笼 — 投稿，管理员审核后上架
+• 📱 打开首页 — 进入新版 Mini App（推荐）
+• 🔍 搜索 — 城市 / 价位 / 关键词
+• ✨ 发布 — 投稿，管理员审核后上架
 • 💬 月影会话 — 匿名中转，结束后结算兰花分
-• 📝 月影报告 — 异常反馈
-• 🌸 兰花信用 — 等级与遮蔽状态
-• 📱 Mini App — 配置 <code>WEBAPP_URL</code> 后主菜单可打开
+• 📝 报告 — 异常反馈
+• 🌸 口碑 — 等级与遮蔽状态
+
+点「打开首页」进入新版 Mini App。
 
 发送城市或关键词即可直接搜索，例如：
 <code>台北 大学生</code> / <code>深圳 5000</code>
@@ -40,7 +42,7 @@ async def cmd_start(message: Message) -> None:
     )
     extra = ""
     if (get_settings().webapp_url or "").strip():
-        extra = "\n主菜单可打开 <b>月影 Mini App</b>。"
+        extra = "\n请点主菜单 <b>打开首页</b> 进入新版 Mini App。"
     await message.answer(
         "欢迎来到 <b>月影车姬</b> 🌕\n月下寻花，影中见真。\n\n"
         f"请选择功能，或直接发送搜索词。{extra}",
@@ -49,12 +51,12 @@ async def cmd_start(message: Message) -> None:
 
 
 @router.message(Command("help"))
-@router.message(F.text == "❓ 帮助")
+@router.message(F.text.in_({"❓ 帮助"}))
 async def cmd_help(message: Message) -> None:
     await message.answer(HELP_TEXT, reply_markup=main_menu())
 
 
-@router.message(F.text == "🌕 我的月影")
+@router.message(F.text.in_({"🌕 我的", "🌕 我的月影"}))
 async def my_profile(message: Message) -> None:
     user = message.from_user
     if not user:

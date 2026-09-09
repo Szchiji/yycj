@@ -12,7 +12,7 @@ from bot.services import credit_service
 router = Router(name="credit")
 
 
-@router.message(F.text == "🌸 兰花信用")
+@router.message(F.text.in_({"🌸 兰花信用", "🌸 口碑"}))
 @router.message(Command("credit"))
 async def show_credit(message: Message) -> None:
     user = message.from_user
