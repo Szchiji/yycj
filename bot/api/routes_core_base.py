@@ -4,21 +4,17 @@ from __future__ import annotations
 
 import logging
 import re
-import uuid
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from bot.api.deps import get_admin_user_id, get_current_user_id
+from bot.api.deps import get_current_user_id
 from bot.api.telegram_webapp import WebAppAuthError, issue_access_token, validate_init_data
 from bot.config import get_settings
-from bot.db import session_scope
-from bot.models import Post, PostStatus, Report, ReportStatus, ReviewStatus, UserRole
-from bot.services import anti_brush, credit_service, home_service, search_service, session_service
-from bot.services import admin_ops
+from bot.models import UserRole
+from bot.services import credit_service, home_service
 from bot.services.admin_ops import AdminActionError
 
 logger = logging.getLogger(__name__)
@@ -32,11 +28,9 @@ _ROLE_LABEL = {
     UserRole.MERCHANT.value: "商家",
 }
 
-# ---------- schemas ----------
 
 class AuthBody(BaseModel):
     init_data: str = Field(..., alias="initData", description="Telegram.WebApp.initData")
-
     model_config = {"populate_by_name": True}
 
 class SessionRequestBody(BaseModel):
@@ -44,7 +38,7 @@ class SessionRequestBody(BaseModel):
     guest_alias: Optional[str] = None
 
 class MediaItem(BaseModel):
-    type: str = "image"  # image | video
+    type: str = "image"
     url: Optional[str] = None
     file_id: Optional[str] = None
 
@@ -73,7 +67,7 @@ class CreditAdjustBody(BaseModel):
     note: str = ""
 
 class RoleBody(BaseModel):
-    role: str  # teacher | guest | merchant
+    role: str
 
 class ReviewCreateBody(BaseModel):
     lamp_id: str
@@ -114,6 +108,27 @@ class OpsSettingsBody(BaseModel):
     bot_welcome_text: Optional[str] = None
     media_max_count: Optional[int] = None
     review_require_audit: Optional[bool] = None
+    listing_days: Optional[int] = None
+    carousel_interval_sec: Optional[int] = None
+    show_bot_link: Optional[bool] = None
+    show_admin_link: Optional[bool] = None
+    bot_btn_label: Optional[str] = None
+    admin_btn_label: Optional[str] = None
+    admin_contact: Optional[str] = None
+    required_chats: Optional[List[Dict[str, Any]]] = None
+
+class BanBody(BaseModel):
+    user_id: int
+    banned: bool = True
+    reason: str = ""
+
+class AliasBody(BaseModel):
+    alias: str = ""
+
+class LampOpBody(BaseModel):
+    reason: str = "admin"
+    days: Optional[int] = None
+
 
 def _ser_dt(v: Any) -> Any:
     if hasattr(v, "isoformat"):
@@ -131,7 +146,7 @@ def _ser_user(u: Dict[str, Any]) -> Dict[str, Any]:
 
 def _ser_lamp(lamp: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(lamp)
-    for k in ("created_at", "updated_at"):
+    for k in ("created_at", "updated_at", "expires_at"):
         if k in out:
             out[k] = _ser_dt(out[k])
     out.pop("user_id", None)
@@ -140,11 +155,7 @@ def _ser_lamp(lamp: Dict[str, Any]) -> Dict[str, Any]:
     out.pop("approx_lng", None)
     return out
 
-def _normalize_media(
-    media: List[MediaItem] | None,
-    photos: List[str] | None,
-) -> List[Dict[str, str]]:
-    """图+视频合计 ≤9；接受 https URL 或 Telegram file_id（相册上传）。"""
+def _normalize_media(media: List[MediaItem] | None, photos: List[str] | None) -> List[Dict[str, str]]:
     items: List[Dict[str, str]] = []
     for m in media or []:
         t = (m.type or "image").lower().strip()
@@ -174,16 +185,12 @@ def _normalize_one_url(s: str) -> str:
         return s
     if _FILE_ID_RE.match(s):
         return s.split(":", 2)[-1] if s.lower().startswith("tg:file_id:") else s
-    raise HTTPException(
-        status_code=400,
-        detail="仅支持 https URL 或 Telegram file_id（可用 tg:file_id: 前缀）",
-    )
+    raise HTTPException(status_code=400, detail="仅支持 https URL 或 Telegram file_id")
 
 def _admin_http_error(exc: AdminActionError) -> HTTPException:
     code = 404 if exc.code == "not_found" else 409
     return HTTPException(status_code=code, detail=str(exc))
 
-# ---------- auth / me ----------
 
 @router.post("/auth")
 async def api_auth(body: AuthBody) -> Dict[str, Any]:
@@ -192,22 +199,16 @@ async def api_auth(body: AuthBody) -> Dict[str, Any]:
         parsed = validate_init_data(body.init_data, settings.bot_token)
     except WebAppAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
-
     tg_user = parsed["user"]
     user_id = int(tg_user["id"])
     username = tg_user.get("username")
-    full_name = " ".join(
-        x for x in [tg_user.get("first_name"), tg_user.get("last_name")] if x
-    ).strip() or None
+    full_name = " ".join(x for x in [tg_user.get("first_name"), tg_user.get("last_name")] if x).strip() or None
     user = await credit_service.ensure_user(user_id, username=username, full_name=full_name)
+    if user.get("is_banned") and not settings.is_admin(user_id):
+        raise HTTPException(status_code=403, detail="当前账号无法使用")
     token = issue_access_token(user_id, settings.bot_token)
-    return {
-        "ok": True,
-        "token": token,
-        "user": _ser_user(user),
-        "is_admin": settings.is_admin(user_id),
-        "needs_role": not bool(user.get("role")),
-    }
+    return {"ok": True, "token": token, "user": _ser_user(user), "is_admin": settings.is_admin(user_id), "needs_role": not bool(user.get("role"))}
+
 
 @router.get("/me")
 async def api_me(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
@@ -222,27 +223,33 @@ async def api_me(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
         "is_admin": get_settings().is_admin(user_id),
         "needs_role": not bool(user.get("role")),
         "reviews": my_reviews,
-        "tips": {
-            "media_limit": "发布媒体图+视频合计最多 9 个；支持相册上传（file_id）或 URL",
-            "report_history": "举报记录可在报告审核后通过 Bot 通知查看结果",
-        },
+        "tips": {"media_limit": "上架媒体图+视频合计最多 6 个；支持相册上传或 URL"},
     }
 
+
 @router.post("/me/role")
-async def api_set_role(
-    body: RoleBody,
-    user_id: int = Depends(get_current_user_id),
-) -> Dict[str, Any]:
+async def api_set_role(body: RoleBody, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
     try:
         user = await credit_service.set_user_role(user_id, body.role.strip().lower())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {
-        "ok": True,
-        "user": _ser_user(user),
-        "role": user.get("role"),
-        "role_label": _ROLE_LABEL.get(user.get("role") or "", ""),
-    }
+    return {"ok": True, "user": _ser_user(user), "role": user.get("role"), "role_label": _ROLE_LABEL.get(user.get("role") or "", "")}
+
+
+@router.post("/me/alias")
+async def api_set_alias(body: AliasBody, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    user = await credit_service.set_guest_alias(user_id, body.alias)
+    return {"ok": True, "user": _ser_user(user)}
+
+
+@router.get("/gate")
+async def api_gate(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    from bot.services import gate
+    settings = get_settings()
+    if settings.is_admin(user_id):
+        return {"ok": True, "required": False, "missing": [], "chats": []}
+    return await gate.check_subscriptions(user_id)
+
 
 @router.get("/me/credit")
 async def api_me_credit(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
@@ -250,9 +257,4 @@ async def api_me_credit(user_id: int = Depends(get_current_user_id)) -> Dict[str
     hist = await credit_service.history(user_id, limit=30)
     for h in hist:
         h["time"] = _ser_dt(h.get("time"))
-    return {
-        "ok": True,
-        "user": _ser_user(user),
-        "tier_ranges": credit_service.TIER_RANGES,
-        "history": hist,
-    }
+    return {"ok": True, "user": _ser_user(user), "tier_ranges": credit_service.TIER_RANGES, "history": hist}
