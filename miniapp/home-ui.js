@@ -4,6 +4,8 @@
   let q = "";
   let carouselTimer = null;
   let booted = false;
+  let cta = "想聊聊";
+  let cities = [];
 
   function token() {
     return localStorage.getItem("yycj_token") || "";
@@ -25,25 +27,51 @@
     for (const p of item.photos || []) if (String(p).startsWith("http")) return p;
     return null;
   }
-  function renderContacts(c) {
+  function renderHeader(data) {
+    const c = data.contacts || {};
+    const brand = $("#brandTitle");
+    if (brand) {
+      if (c.bot_url) {
+        brand.setAttribute("href", c.bot_url);
+        brand.setAttribute("target", "_blank");
+        brand.setAttribute("rel", "noopener");
+      } else {
+        brand.removeAttribute("href");
+      }
+    }
+    const admin = $("#topAdmin");
+    if (admin) {
+      if (c.show_admin && c.admin_url) {
+        admin.textContent = c.admin_label || "管理员";
+        admin.setAttribute("href", c.admin_url);
+        admin.classList.remove("hidden");
+      } else {
+        admin.classList.add("hidden");
+      }
+    }
     const box = $("#contacts");
-    if (!box || !c) return;
-    const bits = [];
-    if (c.show_bot && c.bot_url) {
-      bits.push(`<a class="chip" href="${esc(c.bot_url)}" target="_blank" rel="noopener">${esc(c.bot_label || "机器人")}${c.bot_username ? " @"+esc(c.bot_username) : ""}</a>`);
-    }
-    if (c.show_admin && c.admin_url) {
-      bits.push(`<a class="chip" href="${esc(c.admin_url)}" target="_blank" rel="noopener">${esc(c.admin_label || "管理员")}</a>`);
-    }
-    box.innerHTML = bits.join("");
-    box.classList.toggle("hidden", !bits.length);
+    if (box) box.innerHTML = "";
+    cta = data.chat_cta_label || "想聊聊";
+    cities = data.enabled_cities || cities;
+    const city = data.city || localStorage.getItem("yycj_city") || "";
+    if (city) localStorage.setItem("yycj_city", city);
+    const btn = $("#btnCity");
+    if (btn) btn.textContent = `${city || "城市"} ▾`;
+    renderCityDrop(city);
+  }
+  function renderCityDrop(current) {
+    const drop = $("#cityDrop");
+    if (!drop) return;
+    drop.innerHTML = (cities || []).map((c) =>
+      `<button type="button" class="city-opt${c === current ? " on" : ""}" data-city="${esc(c)}">${esc(c)}</button>`
+    ).join("") || `<div class="muted">暂无城市</div>`;
   }
   function startCarousel(sec) {
     const el = $("#pins");
     if (!el || el.children.length < 2) return;
     clearInterval(carouselTimer);
     const step = () => {
-      const w = el.firstElementChild ? el.firstElementChild.getBoundingClientRect().width + 10 : 280;
+      const w = el.firstElementChild ? el.firstElementChild.getBoundingClientRect().width + 8 : 160;
       if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 8) el.scrollTo({ left: 0, behavior: "smooth" });
       else el.scrollBy({ left: w, behavior: "smooth" });
     };
@@ -52,24 +80,23 @@
   function pinHtml(p) {
     const t = (p && p.lamp) || {};
     const img = cover(t);
-    return `<div class="pin-card" data-id="${esc(t.lamp_id || "")}">
+    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
       <span class="badge-pin">精选</span>
       ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
-      <h3>${esc(t.title || "")}</h3>
-      <div class="muted">${esc(t.city || "")}${t.district ? " · " + esc(t.district) : ""}</div>
+      <div class="pin-copy"><b>${esc(t.title || "")}</b><span>${esc(t.city || "")}</span></div>
     </div>`;
   }
   function cardHtml(t) {
     const img = cover(t);
-    const pin = t.feed_pinned ? '<span class="badge">置顶</span> ' : "";
+    const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
     return `<div class="feed-card compact" data-id="${esc(t.lamp_id)}">
       ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
       <div class="body">
         <h3>${pin}${esc(t.title || "")}</h3>
-        <div class="muted">${esc(t.city || "")}${t.district ? " · " + esc(t.district) : ""} · ${esc(t.price_text || "面议")}</div>
+        <div class="muted">${esc(t.price_text || "面议")}</div>
         <div class="row">
           <button class="btn primary" data-act="detail" type="button">查看</button>
-          <button class="btn" data-act="chat" type="button">想聊聊</button>
+          <button class="btn" data-act="chat" type="button">${esc(cta)}</button>
         </div>
       </div>
     </div>`;
@@ -84,7 +111,7 @@
     params.set("limit", "3");
     params.set("offset", String(offset));
     const data = await api(`/api/home?${params}`);
-    renderContacts(data.contacts);
+    renderHeader(data);
     const pins = $("#pins");
     if (pins) {
       pins.innerHTML = (data.pins || []).map(pinHtml).join("");
@@ -111,6 +138,18 @@
     if (ev.target.id === "btnLoadMore") {
       try { await loadFeed(false); } catch (e) { console.warn(e); }
     }
+    if (ev.target.id === "btnCity" || ev.target.closest("#btnCity")) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      $("#cityDrop")?.classList.toggle("hidden");
+    }
+    const opt = ev.target.closest("#cityDrop [data-city]");
+    if (opt) {
+      localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
+      $("#cityDrop")?.classList.add("hidden");
+      try { await loadFeed(true); } catch (e) { console.warn(e); }
+    }
+    if (!ev.target.closest(".city-wrap")) $("#cityDrop")?.classList.add("hidden");
   });
   const hq = document.getElementById("homeQ");
   if (hq) hq.addEventListener("keydown", (e) => {
@@ -128,7 +167,7 @@
     if (!token()) return;
     booted = true;
     try { await loadFeed(true); } catch (e) { console.warn(e); }
-    setTimeout(() => { loadFeed(true).catch(() => {}); }, 800);
+    setTimeout(() => { loadFeed(true).catch(() => {}); }, 600);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
