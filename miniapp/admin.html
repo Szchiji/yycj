@@ -10,67 +10,98 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260910e" />
+  <link rel="stylesheet" href="./styles.css?v=20260910g" />
+  <link rel="stylesheet" href="./admin.css?v=20260910g" />
 </head>
-<body>
+<body class="admin-body">
   <header class="topbar">
     <div>
-      <h1>管理</h1>
+      <h1>管理后台</h1>
       <div id="status" class="muted"></div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260910e">← 首页</a>
+      <a class="btn" href="./index.html?v=20260910g">← 首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
-  <main>
-    <div id="gate" class="card">正在校验…</div>
-    <div id="console" class="hidden">
-      <section class="card admin-primary">
+  <div id="gate" class="card">正在校验…</div>
+  <div id="console" class="admin-shell hidden">
+    <aside class="admin-side" id="adminSide">
+      <button type="button" class="active" data-pane="audit">审核</button>
+      <button type="button" data-pane="pin">卡片置顶</button>
+      <button type="button" data-pane="carousel">精选轮播</button>
+      <button type="button" data-pane="listings">上架</button>
+      <button type="button" data-pane="users">用户</button>
+      <button type="button" data-pane="venue">场与入口</button>
+      <button type="button" data-pane="more">更多</button>
+    </aside>
+    <div class="admin-main">
+      <section class="admin-pane active" id="pane-audit">
         <h3>待审列表</h3>
         <div id="adminPosts"></div>
         <div id="adminReviews" style="margin-top:12px"></div>
+        <button class="btn primary block" id="btnSeed" type="button" style="margin-top:12px">一键填充演示数据</button>
       </section>
-      <section class="card admin-primary">
-        <button class="btn primary block big" id="btnSeed" type="button">一键填充演示数据</button>
-      </section>
-      <section class="card admin-primary">
+
+      <section class="admin-pane" id="pane-pin">
         <h3>卡片置顶</h3>
-        <p class="muted hint">置顶会出现在首页卡片流最上方，带「置顶」标记（不是轮播）。</p>
+        <p class="muted hint">出现在首页 1×3 列表最上方，带「置顶」。与轮播独立。</p>
         <div id="adminFeedPins"></div>
-        <label>已通过的资料</label>
-        <select id="feedPinLampId"><option value="">选择资料…</option></select>
         <div class="row">
-          <button class="btn primary" id="btnFeedPinAdd" type="button">添加置顶</button>
-          <button class="btn danger" id="btnFeedPinDel" type="button">取消置顶</button>
+          <input id="feedPinQ" placeholder="搜花名 / 城市 / ID" style="flex:1;margin:0" />
+          <button class="btn" id="btnFeedPinSearch" type="button">搜索</button>
         </div>
+        <div id="feedPinResults" class="pick-list"></div>
+        <select id="feedPinLampId" class="hidden"><option value="">选择资料…</option></select>
       </section>
-      <section class="card admin-primary">
+
+      <section class="admin-pane" id="pane-carousel">
         <h3>精选轮播</h3>
-        <p class="muted hint">横向精选条，与卡片置顶互不影响。</p>
+        <p class="muted hint">首页顶部横滑。与卡片置顶独立。</p>
         <div id="adminPins"></div>
-        <label>已通过的资料</label>
-        <select id="pinLampId"><option value="">选择资料…</option></select>
-        <label>过期小时（默认 72，空=不过期）</label>
+        <label>过期小时（空=不过期）</label>
         <input id="pinHours" type="number" value="72" />
         <div class="row">
-          <button class="btn primary" id="btnPin" type="button">上轮播</button>
+          <input id="pinQ" placeholder="搜花名 / 城市 / ID" style="flex:1;margin:0" />
+          <button class="btn" id="btnPinSearch" type="button">搜索</button>
         </div>
+        <div id="pinResults" class="pick-list"></div>
+        <select id="pinLampId" class="hidden"><option value="">选择资料…</option></select>
+        <button class="btn primary hidden" id="btnPin" type="button">上轮播</button>
       </section>
-      <section class="card admin-primary">
-        <h3>运营设置</h3>
+
+      <section class="admin-pane" id="pane-listings">
+        <h3>已上架 / 下架 / 续期</h3>
+        <div class="row">
+          <input id="listingQ" placeholder="搜花名 / 城市" style="flex:1;margin:0" />
+          <button class="btn" id="btnListingSearch" type="button">筛选</button>
+        </div>
+        <div id="adminListings"></div>
+      </section>
+
+      <section class="admin-pane" id="pane-users">
+        <h3>用户</h3>
+        <div class="row">
+          <input id="userQ" placeholder="ID / @用户名 / 昵称" style="flex:1;margin:0" />
+          <button class="btn" id="btnUserSearch" type="button">搜索</button>
+        </div>
+        <div id="adminUsers"></div>
+      </section>
+
+      <section class="admin-pane" id="pane-venue">
+        <h3>场与入口</h3>
         <label>公告</label>
         <input id="annText" placeholder="首页滚动公告" />
         <label class="row"><input type="checkbox" id="annOn" checked /> 显示公告</label>
         <label>开放城市（逗号分隔）</label>
-        <input id="citiesInput" placeholder="台北,深圳,香港" />
+        <input id="citiesInput" placeholder="深圳,广州" />
         <label>首页每次加载条数</label>
         <input id="opsPageSize" type="number" min="1" max="50" value="3" />
         <label>聊天按钮文案</label>
         <input id="opsCta" value="想聊聊" maxlength="32" />
-        <label>Bot /start 欢迎语（可空=默认）</label>
-        <textarea id="opsWelcome" rows="3" placeholder="留空则用默认三行欢迎语"></textarea>
-        <label>上架媒体上限（1-9）</label>
+        <label>Bot /start 欢迎语</label>
+        <textarea id="opsWelcome" rows="3"></textarea>
+        <label>上架媒体上限</label>
         <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
         <label>上架有效天数</label>
         <input id="opsListingDays" type="number" min="1" max="365" value="30" />
@@ -86,20 +117,8 @@
         <button class="btn primary block" id="btnOpsSave" type="button">保存设置</button>
         <button class="btn block" id="btnSyncBot" type="button">同步机器人用户名</button>
       </section>
-      <section class="card admin-primary">
-        <h3>已上架 / 下架 / 续期</h3>
-        <div id="adminListings"></div>
-      </section>
-      <section class="card admin-primary">
-        <h3>用户</h3>
-        <div class="row">
-          <input id="userQ" placeholder="ID / @用户名 / 昵称" style="flex:1;margin:0" />
-          <button class="btn" id="btnUserSearch" type="button">搜索</button>
-        </div>
-        <div id="adminUsers"></div>
-      </section>
-      <details class="card admin-more">
-        <summary><strong>更多</strong></summary>
+
+      <section class="admin-pane" id="pane-more">
         <h3>举报</h3>
         <div id="adminReports"></div>
         <h3>遮蔽名单</h3>
@@ -114,10 +133,10 @@
           <input id="adjNote" />
           <button class="btn primary" type="submit">提交</button>
         </form>
-      </details>
+      </section>
     </div>
-  </main>
-  <script src="./admin.js?v=20260910e"></script>
-  <script src="./admin-ops.js?v=20260910e"></script>
+  </div>
+  <script src="./admin.js?v=20260910g"></script>
+  <script src="./admin-ops.js?v=20260910g"></script>
 </body>
 </html>
