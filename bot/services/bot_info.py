@@ -11,13 +11,17 @@ logger = logging.getLogger(__name__)
 _cache: Dict[str, Any] = {"username": "", "id": None, "ts": 0.0}
 _TTL = 3600.0
 
+try:
+    from bot.services import user_admin  # noqa: F401  挂载 alias/ban
+except Exception:
+    logger.exception("user_admin wire skipped")
+
 
 async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
     global _cache
     try:
         if bot is None:
             from bot.main import bot as app_bot
-
             bot = app_bot
         me = await bot.get_me()
         _cache = {
