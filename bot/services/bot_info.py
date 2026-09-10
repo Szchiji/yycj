@@ -12,9 +12,13 @@ _cache: Dict[str, Any] = {"username": "", "id": None, "ts": 0.0}
 _TTL = 3600.0
 
 try:
-    from bot.services import user_admin  # noqa: F401  挂载 alias/ban
+    from bot.services import user_admin  # noqa: F401
 except Exception:
     logger.exception("user_admin wire skipped")
+try:
+    from bot.services import search_hooks  # noqa: F401
+except Exception:
+    logger.exception("search_hooks wire skipped")
 
 
 async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
