@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260910g" />
+  <link rel="stylesheet" href="./styles.css?v=20260910h" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -18,23 +18,25 @@
   </section>
   <section id="gate" class="gate hidden" aria-hidden="true"></section>
   <div id="app" class="hidden">
-    <header class="topbar">
-      <div>
-        <h1>月影车姬</h1>
-        <div id="topMeta" class="muted"></div>
+    <header class="topbar topbar-3">
+      <a id="topAdmin" class="top-admin hidden" href="#">管理员</a>
+      <a id="brandTitle" class="brand">月影车姬</a>
+      <div class="city-wrap">
+        <button id="btnCity" class="chip" type="button">城市 ▾</button>
+        <div id="cityDrop" class="city-drop hidden"></div>
       </div>
-      <button id="btnCity" class="chip" type="button">城市 ▾</button>
     </header>
+    <div id="topMeta" class="top-meta muted"></div>
     <main id="main">
       <section id="view-home" class="view">
-        <div id="contacts" class="row contacts"></div>
+        <div id="contacts" class="row contacts hidden"></div>
         <div id="announce" class="announce hidden"></div>
         <div id="pins" class="pins"></div>
         <div class="search-row">
           <input id="homeQ" maxlength="64" placeholder="搜花名 / 标签" />
           <button class="btn" id="btnSearch" type="button">搜索</button>
         </div>
-        <div id="feed" class="feed feed-one-col"></div>
+        <div id="feed" class="feed feed-3"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
       <section id="view-publish" class="view hidden">
@@ -86,7 +88,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260910g">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260910h">管理后台</a>
           </div>
         </div>
       </section>
@@ -128,8 +130,8 @@
       <button class="btn block" id="rulesClose" type="button">知道了</button>
     </div>
   </div>
-  <script src="./boot-inline.js?v=20260910g"></script>
-  <script src="./app.js?v=20260910g"></script>
-  <script src="./home-ui.js?v=20260910g"></script>
+  <script src="./boot-inline.js?v=20260910h"></script>
+  <script src="./app.js?v=20260910h"></script>
+  <script src="./home-ui.js?v=20260910h"></script>
 </body>
 </html>
