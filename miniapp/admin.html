@@ -10,7 +10,7 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260910c" />
+  <link rel="stylesheet" href="./styles.css?v=20260910e" />
 </head>
 <body>
   <header class="topbar">
@@ -19,7 +19,7 @@
       <div id="status" class="muted"></div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260910c">← 首页</a>
+      <a class="btn" href="./index.html?v=20260910e">← 首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
@@ -31,11 +31,9 @@
         <div id="adminPosts"></div>
         <div id="adminReviews" style="margin-top:12px"></div>
       </section>
-
       <section class="card admin-primary">
         <button class="btn primary block big" id="btnSeed" type="button">一键填充演示数据</button>
       </section>
-
       <section class="card admin-primary">
         <h3>卡片置顶</h3>
         <p class="muted hint">置顶会出现在首页卡片流最上方，带「置顶」标记（不是轮播）。</p>
@@ -47,7 +45,6 @@
           <button class="btn danger" id="btnFeedPinDel" type="button">取消置顶</button>
         </div>
       </section>
-
       <section class="card admin-primary">
         <h3>精选轮播</h3>
         <p class="muted hint">横向精选条，与卡片置顶互不影响。</p>
@@ -60,7 +57,6 @@
           <button class="btn primary" id="btnPin" type="button">上轮播</button>
         </div>
       </section>
-
       <section class="card admin-primary">
         <h3>运营设置</h3>
         <label>公告</label>
@@ -74,12 +70,34 @@
         <input id="opsCta" value="想聊聊" maxlength="32" />
         <label>Bot /start 欢迎语（可空=默认）</label>
         <textarea id="opsWelcome" rows="3" placeholder="留空则用默认三行欢迎语"></textarea>
-        <label>发布媒体上限（1-9）</label>
-        <input id="opsMediaMax" type="number" min="1" max="9" value="9" />
+        <label>上架媒体上限（1-9）</label>
+        <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
+        <label>上架有效天数</label>
+        <input id="opsListingDays" type="number" min="1" max="365" value="30" />
+        <label>轮播间隔秒</label>
+        <input id="opsCarouselSec" type="number" min="2" max="15" value="4" />
+        <label>管理员联系（@用户名 或 t.me 链接）</label>
+        <input id="opsAdminContact" placeholder="@xxx 或 https://t.me/xxx" />
+        <label class="row"><input type="checkbox" id="opsShowBot" checked /> 首页显示机器人</label>
+        <label class="row"><input type="checkbox" id="opsShowAdmin" checked /> 首页显示管理员</label>
+        <label>必订频道/群（每行 chat_id|标题|链接）</label>
+        <textarea id="opsChats" rows="3" placeholder="-100123|公告频道|https://t.me/xxx"></textarea>
         <label class="row"><input type="checkbox" id="opsReviewAudit" checked /> 评价需审核后展示</label>
         <button class="btn primary block" id="btnOpsSave" type="button">保存设置</button>
+        <button class="btn block" id="btnSyncBot" type="button">同步机器人用户名</button>
       </section>
-
+      <section class="card admin-primary">
+        <h3>已上架 / 下架 / 续期</h3>
+        <div id="adminListings"></div>
+      </section>
+      <section class="card admin-primary">
+        <h3>用户</h3>
+        <div class="row">
+          <input id="userQ" placeholder="ID / @用户名 / 昵称" style="flex:1;margin:0" />
+          <button class="btn" id="btnUserSearch" type="button">搜索</button>
+        </div>
+        <div id="adminUsers"></div>
+      </section>
       <details class="card admin-more">
         <summary><strong>更多</strong></summary>
         <h3>举报</h3>
@@ -99,6 +117,6 @@
       </details>
     </div>
   </main>
-  <script src="./admin.js?v=20260910c"></script>
+  <script src="./admin.js?v=20260910e"></script>
 </body>
 </html>
