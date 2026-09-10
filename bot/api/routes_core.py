@@ -19,6 +19,7 @@ from bot.api.routes_core_base import (  # noqa: F401
     BanBody,
     AliasBody,
     LampOpBody,
+    _ROLE_LABEL,
     _ser_dt,
     _ser_user,
     _ser_lamp,
