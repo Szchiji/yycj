@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260910c" />
+  <link rel="stylesheet" href="./styles.css?v=20260910e" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -18,7 +18,6 @@
     </div>
   </section>
 
-  <!-- 身份门默认隐藏：首次自动设为客人 -->
   <section id="gate" class="gate hidden" aria-hidden="true"></section>
 
   <div id="app" class="hidden">
@@ -32,8 +31,13 @@
 
     <main id="main">
       <section id="view-home" class="view">
+        <div id="contacts" class="row contacts"></div>
         <div id="announce" class="announce hidden"></div>
         <div id="pins" class="pins"></div>
+        <div class="search-row">
+          <input id="homeQ" maxlength="64" placeholder="搜花名 / 标签" />
+          <button class="btn" id="btnSearch" type="button">搜索</button>
+        </div>
         <div id="feed" class="feed feed-one-col"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
@@ -47,7 +51,7 @@
 
       <section id="view-publish" class="view hidden">
         <form id="publishForm" class="card form">
-          <h3 id="publishTitle">发布</h3>
+          <h3 id="publishTitle">上架</h3>
           <label>相册（图/视频，最多 9）</label>
           <input id="pubFiles" type="file" accept="image/*,video/*" multiple />
           <div id="pubPreview" class="media-preview"></div>
@@ -77,7 +81,7 @@
         <div id="meCard" class="card"></div>
         <div class="card">
           <h3>我的身份</h3>
-          <p class="muted hint">浏览默认是客人；发布时再选老师/商家。</p>
+          <p class="muted hint">浏览默认是客人；上架时再选老师/商家。</p>
           <label>聊天代称（仅会话显示，不公开账号）</label>
           <div class="row">
             <input id="guestNick" maxlength="16" placeholder="例如：小明" style="flex:1;margin:0" />
@@ -95,7 +99,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260910c">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260910e">管理后台</a>
           </div>
         </div>
       </section>
@@ -123,7 +127,7 @@
     <nav class="bottom-nav">
       <button data-nav="home" class="nav-item active" type="button"><span>首页</span></button>
       <button data-nav="msg" class="nav-item" type="button"><span>消息</span></button>
-      <button data-nav="publish" class="nav-item" type="button"><span>发布</span></button>
+      <button data-nav="publish" class="nav-item" type="button"><span>上架</span></button>
       <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
     </nav>
   </div>
@@ -144,7 +148,8 @@
     </div>
   </div>
 
-  <script src="./boot-inline.js?v=20260910c"></script>
-  <script src="./app.js?v=20260910c"></script>
+  <script src="./boot-inline.js?v=20260910e"></script>
+  <script src="./app.js?v=20260910e"></script>
+  <script src="./home-ui.js?v=20260910e"></script>
 </body>
 </html>
