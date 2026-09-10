@@ -3,6 +3,7 @@
   let offset = 0;
   let q = "";
   let carouselTimer = null;
+  let booted = false;
 
   function token() {
     return localStorage.getItem("yycj_token") || "";
@@ -48,21 +49,33 @@
     };
     carouselTimer = setInterval(step, Math.max(2, sec || 4) * 1000);
   }
+  function pinHtml(p) {
+    const t = (p && p.lamp) || {};
+    const img = cover(t);
+    return `<div class="pin-card" data-id="${esc(t.lamp_id || "")}">
+      <span class="badge-pin">精选</span>
+      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
+      <h3>${esc(t.title || "")}</h3>
+      <div class="muted">${esc(t.city || "")}${t.district ? " · " + esc(t.district) : ""}</div>
+    </div>`;
+  }
   function cardHtml(t) {
     const img = cover(t);
     const pin = t.feed_pinned ? '<span class="badge">置顶</span> ' : "";
-    return `<div class="feed-card" data-id="${esc(t.lamp_id)}">
-      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
-      <h3>${pin}${esc(t.title || "")}</h3>
-      <div class="muted">📍 ${esc(t.city || "")}${t.district ? " · " + esc(t.district) : ""}</div>
-      <div class="muted">💰 ${esc(t.price_text || "面议")}</div>
-      <div class="row">
-        <button class="btn primary" data-act="detail" type="button">查看</button>
-        <button class="btn" data-act="chat" type="button">想聊聊</button>
+    return `<div class="feed-card compact" data-id="${esc(t.lamp_id)}">
+      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+      <div class="body">
+        <h3>${pin}${esc(t.title || "")}</h3>
+        <div class="muted">${esc(t.city || "")}${t.district ? " · " + esc(t.district) : ""} · ${esc(t.price_text || "面议")}</div>
+        <div class="row">
+          <button class="btn primary" data-act="detail" type="button">查看</button>
+          <button class="btn" data-act="chat" type="button">想聊聊</button>
+        </div>
       </div>
     </div>`;
   }
   async function loadFeed(reset) {
+    if (!token()) return null;
     if (reset) offset = 0;
     const city = localStorage.getItem("yycj_city") || "";
     const params = new URLSearchParams();
@@ -72,10 +85,17 @@
     params.set("offset", String(offset));
     const data = await api(`/api/home?${params}`);
     renderContacts(data.contacts);
+    const pins = $("#pins");
+    if (pins) {
+      pins.innerHTML = (data.pins || []).map(pinHtml).join("");
+      pins.classList.toggle("hidden", !(data.pins || []).length);
+    }
     const feed = $("#feed");
-    const html = (data.items || []).map(cardHtml).join("") || '<div class="empty card"><p class="muted">这里暂时还没有内容</p></div>';
-    if (reset || offset === 0) feed.innerHTML = html;
-    else feed.insertAdjacentHTML("beforeend", (data.items || []).map(cardHtml).join(""));
+    if (feed) {
+      const html = (data.items || []).map(cardHtml).join("") || '<div class="empty card"><p class="muted">这里暂时还没有内容</p></div>';
+      if (reset || offset === 0) feed.innerHTML = html;
+      else feed.insertAdjacentHTML("beforeend", (data.items || []).map(cardHtml).join(""));
+    }
     offset += (data.items || []).length;
     const more = $("#btnLoadMore");
     if (more) more.classList.toggle("hidden", !data.has_more);
@@ -100,21 +120,16 @@
     }
   });
 
-  const nickBtn = document.getElementById("btnSaveNick");
-  if (nickBtn) {
-    nickBtn.addEventListener("click", async () => {
-      const alias = (document.getElementById("guestNick") || {}).value || "";
-      try {
-        await fetch("/api/me/alias", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
-          body: JSON.stringify({ alias }),
-        });
-      } catch (e) { console.warn(e); }
-    });
+  async function boot() {
+    if (booted) return;
+    for (let i = 0; i < 40 && !token(); i += 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!token()) return;
+    booted = true;
+    try { await loadFeed(true); } catch (e) { console.warn(e); }
+    setTimeout(() => { loadFeed(true).catch(() => {}); }, 800);
   }
-
-  setTimeout(() => {
-    loadFeed(true).catch(() => {});
-  }, 1200);
+  if (document.readyState === "complete") boot();
+  else window.addEventListener("load", boot);
 })();
