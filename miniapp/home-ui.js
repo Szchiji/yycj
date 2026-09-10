@@ -4,6 +4,7 @@
   let q = "";
   let carouselTimer = null;
   let booted = false;
+  let painting = false;
   let cta = "想聊聊";
   let cities = [];
 
@@ -35,9 +36,7 @@
         brand.setAttribute("href", c.bot_url);
         brand.setAttribute("target", "_blank");
         brand.setAttribute("rel", "noopener");
-      } else {
-        brand.removeAttribute("href");
-      }
+      } else brand.removeAttribute("href");
     }
     const admin = $("#topAdmin");
     if (admin) {
@@ -45,12 +44,8 @@
         admin.textContent = c.admin_label || "管理员";
         admin.setAttribute("href", c.admin_url);
         admin.classList.remove("hidden");
-      } else {
-        admin.classList.add("hidden");
-      }
+      } else admin.classList.add("hidden");
     }
-    const box = $("#contacts");
-    if (box) box.innerHTML = "";
     cta = data.chat_cta_label || "想聊聊";
     cities = data.enabled_cities || cities;
     const city = data.city || localStorage.getItem("yycj_city") || "";
@@ -83,7 +78,7 @@
     return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
       <span class="badge-pin">精选</span>
       ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
-      <div class="pin-copy"><b>${esc(t.title || "")}</b><span>${esc(t.city || "")}</span></div>
+      <div class="pin-copy"><b>${esc(t.title || "")}</b><span>${esc(t.city || "")}${t.price_text ? " · " + esc(t.price_text) : ""}</span></div>
     </div>`;
   }
   function cardHtml(t) {
@@ -102,32 +97,37 @@
     </div>`;
   }
   async function loadFeed(reset) {
-    if (!token()) return null;
-    if (reset) offset = 0;
-    const city = localStorage.getItem("yycj_city") || "";
-    const params = new URLSearchParams();
-    if (city) params.set("city", city);
-    if (q) params.set("q", q);
-    params.set("limit", "3");
-    params.set("offset", String(offset));
-    const data = await api(`/api/home?${params}`);
-    renderHeader(data);
-    const pins = $("#pins");
-    if (pins) {
-      pins.innerHTML = (data.pins || []).map(pinHtml).join("");
-      pins.classList.toggle("hidden", !(data.pins || []).length);
+    if (!token() || painting) return null;
+    painting = true;
+    try {
+      if (reset) offset = 0;
+      const city = localStorage.getItem("yycj_city") || "";
+      const params = new URLSearchParams();
+      if (city) params.set("city", city);
+      if (q) params.set("q", q);
+      params.set("limit", "3");
+      params.set("offset", String(offset));
+      const data = await api(`/api/home?${params}`);
+      renderHeader(data);
+      const pins = $("#pins");
+      if (pins) {
+        pins.innerHTML = (data.pins || []).map(pinHtml).join("");
+        pins.classList.toggle("hidden", !(data.pins || []).length);
+      }
+      const feed = $("#feed");
+      if (feed) {
+        const html = (data.items || []).map(cardHtml).join("") || '<div class="empty card"><p class="muted">这里暂时还没有内容</p></div>';
+        if (reset || offset === 0) feed.innerHTML = html;
+        else feed.insertAdjacentHTML("beforeend", (data.items || []).map(cardHtml).join(""));
+      }
+      offset += (data.items || []).length;
+      const more = $("#btnLoadMore");
+      if (more) more.classList.toggle("hidden", !data.has_more);
+      startCarousel(data.carousel_interval_sec);
+      return data;
+    } finally {
+      setTimeout(() => { painting = false; }, 50);
     }
-    const feed = $("#feed");
-    if (feed) {
-      const html = (data.items || []).map(cardHtml).join("") || '<div class="empty card"><p class="muted">这里暂时还没有内容</p></div>';
-      if (reset || offset === 0) feed.innerHTML = html;
-      else feed.insertAdjacentHTML("beforeend", (data.items || []).map(cardHtml).join(""));
-    }
-    offset += (data.items || []).length;
-    const more = $("#btnLoadMore");
-    if (more) more.classList.toggle("hidden", !data.has_more);
-    startCarousel(data.carousel_interval_sec);
-    return data;
   }
 
   document.addEventListener("click", async (ev) => {
@@ -151,23 +151,23 @@
     }
     if (!ev.target.closest(".city-wrap")) $("#cityDrop")?.classList.add("hidden");
   });
-  const hq = document.getElementById("homeQ");
-  if (hq) hq.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      document.getElementById("btnSearch")?.click();
-    }
-  });
 
   async function boot() {
     if (booted) return;
-    for (let i = 0; i < 40 && !token(); i += 1) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
+    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 200));
     if (!token()) return;
     booted = true;
     try { await loadFeed(true); } catch (e) { console.warn(e); }
-    setTimeout(() => { loadFeed(true).catch(() => {}); }, 600);
+    const feed = $("#feed");
+    const pins = $("#pins");
+    const redo = () => {
+      if (painting) return;
+      if (feed && !feed.querySelector(".feed-card.compact")) loadFeed(true).catch(() => {});
+      else if (pins && pins.querySelector(".pin-card") && !pins.querySelector(".pin-copy")) loadFeed(true).catch(() => {});
+    };
+    if (feed) new MutationObserver(redo).observe(feed, { childList: true });
+    if (pins) new MutationObserver(redo).observe(pins, { childList: true });
+    setTimeout(redo, 800);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
