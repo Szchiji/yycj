@@ -1,0 +1,27 @@
+.pin-card, .pin-card.short {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  overflow: hidden !important;
+  min-height: 56px !important;
+  height: 56px;
+}
+.pin-card .thumb {
+  width: 44px !important;
+  height: 44px !important;
+  max-height: 44px !important;
+  flex: 0 0 44px !important;
+}
+.pin-card h3,
+.pin-card .muted,
+.pin-card .pin-copy,
+.pin-copy b,
+.pin-copy span {
+  writing-mode: horizontal-tb !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0;
+}
+.pin-copy { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.pin-card .muted { display: none; }

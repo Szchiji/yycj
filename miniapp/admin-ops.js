@@ -43,6 +43,8 @@
             show_bot_link: $("#opsShowBot") ? $("#opsShowBot").checked : true,
             show_admin_link: $("#opsShowAdmin") ? $("#opsShowAdmin").checked : true,
             required_chats: chats,
+            chat_cta_label: $("#opsCta")?.value || "想聊聊",
+            home_feed_page_size: parseInt($("#opsPageSize")?.value, 10) || 3,
           }),
         });
       } catch (e) { console.warn(e); }
@@ -56,6 +58,40 @@
     } catch (e) { alert(e.message || String(e)); }
   });
 
+  async function setShadow(userId, shadowed) {
+    await api("/api/admin/users/shadow", {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: parseInt(userId, 10),
+        shadowed,
+        days: parseInt($("#shadowDays")?.value, 10) || 7,
+        reason: $("#shadowReason")?.value || "",
+      }),
+    });
+  }
+  $("#btnShadowOn")?.addEventListener("click", async () => {
+    try {
+      await setShadow($("#shadowUid")?.value, true);
+      alert("已设置遮蔽");
+      document.getElementById("btnRefresh")?.click();
+    } catch (e) { alert(e.message || String(e)); }
+  });
+  $("#btnShadowOff")?.addEventListener("click", async () => {
+    try {
+      await setShadow($("#shadowUid")?.value, false);
+      alert("已解除遮蔽");
+      document.getElementById("btnRefresh")?.click();
+    } catch (e) { alert(e.message || String(e)); }
+  });
+  $("#adminShadow")?.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("[data-unshadow]");
+    if (!btn) return;
+    try {
+      await setShadow(btn.getAttribute("data-unshadow"), false);
+      document.getElementById("btnRefresh")?.click();
+    } catch (e) { alert(e.message || String(e)); }
+  });
+
   function renderListingCards(items) {
     const box = $("#adminListings");
     if (!box) return;
@@ -64,7 +100,6 @@
         <div class="meta">
           <strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${esc(x.status || "")} · ${esc((x.lamp_id || "").slice(0,8))}</div>
-          <div class="muted">到期 ${esc(x.expires_at || "-")}</div>
         </div>
         <div class="row">
           <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期</button>
@@ -80,7 +115,7 @@
       <div class="pick-item">
         <div class="meta">
           <strong>${esc(x.title || "")}</strong>
-          <div class="muted">${esc(x.city || "")} · ${esc(x.status || "")} · ${esc((x.lamp_id || "").slice(0,8))}</div>
+          <div class="muted">${esc(x.city || "")} · ${esc(x.status || "")}</div>
         </div>
         <button class="btn primary" data-pick="${action}" data-id="${esc(x.lamp_id)}">${action === "pin" ? "置顶" : "上轮播"}</button>
       </div>`).join("") || "<p class='muted'>无匹配</p>";
@@ -97,26 +132,19 @@
     }
   }
   $("#btnListingSearch")?.addEventListener("click", () => {
-    const q = ($("#listingQ")?.value || "").trim();
-    renderListingCards(listingCache.filter((x) => matchQ(x, q)));
+    renderListingCards(listingCache.filter((x) => matchQ(x, ($("#listingQ")?.value || "").trim())));
   });
   $("#btnFeedPinSearch")?.addEventListener("click", () => {
-    const q = ($("#feedPinQ")?.value || "").trim();
-    renderPick("#feedPinResults", listingCache.filter((x) => x.status === "active" && matchQ(x, q)), "pin");
+    renderPick("#feedPinResults", listingCache.filter((x) => x.status === "active" && matchQ(x, ($("#feedPinQ")?.value || "").trim())), "pin");
   });
   $("#btnPinSearch")?.addEventListener("click", () => {
-    const q = ($("#pinQ")?.value || "").trim();
-    renderPick("#pinResults", listingCache.filter((x) => x.status === "active" && matchQ(x, q)), "carousel");
+    renderPick("#pinResults", listingCache.filter((x) => x.status === "active" && matchQ(x, ($("#pinQ")?.value || "").trim())), "carousel");
   });
-
   $("#feedPinResults")?.addEventListener("click", async (ev) => {
     const btn = ev.target.closest("[data-pick='pin']");
     if (!btn) return;
     try {
-      await api("/api/admin/homepage/feed-pins", {
-        method: "POST",
-        body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), pinned: true }),
-      });
+      await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), pinned: true }) });
       document.getElementById("btnRefresh")?.click();
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
@@ -126,19 +154,11 @@
     if (!btn) return;
     try {
       const hoursRaw = $("#pinHours")?.value;
-      await api("/api/admin/homepage/pins", {
-        method: "POST",
-        body: JSON.stringify({
-          lamp_id: btn.getAttribute("data-id"),
-          sort_order: 0,
-          expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10),
-        }),
-      });
+      await api("/api/admin/homepage/pins", { method: "POST", body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), sort_order: 0, expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10) }) });
       document.getElementById("btnRefresh")?.click();
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
   });
-
   $("#adminListings")?.addEventListener("click", async (ev) => {
     const btn = ev.target.closest("[data-list]");
     if (!btn) return;
@@ -151,7 +171,6 @@
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
   });
-
   async function renderUsers() {
     const data = await api("/api/admin/users?q=" + encodeURIComponent($("#userQ")?.value || ""));
     if ($("#adminUsers")) {
@@ -159,27 +178,29 @@
         <div class="pick-item">
           <div class="meta">
             <div><strong>${u.user_id}</strong> @${esc(u.username || "-")} · ${esc(u.full_name || "")}</div>
-            <div class="muted">${esc(u.role || "-")} · ${u.lanhua_score} · ${u.is_banned ? "已拉黑" : "正常"}</div>
+            <div class="muted">${esc(u.role || "-")} · ${u.lanhua_score} · ${u.is_banned ? "已拉黑" : "正常"}${u.is_shadowed ? " · 遮蔽" + (u.shadow_days || 0) + "天" : ""}</div>
           </div>
           <div class="row">
             <button class="btn danger" data-ban="1" data-id="${u.user_id}">拉黑</button>
             <button class="btn" data-ban="0" data-id="${u.user_id}">解除</button>
+            <button class="btn" data-fill-shadow="${u.user_id}">遮蔽</button>
           </div>
         </div>`).join("") || "<p class='muted'>无结果</p>";
     }
   }
   $("#btnUserSearch")?.addEventListener("click", () => renderUsers().catch((e) => alert(e.message || e)));
   $("#adminUsers")?.addEventListener("click", async (ev) => {
+    const fill = ev.target.closest("[data-fill-shadow]");
+    if (fill) {
+      if ($("#shadowUid")) $("#shadowUid").value = fill.getAttribute("data-fill-shadow");
+      return;
+    }
     const btn = ev.target.closest("[data-ban]");
     if (!btn) return;
     try {
-      await api("/api/admin/users/ban", {
-        method: "POST",
-        body: JSON.stringify({ user_id: parseInt(btn.getAttribute("data-id"), 10), banned: btn.getAttribute("data-ban") === "1", reason: "admin" }),
-      });
+      await api("/api/admin/users/ban", { method: "POST", body: JSON.stringify({ user_id: parseInt(btn.getAttribute("data-id"), 10), banned: btn.getAttribute("data-ban") === "1", reason: "admin" }) });
       await renderUsers();
     } catch (e) { alert(e.message || String(e)); }
   });
-
   setTimeout(() => { loadListings().catch(() => {}); }, 1600);
 })();
