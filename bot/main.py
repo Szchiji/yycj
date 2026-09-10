@@ -75,31 +75,23 @@ async def job_daily_credit() -> None:
         logger.exception("daily credit failed")
 
 
+async def job_expire_listings() -> None:
+    try:
+        from bot.services import listing_ops
+        n = await listing_ops.expire_due_lamps()
+        if n:
+            logger.info("Expired %s listings", n)
+    except Exception:
+        logger.exception("expire listings failed")
+
+
 def _schedule_jobs() -> None:
     if scheduler.running:
         return
-    scheduler.add_job(
-        job_expire_sessions,
-        "interval",
-        minutes=5,
-        id="expire_sessions",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        job_purge_session_messages,
-        "interval",
-        minutes=30,
-        id="purge_session_messages",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        job_daily_credit,
-        "cron",
-        hour=0,
-        minute=5,
-        id="daily_credit",
-        replace_existing=True,
-    )
+    scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True)
+    scheduler.add_job(job_purge_session_messages, "interval", minutes=30, id="purge_session_messages", replace_existing=True)
+    scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True)
+    scheduler.add_job(job_expire_listings, "interval", minutes=30, id="expire_listings", replace_existing=True)
     scheduler.start()
 
 
@@ -109,10 +101,8 @@ async def _startup() -> None:
         if not settings.bot_token:
             raise RuntimeError("请设置环境变量 BOT_TOKEN")
         logging.getLogger().setLevel(settings.log_level.upper())
-
         await connect_db()
         logger.info("Database connected")
-
         try:
             from bot.services import home_service
             seed = await home_service.seed_demo_if_empty()
@@ -120,12 +110,13 @@ async def _startup() -> None:
                 logger.info("Demo seed: %s", seed.get("lamp_ids"))
         except Exception:
             logger.exception("demo seed skipped")
-
-        # 预热 Redis / 打出内存回退警告
         await anti_brush.allow("__warmup__", limit=1, window_sec=1)
-
         _schedule_jobs()
-
+        try:
+            from bot.services import bot_info
+            await bot_info.refresh_bot_identity(bot)
+        except Exception:
+            logger.exception("bot identity refresh skipped")
         if settings.use_webhook:
             await bot.set_webhook(
                 url=settings.webhook_url,
@@ -137,16 +128,12 @@ async def _startup() -> None:
             logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
         else:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
-
         webapp = settings.normalized_webapp_url
         if webapp:
             logger.info("WEBAPP_URL=%s (normalized=%s)", settings.webapp_url, webapp)
             try:
                 await bot.set_chat_menu_button(
-                    menu_button=MenuButtonWebApp(
-                        text="首页",
-                        web_app=WebAppInfo(url=webapp),
-                    )
+                    menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=webapp))
                 )
                 logger.info("Chat menu button set -> %s", webapp)
             except Exception:
@@ -164,7 +151,6 @@ async def _startup() -> None:
             logger.exception("set_my_commands failed")
         if MINIAPP_DIR.is_dir():
             logger.info("Mini App static: %s -> /app", MINIAPP_DIR)
-
         _ready = True
         _startup_error = None
     except Exception as exc:
@@ -184,8 +170,6 @@ async def lifespan(_app: FastAPI):
             pass
     if scheduler.running:
         scheduler.shutdown(wait=False)
-    # 注意：Railway 滚动部署时旧实例会先关机。若在此 delete_webhook，
-    # 会清掉新实例刚设好的 webhook，导致 Bot 无响应。生产 webhook 模式勿删。
     await anti_brush.close_redis()
     await close_db()
     await bot.session.close()
@@ -215,7 +199,6 @@ async def healthz() -> PlainTextResponse:
 
 @app.get("/app")
 async def miniapp_index():
-    """Serve index.html at /app with 200 (no 307). Trailing-slash redirect drops Telegram initData."""
     index = MINIAPP_DIR / "index.html"
     if not index.is_file():
         raise HTTPException(status_code=404, detail="miniapp missing")
@@ -238,11 +221,7 @@ async def telegram_webhook(
 
 
 if MINIAPP_DIR.is_dir():
-    app.mount(
-        "/app",
-        StaticFiles(directory=str(MINIAPP_DIR), html=True),
-        name="miniapp",
-    )
+    app.mount("/app", StaticFiles(directory=str(MINIAPP_DIR), html=True), name="miniapp")
 
 
 async def run_polling() -> None:
@@ -259,12 +238,8 @@ async def run_polling() -> None:
     if webapp:
         try:
             await bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(
-                    text="首页",
-                    web_app=WebAppInfo(url=webapp),
-                )
+                menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=webapp))
             )
-            logger.info("Chat menu button set -> %s", webapp)
         except Exception:
             logger.exception("set_chat_menu_button failed")
     try:
@@ -289,18 +264,11 @@ async def run_polling() -> None:
 
 def main() -> None:
     import uvicorn
-
     port = int(os.environ.get("PORT") or settings.port or 8080)
-
     if settings.use_webhook or os.environ.get("PORT"):
         if not settings.use_webhook:
             logger.warning("PORT 已注入但 WEBHOOK_HOST 为空，仍启动 HTTP 服务")
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=port,
-            log_level=settings.log_level.lower(),
-        )
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level=settings.log_level.lower())
     else:
         asyncio.run(run_polling())
 
