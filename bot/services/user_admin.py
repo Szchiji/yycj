@@ -1,8 +1,8 @@
-"""用户代称、拉黑与搜索（挂到 credit_service）。"""
+"""用户代称、拉黑、遮蔽与搜索。"""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import or_, select
 
@@ -40,6 +40,32 @@ async def set_banned(user_id: int, banned: bool, reason: str = "") -> Dict[str, 
         return _user_to_dict(user)
 
 
+async def set_shadow(
+    user_id: int,
+    *,
+    shadowed: bool,
+    days: Optional[int] = None,
+    reason: str = "",
+) -> Dict[str, Any]:
+    await ensure_user(user_id)
+    async with session_scope() as s:
+        res = await s.execute(select(User).where(User.user_id == user_id))
+        user = res.scalar_one_or_none()
+        if not user:
+            raise RuntimeError("用户不存在")
+        if shadowed:
+            user.is_shadowed = True
+            user.shadow_days = max(1, int(days if days is not None else 7))
+            user.shadow_reason = (reason or "管理员设置")[:256]
+        else:
+            user.is_shadowed = False
+            user.shadow_days = 0
+            user.shadow_reason = None
+        user.updated_at = datetime.utcnow()
+        await s.flush()
+        return _user_to_dict(user)
+
+
 async def search_users(q: str = "", limit: int = 50) -> List[Dict[str, Any]]:
     q = (q or "").strip().lstrip("@")
     async with session_scope() as s:
@@ -51,7 +77,7 @@ async def search_users(q: str = "", limit: int = 50) -> List[Dict[str, Any]]:
                 like = f"%{q}%"
                 stmt = (
                     select(User)
-                    .where(or_(User.username.ilike(like), User.full_name.ilike(like)))
+                    .where(or_(User.username.ilike(like), User.full_name.ilike(like), User.guest_alias.ilike(like)))
                     .order_by(User.updated_at.desc())
                     .limit(max(1, min(limit, 200)))
                 )
@@ -61,4 +87,5 @@ async def search_users(q: str = "", limit: int = 50) -> List[Dict[str, Any]]:
 
 credit_service.set_guest_alias = set_guest_alias  # type: ignore[attr-defined]
 credit_service.set_banned = set_banned  # type: ignore[attr-defined]
+credit_service.set_shadow = set_shadow  # type: ignore[attr-defined]
 credit_service.search_users = search_users  # type: ignore[attr-defined]

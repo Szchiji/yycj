@@ -1,4 +1,4 @@
-"""管理：用户拉黑、下架、续期、Bot 同步、额外设置。"""
+"""管理：用户拉黑、遮蔽、下架、续期、Bot 同步。"""
 from __future__ import annotations
 
 import logging
@@ -27,6 +27,15 @@ class ExtraOpsBody(BaseModel):
     admin_btn_label: Optional[str] = None
     admin_contact: Optional[str] = None
     required_chats: Optional[List[Dict[str, Any]]] = None
+    chat_cta_label: Optional[str] = None
+    home_feed_page_size: Optional[int] = None
+
+
+class ShadowBody(BaseModel):
+    user_id: int
+    shadowed: bool = True
+    days: Optional[int] = 7
+    reason: str = ""
 
 
 @router.post("/admin/settings/extra")
@@ -67,6 +76,22 @@ async def api_admin_ban(
                 await listing_ops.unlist_lamp(lid, reason="banned")
             except Exception:
                 logger.exception("unlist on ban failed %s", lid)
+    return {"ok": True, "user": _ser_user(user), "by": admin_id}
+
+
+@router.post("/admin/users/shadow")
+async def api_admin_shadow(
+    body: ShadowBody,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    if get_settings().is_admin(body.user_id):
+        raise HTTPException(status_code=400, detail="不能遮蔽管理员")
+    user = await user_admin.set_shadow(
+        body.user_id,
+        shadowed=body.shadowed,
+        days=body.days,
+        reason=body.reason or ("管理员设置" if body.shadowed else ""),
+    )
     return {"ok": True, "user": _ser_user(user), "by": admin_id}
 
 
