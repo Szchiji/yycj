@@ -5,11 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260910e" />
+  <link rel="stylesheet" href="./styles.css?v=20260910f" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
-
   <section id="boot" class="boot">
     <div class="boot-card">
       <h1>月影车姬</h1>
@@ -17,9 +16,7 @@
       <button id="bootRetry" class="btn primary block hidden" type="button">重试</button>
     </div>
   </section>
-
   <section id="gate" class="gate hidden" aria-hidden="true"></section>
-
   <div id="app" class="hidden">
     <header class="topbar">
       <div>
@@ -28,7 +25,6 @@
       </div>
       <button id="btnCity" class="chip" type="button">城市 ▾</button>
     </header>
-
     <main id="main">
       <section id="view-home" class="view">
         <div id="contacts" class="row contacts"></div>
@@ -41,14 +37,12 @@
         <div id="feed" class="feed feed-one-col"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
-
       <section id="view-msg" class="view hidden">
         <div class="empty card">
           <h3>消息</h3>
           <p class="muted">会话在 Bot 里进行。点「想聊聊」后回到 Telegram 对话即可。</p>
         </div>
       </section>
-
       <section id="view-publish" class="view hidden">
         <form id="publishForm" class="card form">
           <h3 id="publishTitle">上架</h3>
@@ -76,7 +70,6 @@
           <button class="btn primary block big" type="submit">提交审核</button>
         </form>
       </section>
-
       <section id="view-me" class="view hidden">
         <div id="meCard" class="card"></div>
         <div class="card">
@@ -99,16 +92,14 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260910e">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260910f">管理后台</a>
           </div>
         </div>
       </section>
-
       <section id="view-detail" class="view hidden">
         <button class="btn ghost" id="btnBackHome" type="button">← 返回</button>
         <div id="detail"></div>
       </section>
-
       <section id="view-review" class="view hidden">
         <form id="reviewForm" class="card form">
           <h3>提交评价</h3>
@@ -123,7 +114,6 @@
         </form>
       </section>
     </main>
-
     <nav class="bottom-nav">
       <button data-nav="home" class="nav-item active" type="button"><span>首页</span></button>
       <button data-nav="msg" class="nav-item" type="button"><span>消息</span></button>
@@ -131,7 +121,6 @@
       <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
     </nav>
   </div>
-
   <div id="citySheet" class="sheet hidden">
     <div class="sheet-panel">
       <h3>选择城市</h3>
@@ -139,7 +128,6 @@
       <button class="btn block" id="cityClose" type="button">关闭</button>
     </div>
   </div>
-
   <div id="rulesSheet" class="sheet hidden">
     <div class="sheet-panel">
       <h3 id="rulesTitle">口碑分说明</h3>
@@ -147,9 +135,8 @@
       <button class="btn block" id="rulesClose" type="button">知道了</button>
     </div>
   </div>
-
-  <script src="./boot-inline.js?v=20260910e"></script>
-  <script src="./app.js?v=20260910e"></script>
-  <script src="./home-ui.js?v=20260910e"></script>
+  <script src="./boot-inline.js?v=20260910f"></script>
+  <script src="./app.js?v=20260910f"></script>
+  <script src="./home-ui.js?v=20260910f"></script>
 </body>
 </html>
