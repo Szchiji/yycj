@@ -13,8 +13,16 @@ DEFAULT_OPS = {
     "home_feed_page_size": 3,
     "chat_cta_label": "想聊聊",
     "bot_welcome_text": "",
-    "media_max_count": 9,
+    "media_max_count": 6,
     "review_require_audit": True,
+    "listing_days": 30,
+    "carousel_interval_sec": 4,
+    "show_bot_link": True,
+    "show_admin_link": True,
+    "bot_btn_label": "机器人",
+    "admin_btn_label": "管理员",
+    "admin_contact": "",
+    "required_chats": [],
 }
 
 
@@ -35,11 +43,25 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["chat_cta_label"] = str(out.get("chat_cta_label") or "想聊聊")[:32]
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
     out["review_require_audit"] = bool(out.get("review_require_audit", True))
+    try:
+        out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
+    except (TypeError, ValueError):
+        out["listing_days"] = 30
+    try:
+        out["carousel_interval_sec"] = max(2, min(15, int(out.get("carousel_interval_sec") or 4)))
+    except (TypeError, ValueError):
+        out["carousel_interval_sec"] = 4
+    out["show_bot_link"] = bool(out.get("show_bot_link", True))
+    out["show_admin_link"] = bool(out.get("show_admin_link", True))
+    out["bot_btn_label"] = str(out.get("bot_btn_label") or "机器人")[:16]
+    out["admin_btn_label"] = str(out.get("admin_btn_label") or "管理员")[:16]
+    out["admin_contact"] = str(out.get("admin_contact") or "").strip()[:128]
+    chats = out.get("required_chats") or []
+    out["required_chats"] = chats if isinstance(chats, list) else []
     return out
 
 
 async def set_feed_pin(lamp_id: str, *, pinned: bool = True, pin_order: int = 0) -> Dict[str, Any]:
-    """卡片流置顶（非轮播）。"""
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
         lamp = res.scalar_one_or_none()
@@ -81,7 +103,6 @@ async def list_feed_pins() -> List[Dict[str, Any]]:
 
 
 async def list_approved_lamps_brief(limit: int = 100) -> List[Dict[str, Any]]:
-    """管理端下拉：已上架资料简表。"""
     async with session_scope() as s:
         res = await s.execute(
             select(Lamp)

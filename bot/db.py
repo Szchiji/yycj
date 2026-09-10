@@ -33,8 +33,12 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS publisher_role VARCHAR(16)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pinned BOOLEAN DEFAULT FALSE",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pin_order INTEGER DEFAULT 0",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS unlist_reason VARCHAR(64)",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason VARCHAR(256)",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS guest_alias VARCHAR(32)",
     "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS ops_config JSONB DEFAULT '{}'::jsonb",
-    # sessions: columns added after table already existed in production
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS messages_purge_at TIMESTAMP",
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 50",
 ]
@@ -64,7 +68,6 @@ async def connect_db() -> None:
     )
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     async with _engine.begin() as conn:
-        # Creates missing tables (Review/HomepagePin/SiteSettings/session_messages, etc.)
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_columns(conn)
 
