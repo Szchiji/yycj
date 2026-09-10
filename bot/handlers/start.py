@@ -29,7 +29,7 @@ async def cmd_start(message: Message) -> None:
     )
     settings = get_settings()
     tip = "点左下角「首页」开始。" if settings.normalized_webapp_url else "请先配置 WEBAPP_URL。"
-    welcome = f"欢迎使用 <b>月影车姬</b>\n{tip}\n也可在首页里搜索与发布。"
+    welcome = f"欢迎使用 <b>月影车姬</b>\n{tip}\n也可在首页里搜索与上架。"
     try:
         site = await home_service.get_or_create_settings()
         custom = (site.get("bot_welcome_text") or "").strip()
