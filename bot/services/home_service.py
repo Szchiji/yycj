@@ -34,18 +34,15 @@ SCORING_RULES = {
 def _settings_to_dict(row: SiteSettings) -> Dict[str, Any]:
     cities = list(row.enabled_cities or []) or list(DEFAULT_CITIES)
     ops = home_feed.merge_ops(getattr(row, "ops_config", None) or {})
-    return {
+    out = {
         "announcement_text": row.announcement_text or "",
         "announcement_enabled": bool(row.announcement_enabled),
         "enabled_cities": cities,
         "ops": ops,
-        "home_feed_page_size": ops["home_feed_page_size"],
-        "chat_cta_label": ops["chat_cta_label"],
-        "bot_welcome_text": ops["bot_welcome_text"],
-        "media_max_count": ops["media_max_count"],
-        "review_require_audit": ops["review_require_audit"],
         "updated_at": row.updated_at,
     }
+    out.update(ops)
+    return out
 
 
 async def get_or_create_settings() -> Dict[str, Any]:
@@ -253,7 +250,6 @@ async def seed_demo_if_empty() -> Dict[str, Any]:
     return {"seeded": True, "lamp_ids": created}
 
 
-# 卡片置顶 / 运营配置（委托 home_feed）
 set_feed_pin = home_feed.set_feed_pin
 list_feed_pins = home_feed.list_feed_pins
 list_approved_lamps_brief = home_feed.list_approved_lamps_brief
