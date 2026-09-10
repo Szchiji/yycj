@@ -1,10 +1,11 @@
-"""管理：用户拉黑、下架、续期、Bot 同步。"""
+"""管理：用户拉黑、下架、续期、Bot 同步、额外设置。"""
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from bot.api.deps import get_admin_user_id
@@ -12,9 +13,31 @@ from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import Lamp
-from bot.services import credit_service, listing_ops, user_admin
+from bot.services import home_service, listing_ops, user_admin
 
 logger = logging.getLogger(__name__)
+
+
+class ExtraOpsBody(BaseModel):
+    listing_days: Optional[int] = None
+    carousel_interval_sec: Optional[int] = None
+    show_bot_link: Optional[bool] = None
+    show_admin_link: Optional[bool] = None
+    bot_btn_label: Optional[str] = None
+    admin_btn_label: Optional[str] = None
+    admin_contact: Optional[str] = None
+    required_chats: Optional[List[Dict[str, Any]]] = None
+
+
+@router.post("/admin/settings/extra")
+async def api_admin_extra_ops(
+    body: ExtraOpsBody,
+    _: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    ops = {k: v for k, v in body.model_dump().items() if v is not None}
+    settings = await home_service.update_settings(ops_config=ops or None)
+    settings["updated_at"] = _ser_dt(settings.get("updated_at"))
+    return {"ok": True, "settings": settings}
 
 
 @router.get("/admin/users")
@@ -57,9 +80,7 @@ async def api_admin_listings(_: int = Depends(get_admin_user_id)) -> Dict[str, A
 
 @router.post("/admin/listings/{lamp_id}/unlist")
 async def api_admin_unlist(
-    lamp_id: str,
-    body: LampOpBody = LampOpBody(),
-    _: int = Depends(get_admin_user_id),
+    lamp_id: str, body: LampOpBody = LampOpBody(), _: int = Depends(get_admin_user_id)
 ) -> Dict[str, Any]:
     try:
         data = await listing_ops.unlist_lamp(lamp_id, reason=body.reason or "admin")
@@ -69,10 +90,7 @@ async def api_admin_unlist(
 
 
 @router.post("/admin/listings/{lamp_id}/relist")
-async def api_admin_relist(
-    lamp_id: str,
-    _: int = Depends(get_admin_user_id),
-) -> Dict[str, Any]:
+async def api_admin_relist(lamp_id: str, _: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
     try:
         data = await listing_ops.relist_lamp(lamp_id)
     except ValueError as exc:
@@ -83,9 +101,7 @@ async def api_admin_relist(
 
 @router.post("/admin/listings/{lamp_id}/renew")
 async def api_admin_renew(
-    lamp_id: str,
-    body: LampOpBody = LampOpBody(),
-    _: int = Depends(get_admin_user_id),
+    lamp_id: str, body: LampOpBody = LampOpBody(), _: int = Depends(get_admin_user_id)
 ) -> Dict[str, Any]:
     try:
         data = await listing_ops.set_listing_expiry(lamp_id, days=body.days)
