@@ -17,11 +17,11 @@ from bot.services import anti_brush, credit_service, home_service, search_servic
 
 logger = logging.getLogger(__name__)
 
-# ---------- home feed ----------
 
 @router.get("/home")
 async def api_home(
     city: Optional[str] = None,
+    q: Optional[str] = None,
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     limit: int = Query(default=3, ge=1, le=50),
@@ -29,7 +29,6 @@ async def api_home(
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
     settings = await home_service.get_or_create_settings()
-    # 若客户端未显式翻页且用默认 limit，可按运营配置页大小（limit 仍可覆盖）
     page_size = int(settings.get("home_feed_page_size") or 3)
     if limit == 3 and page_size != 3:
         limit = page_size
@@ -55,15 +54,18 @@ async def api_home(
             }
         )
 
-    items = await search_service.search_lamps(city=use_city, limit=limit, offset=offset, lat=lat, lng=lng)
-    # 卡片流：置顶优先（与精选轮播独立）
+    items = await search_service.search_lamps(
+        keyword=q,
+        city=use_city,
+        limit=limit,
+        offset=offset,
+        lat=lat,
+        lng=lng,
+    )
     items.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, -(x.get("authenticity_score") or 0)))
     announcement = None
     if settings.get("announcement_enabled") and settings.get("announcement_text"):
-        announcement = {
-            "text": settings["announcement_text"],
-            "enabled": True,
-        }
+        announcement = {"text": settings["announcement_text"], "enabled": True}
 
     return {
         "ok": True,
@@ -78,16 +80,34 @@ async def api_home(
         "has_more": len(items) >= limit,
         "scoring_rules": home_service.SCORING_RULES,
         "chat_cta_label": settings.get("chat_cta_label") or "想聊聊",
-        "media_max_count": int(settings.get("media_max_count") or 9),
+        "media_max_count": int(settings.get("media_max_count") or 6),
         "page_size": int(settings.get("home_feed_page_size") or 3),
+        "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
+        "contacts": await _home_contacts(settings),
     }
+
+
+async def _home_contacts(settings: Dict[str, Any]) -> Dict[str, Any]:
+    from bot.services import bot_info
+    ident = await bot_info.get_bot_identity()
+    bot_url = bot_info.bot_tme_url(ident.get("username"))
+    admin_url = bot_info.normalize_contact(settings.get("admin_contact") or "")
+    return {
+        "bot_username": ident.get("username") or "",
+        "bot_url": bot_url,
+        "admin_url": admin_url,
+        "show_bot": bool(settings.get("show_bot_link", True)) and bool(bot_url),
+        "show_admin": bool(settings.get("show_admin_link", True)) and bool(admin_url),
+        "bot_label": settings.get("bot_btn_label") or "机器人",
+        "admin_label": settings.get("admin_btn_label") or "管理员",
+    }
+
 
 @router.get("/cities")
 async def api_cities(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
     settings = await home_service.get_or_create_settings()
     return {"ok": True, "cities": settings.get("enabled_cities") or []}
 
-# ---------- lamps ----------
 
 @router.get("/lamps")
 async def api_lamps(
@@ -103,15 +123,10 @@ async def api_lamps(
     if not await anti_brush.check_search_rate(user_id):
         raise HTTPException(status_code=429, detail="搜索过于频繁，请稍后再试")
     items = await search_service.search_lamps(
-        keyword=q,
-        city=city,
-        price_min=price_min,
-        price_max=price_max,
-        limit=limit,
-        lat=lat,
-        lng=lng,
+        keyword=q, city=city, price_min=price_min, price_max=price_max, limit=limit, lat=lat, lng=lng
     )
     return {"ok": True, "items": [_ser_lamp(x) for x in items], "count": len(items)}
+
 
 @router.get("/lamps/{lamp_id}")
 async def api_lamp_detail(
@@ -131,14 +146,8 @@ async def api_lamp_detail(
         r["created_at"] = _ser_dt(r.get("created_at"))
         r.pop("guest_id", None)
         r.pop("target_user_id", None)
-    return {
-        "ok": True,
-        "lamp": _ser_lamp(lamp),
-        "reputation": rep,
-        "reviews": reviews,
-    }
+    return {"ok": True, "lamp": _ser_lamp(lamp), "reputation": rep, "reviews": reviews}
 
-# ---------- sessions ----------
 
 @router.post("/sessions/request")
 async def api_session_request(
@@ -158,12 +167,16 @@ async def api_session_request(
     existing = await session_service.get_active_for_user(user_id)
     if existing:
         raise HTTPException(status_code=400, detail="已有进行中的会话，请先结束")
-
-    sess = await session_service.create_request(body.lamp_id, user_id, lamp["user_id"], lamp_title=lamp.get("title"), guest_alias=body.guest_alias)
+    alias = (body.guest_alias or "").strip()
+    if not alias:
+        me = await credit_service.ensure_user(user_id)
+        alias = (me.get("guest_alias") or "").strip() or None
+    sess = await session_service.create_request(
+        body.lamp_id, user_id, lamp["user_id"], lamp_title=lamp.get("title"), guest_alias=alias
+    )
     try:
         from bot.keyboards import session_accept_kb
         from bot.main import bot
-
         await bot.send_message(
             lamp["user_id"],
             f"🌕 有人通过月影车姬就你的资料 <b>{lamp.get('title')}</b> 发起匿名会话。\n"
@@ -172,7 +185,6 @@ async def api_session_request(
         )
     except Exception:
         logger.exception("notify lamp owner failed")
-
     return {
         "ok": True,
         "session_id": sess["session_id"],
