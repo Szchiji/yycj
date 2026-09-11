@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260911b" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260911b" />
+  <link rel="stylesheet" href="./styles.css?v=20260911c" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260911c" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -47,21 +47,17 @@
           <input id="pubFiles" type="file" accept="image/*,video/*" multiple />
           <div id="pubPreview" class="media-preview"></div>
           <label>称呼</label>
-          <input id="pubTitle" required maxlength="64" placeholder="怎么称呼你" />
+          <input id="pubTitle" required maxlength="64" />
           <label>城市</label>
           <select id="pubCity" required></select>
           <label>简介</label>
           <textarea id="pubDesc" rows="3" maxlength="2000"></textarea>
           <details class="advanced">
             <summary>更多选填</summary>
-            <label>价位</label>
-            <input id="pubPrice" />
-            <label>区</label>
-            <input id="pubDistrict" />
-            <label>大致位置</label>
-            <input id="pubApprox" />
-            <label>标签</label>
-            <input id="pubTags" />
+            <input id="pubPrice" placeholder="价位" />
+            <input id="pubDistrict" placeholder="区" />
+            <input id="pubApprox" placeholder="大致位置" />
+            <input id="pubTags" placeholder="标签" />
             <textarea id="pubMedia" class="hidden" rows="1"></textarea>
           </details>
           <button class="btn primary block big" type="submit">提交审核</button>
@@ -71,7 +67,6 @@
         <div id="meCard" class="card"></div>
         <div class="card">
           <h3>我的身份</h3>
-          <label>聊天代称</label>
           <div class="row">
             <input id="guestNick" maxlength="16" style="flex:1;margin:0" />
             <button class="btn" id="btnSaveNick" type="button">保存</button>
@@ -88,7 +83,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260911b">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260911c">管理后台</a>
           </div>
         </div>
       </section>
@@ -102,7 +97,6 @@
           <input type="hidden" id="revLampId" />
           <input id="revStars" type="number" min="1" max="5" value="5" required />
           <textarea id="revText" rows="3"></textarea>
-          <input id="revPhotos" />
           <button class="btn primary block" type="submit">提交评价</button>
         </form>
       </section>
@@ -115,11 +109,12 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
-  <script src="./boot-inline.js?v=20260911b"></script>
-  <script src="./app.js?v=20260911b"></script>
-  <script src="./home-ui.js?v=20260911b"></script>
-  <script src="./publish-ui.js?v=20260911b"></script>
-  <script src="./home-media.js?v=20260911b"></script>
-  <script src="./me-listings.js?v=20260911b"></script>
+  <script src="./boot-inline.js?v=20260911c"></script>
+  <script src="./app.js?v=20260911c"></script>
+  <script src="./home-ui.js?v=20260911c"></script>
+  <script src="./publish-ui.js?v=20260911c"></script>
+  <script src="./home-media.js?v=20260911c"></script>
+  <script src="./me-listings.js?v=20260911c"></script>
+  <script src="./detail-fix.js?v=20260911c"></script>
 </body>
 </html>
