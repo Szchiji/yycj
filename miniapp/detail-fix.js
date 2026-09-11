@@ -3,8 +3,8 @@
   function srcOf(u) {
     const s = String(u || "").trim();
     if (!s) return "";
-    if (s.startsWith("http") || s.startsWith("/") || s.startsWith("blob:")) return s;
     if (s.toLowerCase().startsWith("file_id:")) return srcOf(s.slice(8).trim());
+    if (s.startsWith("http") || s.startsWith("/") || s.startsWith("blob:")) return s;
     return "/api/media/file/" + encodeURIComponent(s);
   }
   function isVideo(m, raw) {
@@ -25,13 +25,20 @@
     });
     return out;
   }
-  function hideFileIdText(box) {
+  function hideNoise(box) {
     box.querySelectorAll("p, li, span, pre, code, div").forEach((n) => {
       if (n.closest(".gallery")) return;
       const t = (n.textContent || "").replace(/\s+/g, " ").trim();
-      if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) {
-        n.style.display = "none";
-      }
+      if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) n.style.display = "none";
+    });
+    box.querySelectorAll("p, div, span, h3, h4").forEach((n) => {
+      if (n.closest(".gallery")) return;
+      const t = (n.textContent || "").trim();
+      if (!t.includes("·")) return;
+      const parts = t.split("·").map((s) => s.trim()).filter(Boolean);
+      const uniq = [];
+      parts.forEach((p) => { if (!uniq.includes(p)) uniq.push(p); });
+      if (uniq.length && uniq.length < parts.length && n.childElementCount === 0) n.textContent = uniq.join(" · ");
     });
   }
   function renderGallery(box, items) {
@@ -53,15 +60,13 @@
     wrap.innerHTML = `
       <div class="gallery-hero">
         ${cur.type === "video"
-          ? `<video src="${cur.src}" controls playsinline preload="metadata"></video>`
+          ? `<video src="${cur.src}" controls playsinline webkit-playsinline preload="metadata"></video>`
           : `<img src="${cur.src}" alt="" />`}
       </div>
       <div class="gallery-thumbs">
         ${items.map((m, i) => `
           <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
-            ${m.type === "video"
-              ? `<span class="play">▶</span>`
-              : `<img src="${m.src}" alt="" loading="lazy" />`}
+            ${m.type === "video" ? `<span class="play">▶</span>` : `<img src="${m.src}" alt="" loading="lazy" />`}
           </button>`).join("")}
       </div>`;
     wrap.dataset.idx = String(idx);
@@ -70,6 +75,8 @@
         ev.stopPropagation();
         wrap.dataset.idx = btn.getAttribute("data-g") || "0";
         renderGallery(box, items);
+        const v = wrap.querySelector("video");
+        if (v) v.play().catch(() => {});
       });
     });
   }
@@ -81,21 +88,17 @@
         headers: { Authorization: "Bearer " + token() },
       });
       const data = await r.json();
-      const lamp = data.lamp || data.item || data;
-      renderGallery(box, collect(lamp));
-      hideFileIdText(box);
-      setTimeout(() => hideFileIdText(box), 200);
-    } catch (e) {
-      console.warn(e);
-    }
+      renderGallery(box, collect(data.lamp || data.item || data));
+      hideNoise(box);
+      setTimeout(() => hideNoise(box), 250);
+    } catch (e) { console.warn(e); }
   }
   document.addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-id]");
     if (!card || ev.target.closest("[data-fav]")) return;
-    const id = card.getAttribute("data-id");
     const box = document.getElementById("detail");
     const g = box && box.querySelector(".gallery");
     if (g) g.dataset.idx = "-1";
-    setTimeout(() => paint(id), 280);
+    setTimeout(() => paint(card.getAttribute("data-id")), 280);
   });
 })();
