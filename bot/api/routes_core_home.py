@@ -84,6 +84,7 @@ async def api_home(
         "page_size": int(settings.get("home_feed_page_size") or 3),
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
         "contacts": await _home_contacts(settings),
+        "listing_fields": settings.get("listing_fields") or [],
     }
 
 
