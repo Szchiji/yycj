@@ -1,23 +1,32 @@
+html, body.admin-body {
+  height: auto !important;
+  max-height: none !important;
+  overflow: auto !important;
+  overflow-y: scroll !important;
+  -webkit-overflow-scrolling: touch !important;
+  background:#0b1020; color:#e8eefc;
+}
 .admin-body { background:#0b1020; color:#e8eefc; }
-.admin-shell { display:flex !important; flex-direction:row !important; min-height:100vh; }
+.admin-shell { display:flex !important; flex-direction:row !important; min-height:auto; height:auto !important; overflow:visible !important; }
 .admin-side {
   position:fixed; left:0; top:56px; bottom:0; z-index:40;
   width:148px; padding:12px 8px;
   background:#0d1424; border-right:1px solid #243049;
   transform:translateX(-110%); transition:transform .2s ease;
+  overflow:auto;
 }
 body.side-open .admin-side { transform:translateX(0); }
 .admin-side button { display:block; width:100%; margin:0 0 6px; text-align:left; }
 .admin-side button.active { background:#2a3348; }
-.admin-main { flex:1; min-width:0; padding:12px; }
+.admin-main { flex:1; min-width:0; padding:12px 12px 80px; height:auto !important; overflow:visible !important; }
 .admin-pane { display:none; }
 .admin-pane.active { display:block; }
-.side-toggle { margin-left:8px; }
+.side-toggle { display:none !important; }
 .side-mask { display:none; }
 body.side-open .side-mask {
   display:block; position:fixed; inset:56px 0 0 0; background:rgba(0,0,0,.35); z-index:30;
 }
-.pick-item { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 8px; padding:8px; border:1px solid #243049; border-radius:10px; }
+.pick-item { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; margin:0 0 8px; padding:10px; border:1px solid #243049; border-radius:12px; }
 .admin-thumb { width:56px; height:56px; object-fit:cover; border-radius:8px; background:#1a2030; flex:0 0 56px; }
 #proxyPreview, #editPreview, .media-preview { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
 .up-thumb { width:56px; height:56px; object-fit:cover; border-radius:8px; }
