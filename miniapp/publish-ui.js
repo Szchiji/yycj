@@ -2,6 +2,12 @@
   const $ = (s) => document.querySelector(s);
   const token = () => localStorage.getItem("yycj_token") || "";
   let uploaded = [];
+  if (!document.getElementById("yycj-pub-css")) {
+    const st = document.createElement("style");
+    st.id = "yycj-pub-css";
+    st.textContent = `#pubPreview{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:6px;margin:8px 0;}#pubPreview .up-thumb{width:100%;height:96px;object-fit:cover;border-radius:8px;background:#111;display:block;}#pubPreview .up-fail{opacity:.45;}`;
+    document.head.appendChild(st);
+  }
   function toast(msg) {
     const el = $("#toast");
     if (!el) return alert(msg);
@@ -17,8 +23,9 @@
     if (!box) return;
     box.innerHTML = uploaded.map((m) => {
       const src = m.local || m.preview_url || (m.file_id ? "/api/media/file/" + encodeURIComponent(m.file_id) : "");
-      if (m.type === "video") return `<video class="up-thumb" src="${src}" muted playsinline></video>`;
-      return `<img class="up-thumb" src="${src}" alt="" />`;
+      const fail = m.failed ? " up-fail" : "";
+      if (m.type === "video") return `<video class="up-thumb${fail}" src="${src}" muted playsinline preload="metadata"></video>`;
+      return src ? `<img class="up-thumb${fail}" src="${src}" alt="" />` : `<div class="up-thumb"></div>`;
     }).join("");
   }
   async function uploadOne(file) {
@@ -43,7 +50,7 @@
         uploaded[i] = { type: it.type || uploaded[i].type, url: it.file_id || it.url, file_id: it.file_id, preview_url: it.preview_url, local: uploaded[i].local };
         ok += 1;
         previewBox();
-      } catch (e) { uploaded[i].failed = true; toast(e.message || String(e)); }
+      } catch (e) { uploaded[i].failed = true; previewBox(); toast(e.message || String(e)); }
     }
     toast(`上传完成 ${ok}/${files.length}，用时 ${Math.floor((Date.now() - start) / 1000)} 秒`);
   });
