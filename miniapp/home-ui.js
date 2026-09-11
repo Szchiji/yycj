@@ -72,13 +72,14 @@
   function paint() {
     const feed = $("#feed");
     if (feed) {
-      feed.classList.add("has-cover");
+      feed.classList.add("has-cover", "yycj-on");
       feed.innerHTML = lastItems.length ? lastItems.map(cardHtml).join("") : (q ? "<p class='muted'>没有匹配的资料</p>" : "");
     }
     const pins = $("#pins");
     if (pins) {
       pins.innerHTML = lastPins.map(pinHtml).join("");
       pins.classList.toggle("hidden", !lastPins.length || !!q);
+      pins.classList.add("yycj-on");
     }
   }
   async function loadFeed(reset) {
@@ -102,6 +103,7 @@
     } catch (e) { console.warn(e); }
     finally { painting = false; }
   }
+  window.__yycjReloadHome = () => loadFeed(true);
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-share]")) return;
     if (ev.target.closest("#feed [data-id], #pins [data-id]")) window.__yycjBack = "home";
@@ -124,19 +126,12 @@
       loadFeed(true);
     }
   }, true);
-  const list = document.getElementById("cityList");
-  if (list) {
-    new MutationObserver(() => {
-      const found = [...list.querySelectorAll("[data-city]")].map((b) => b.getAttribute("data-city")).filter(Boolean);
-      if (found.length) fillCities(found, localStorage.getItem("yycj_city") || "");
-    }).observe(list, { childList: true });
-  }
   ["lazy.js", "share.js", "boot-extra.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911as";
+    s.src = "./" + name + "?v=20260911bd";
     document.head.appendChild(s);
   });
   async function boot() {
