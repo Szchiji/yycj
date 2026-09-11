@@ -26,7 +26,8 @@ DEFAULT_OPS = {
     "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
     "broadcast_channel": "",
     "media_channel_id": "",
-    "broadcast_template": "🌙 月影车姬 · 新上架\n{title}\n📍 {loc}\n💰 {price}\n{tags}\n{desc}\n{link}",
+    "broadcast_template": "🌙 月影车姬 · 新上架\n{称呼}\n📍 {地点}\n💰 {价位}\n{标签}\n{简介}\n{链接}",
+    "listing_fields": [],
 }
 
 
@@ -50,6 +51,8 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_channel"] = str(out.get("broadcast_channel") or "").strip()[:128]
     out["media_channel_id"] = str(out.get("media_channel_id") or "").strip()[:128]
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
+    fields = out.get("listing_fields") or []
+    out["listing_fields"] = fields if isinstance(fields, list) else []
     out["review_require_audit"] = bool(out.get("review_require_audit", True))
     try:
         out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
