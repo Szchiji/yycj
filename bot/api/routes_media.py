@@ -56,8 +56,12 @@ async def api_media_upload(
         buf = BufferedInputFile(data, filename=safe_name)
         try:
             if kind == "video":
-                msg = await bot.send_video(chat_id, buf, disable_notification=True)
-                file_id = (msg.video.file_id if msg.video else None) or (msg.document.file_id if msg.document else None)
+                try:
+                    msg = await bot.send_video(chat_id, buf, disable_notification=True)
+                    file_id = (msg.video.file_id if msg.video else None) or (msg.document.file_id if msg.document else None)
+                except Exception:
+                    msg = await bot.send_document(chat_id, buf, disable_notification=True)
+                    file_id = msg.document.file_id if msg.document else None
             else:
                 msg = await bot.send_photo(chat_id, buf, disable_notification=True)
                 file_id = msg.photo[-1].file_id if msg.photo else None
@@ -74,7 +78,7 @@ async def api_media_upload(
         results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": file_id})
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
-    return {"ok": True, "items": results, "count": len(results)}
+    return {"ok": True, "items": results, "count": results and len(results)}
 
 
 @router.get("/media/file/{file_id:path}")
@@ -88,14 +92,16 @@ async def api_media_file(file_id: str):
     except Exception as exc:
         logger.warning("get_file failed: %s", exc)
         raise HTTPException(status_code=404, detail="文件不存在或已失效") from exc
-    path = tg_file.file_path or ""
+    path = tg_file.file_path
     if not path:
         raise HTTPException(status_code=404, detail="无 file_path")
     url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
     mime, _ = mimetypes.guess_type(path)
-    low = path.lower()
-    if file_id.startswith("BAAC") or low.endswith((".mp4", ".mov", ".webm")):
+    fid = str(file_id or "")
+    if fid.startswith("BAAC") or str(path).lower().endswith((".mp4", ".mov", ".webm", ".mkv")):
         mime = "video/mp4"
+    elif fid.startswith("AgAC") or str(path).lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        mime = mime or "image/jpeg"
     mime = mime or "application/octet-stream"
     client = httpx.AsyncClient(timeout=60.0)
     try:
@@ -108,7 +114,6 @@ async def api_media_file(file_id: str):
         await resp.aclose()
         await client.aclose()
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
-
     async def stream():
         try:
             async for chunk in resp.aiter_bytes(64 * 1024):
@@ -116,5 +121,8 @@ async def api_media_file(file_id: str):
         finally:
             await resp.aclose()
             await client.aclose()
-
-    return StreamingResponse(stream(), media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
+    return StreamingResponse(stream(), media_type=mime, headers={
+        "Cache-Control": "private, max-age=3600",
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": "inline",
+    })
