@@ -52,3 +52,4 @@
   .ph-row { grid-template-columns: 1fr auto; }
   .ph-row .muted { display: none; }
 }
+#btnSeed { display: none !important; }
