@@ -82,13 +82,15 @@ async def api_media_upload(
             else:
                 msg = await bot.send_photo(chat_id, buf, disable_notification=True)
                 file_id = msg.photo[-1].file_id if msg.photo else None
+                if msg.photo:
+                    thumb_id = msg.photo[0].file_id
         except Exception as exc:
             logger.exception("upload to telegram failed")
             raise HTTPException(status_code=502, detail=f"上传失败：{exc}") from exc
         if not file_id:
             continue
         item = {"type": kind, "file_id": file_id, "url": file_id, "preview_url": f"/api/media/file/{file_id}"}
-        if kind == "video" and thumb_id:
+        if thumb_id:
             item["thumb_file_id"] = thumb_id
             item["preview_url"] = f"/api/media/file/{thumb_id}"
         results.append(item)
@@ -144,7 +146,7 @@ async def api_media_file(file_id: str, request: Request):
             await client.aclose()
 
     out = {
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "public, max-age=604800, immutable",
         "Accept-Ranges": "bytes",
         "Content-Disposition": "inline",
     }
