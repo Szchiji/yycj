@@ -29,6 +29,7 @@ class ExtraOpsBody(BaseModel):
     required_chats: Optional[List[Dict[str, Any]]] = None
     chat_cta_label: Optional[str] = None
     home_feed_page_size: Optional[int] = None
+    approve_promo_text: Optional[str] = None
 
 
 class ShadowBody(BaseModel):
