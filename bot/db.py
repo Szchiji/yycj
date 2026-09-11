@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 
 from bot.config import get_settings
 from bot.models import Base
+import bot.models_extra  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
