@@ -47,7 +47,7 @@
       toast(`正在上传 ${i + 1}/${files.length}… ${Math.floor((Date.now() - start) / 1000)} 秒`);
       try {
         const it = await uploadOne(files[i]);
-        uploaded[i] = { type: it.type || uploaded[i].type, url: it.file_id || it.url, file_id: it.file_id, preview_url: it.preview_url, local: uploaded[i].local };
+        uploaded[i] = { type: it.type || uploaded[i].type, url: it.file_id || it.url, file_id: it.file_id, thumb_file_id: it.thumb_file_id, preview_url: it.preview_url, local: uploaded[i].local };
         ok += 1;
         previewBox();
       } catch (e) { uploaded[i].failed = true; previewBox(); toast(e.message || String(e)); }
@@ -61,7 +61,7 @@
     ev.stopImmediatePropagation();
     const title = ($("#pubTitle")?.value || "").trim();
     if (!title) return toast("请填称呼");
-    const media = uploaded.filter((m) => m.file_id || m.url).map((m) => ({ type: m.type, url: m.file_id || m.url, file_id: m.file_id }));
+    const media = uploaded.filter((m) => m.file_id || m.url).map((m) => ({ type: m.type, url: m.file_id || m.url, file_id: m.file_id, thumb_file_id: m.thumb_file_id, preview_url: m.preview_url }));
     if (!media.length) return toast("请先上传至少 1 个媒体");
     const body = {
       city: $("#pubCity")?.value, title,
