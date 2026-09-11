@@ -1,5 +1,6 @@
 (() => {
   document.getElementById("filterBar")?.remove();
+  document.getElementById("searchHint")?.remove();
   const row = document.querySelector(".search-row");
   const pins = document.getElementById("pins");
   const announce = document.getElementById("announce");
@@ -19,13 +20,6 @@
     clr.textContent = "清除";
     row.insertBefore(clr, document.getElementById("btnSearch"));
   }
-  if (!document.getElementById("searchHint")) {
-    const hint = document.createElement("p");
-    hint.id = "searchHint";
-    hint.className = "muted";
-    hint.style.margin = "0 0 8px";
-    row?.after(hint);
-  }
   document.addEventListener("click", (ev) => {
     if (ev.target && ev.target.id === "btnSearchClear") {
       if (input) input.value = "";
@@ -34,10 +28,6 @@
   });
   let timer = 0;
   function run() {
-    const q = (input && input.value.trim()) || "";
-    const city = localStorage.getItem("yycj_city") || "";
-    const hint = document.getElementById("searchHint");
-    if (hint) hint.textContent = q ? ("搜索「" + q + "」 · 仅限" + (city || "当前城市")) : "";
     document.getElementById("btnSearch")?.click();
   }
   input?.addEventListener("input", () => {

@@ -2,14 +2,20 @@
   const side = document.getElementById("adminSide");
   if (!side) return;
   document.body.classList.add("admin-has-side");
-  if (!document.getElementById("btnSide")) {
-    const btn = document.createElement("button");
-    btn.id = "btnSide";
-    btn.type = "button";
-    btn.className = "btn side-toggle";
-    btn.textContent = "菜单";
-    document.querySelector(".topbar")?.appendChild(btn);
-    btn.addEventListener("click", (ev) => {
+  document.getElementById("btnSide")?.remove();
+  const title = document.querySelector(".topbar h1");
+  if (title) {
+    title.style.cursor = "pointer";
+    title.title = "点击展开菜单";
+    if (!title.querySelector(".menu-caret")) {
+      const caret = document.createElement("span");
+      caret.className = "menu-caret";
+      caret.textContent = " ▾";
+      caret.style.fontSize = ".7em";
+      caret.style.opacity = ".7";
+      title.appendChild(caret);
+    }
+    title.addEventListener("click", (ev) => {
       ev.stopPropagation();
       document.body.classList.toggle("side-open");
     });
