@@ -1,6 +1,8 @@
 (() => {
   const $ = (s) => document.querySelector(s);
   const token = () => localStorage.getItem("yycj_token") || "";
+  const ST = { active: "已上架", hidden: "已下架", pending: "待审", rejected: "已拒", gray: "灰色" };
+  const ROLE = { teacher: "老师", guest: "客人", merchant: "商家" };
   let listingCache = [];
   async function api(path, opt={}) {
     const r = await fetch(path, Object.assign({
@@ -13,9 +15,11 @@
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
+  function zhStatus(s) { return ST[s] || s || "-"; }
+  function zhRole(s) { return ROLE[s] || s || "-"; }
   function matchQ(item, q) {
     if (!q) return true;
-    const blob = `${item.title || ""} ${item.city || ""} ${item.lamp_id || ""} ${item.status || ""}`.toLowerCase();
+    const blob = `${item.title || ""} ${item.city || ""} ${item.lamp_id || ""} ${zhStatus(item.status)}`.toLowerCase();
     return blob.includes(q.toLowerCase());
   }
 
@@ -70,26 +74,12 @@
     });
   }
   $("#btnShadowOn")?.addEventListener("click", async () => {
-    try {
-      await setShadow($("#shadowUid")?.value, true);
-      alert("已设置遮蔽");
-      document.getElementById("btnRefresh")?.click();
-    } catch (e) { alert(e.message || String(e)); }
+    try { await setShadow($("#shadowUid")?.value, true); alert("已设置遮蔽"); document.getElementById("btnRefresh")?.click(); }
+    catch (e) { alert(e.message || String(e)); }
   });
   $("#btnShadowOff")?.addEventListener("click", async () => {
-    try {
-      await setShadow($("#shadowUid")?.value, false);
-      alert("已解除遮蔽");
-      document.getElementById("btnRefresh")?.click();
-    } catch (e) { alert(e.message || String(e)); }
-  });
-  $("#adminShadow")?.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("[data-unshadow]");
-    if (!btn) return;
-    try {
-      await setShadow(btn.getAttribute("data-unshadow"), false);
-      document.getElementById("btnRefresh")?.click();
-    } catch (e) { alert(e.message || String(e)); }
+    try { await setShadow($("#shadowUid")?.value, false); alert("已解除遮蔽"); document.getElementById("btnRefresh")?.click(); }
+    catch (e) { alert(e.message || String(e)); }
   });
 
   function renderListingCards(items) {
@@ -99,11 +89,11 @@
       <div class="pick-item">
         <div class="meta">
           <strong>${esc(x.title || "")}</strong>
-          <div class="muted">${esc(x.city || "")} · ${esc(x.status || "")} · ${esc((x.lamp_id || "").slice(0,8))}</div>
+          <div class="muted">${esc(x.city || "")} · ${zhStatus(x.status)} · ${x.expires_at ? ("到期 " + String(x.expires_at).slice(0,10)) : "无截止"}</div>
         </div>
         <div class="row">
-          <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期</button>
-          <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">上架</button>
+          <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期30天</button>
+          <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
           <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
         </div>
       </div>`).join("") || "<p class='muted'>暂无资料</p>";
@@ -115,8 +105,9 @@
       <div class="pick-item">
         <div class="meta">
           <strong>${esc(x.title || "")}</strong>
-          <div class="muted">${esc(x.city || "")} · ${esc(x.status || "")}</div>
+          <div class="muted">${esc(x.city || "")} · ${zhStatus(x.status)}</div>
         </div>
+        <input class="hrs" type="number" min="0" placeholder="小时，空=长久" style="width:88px" />
         <button class="btn primary" data-pick="${action}" data-id="${esc(x.lamp_id)}">${action === "pin" ? "置顶" : "上轮播"}</button>
       </div>`).join("") || "<p class='muted'>无匹配</p>";
   }
@@ -140,11 +131,21 @@
   $("#btnPinSearch")?.addEventListener("click", () => {
     renderPick("#pinResults", listingCache.filter((x) => x.status === "active" && matchQ(x, ($("#pinQ")?.value || "").trim())), "carousel");
   });
+  function rowHours(btn) {
+    const input = btn.parentElement && btn.parentElement.querySelector(".hrs");
+    const raw = input && input.value;
+    if (raw === "" || raw == null) return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
+  }
   $("#feedPinResults")?.addEventListener("click", async (ev) => {
     const btn = ev.target.closest("[data-pick='pin']");
     if (!btn) return;
     try {
-      await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), pinned: true }) });
+      await api("/api/admin/homepage/feed-pin", {
+        method: "POST",
+        body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), pinned: true, expires_hours: rowHours(btn) }),
+      });
       document.getElementById("btnRefresh")?.click();
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
@@ -153,8 +154,10 @@
     const btn = ev.target.closest("[data-pick='carousel']");
     if (!btn) return;
     try {
-      const hoursRaw = $("#pinHours")?.value;
-      await api("/api/admin/homepage/pins", { method: "POST", body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), sort_order: 0, expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10) }) });
+      await api("/api/admin/homepage/pins", {
+        method: "POST",
+        body: JSON.stringify({ lamp_id: btn.getAttribute("data-id"), sort_order: 0, expires_hours: rowHours(btn) }),
+      });
       document.getElementById("btnRefresh")?.click();
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
@@ -178,12 +181,12 @@
         <div class="pick-item">
           <div class="meta">
             <div><strong>${u.user_id}</strong> @${esc(u.username || "-")} · ${esc(u.full_name || "")}</div>
-            <div class="muted">${esc(u.role || "-")} · ${u.lanhua_score} · ${u.is_banned ? "已拉黑" : "正常"}${u.is_shadowed ? " · 遮蔽" + (u.shadow_days || 0) + "天" : ""}</div>
+            <div class="muted">${zhRole(u.role)} · 口碑 ${u.lanhua_score} · ${u.is_banned ? "已拉黑" : "正常"}${u.is_shadowed ? " · 遮蔽" + (u.shadow_days || 0) + "天" : ""}</div>
           </div>
           <div class="row">
             <button class="btn danger" data-ban="1" data-id="${u.user_id}">拉黑</button>
-            <button class="btn" data-ban="0" data-id="${u.user_id}">解除</button>
-            <button class="btn" data-fill-shadow="${u.user_id}">遮蔽</button>
+            <button class="btn" data-ban="0" data-id="${u.user_id}">解除拉黑</button>
+            <button class="btn" data-fill-shadow="${u.user_id}">填入遮蔽</button>
           </div>
         </div>`).join("") || "<p class='muted'>无结果</p>";
     }
