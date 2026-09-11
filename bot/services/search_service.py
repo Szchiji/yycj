@@ -105,7 +105,7 @@ def parse_query(text: str) -> Dict[str, Any]:
     elif len(prices) == 1:
         p = prices[0]
         price_min, price_max = int(p * 0.7), int(p * 1.3)
-    raw = re.sub(r"[/\uff0f]+", " ", text)
+    raw = re.sub(r"[/／]+", " ", text)
     kw = raw
     if city:
         kw = kw.replace(city, " ")
@@ -143,14 +143,18 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                     cast(Lamp.tags, String).ilike(like),
                 ))
         off = max(0, int(offset or 0))
-        stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.authenticity_score.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
+        stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.created_at.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
         res = await s.execute(stmt)
         items = [_lamp_to_dict(x) for x in res.scalars().all()]
     enriched = [attach_fuzzy_distance(x, lat, lng) for x in items]
     if lat is not None and lng is not None:
         enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, x.get("_distance_km") if x.get("_distance_km") is not None else 1e9))
     else:
-        enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, -(x.get("authenticity_score") or 0)))
+        pinned = [x for x in enriched if x.get("feed_pinned")]
+        fresh = [x for x in enriched if not x.get("feed_pinned")]
+        pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
+        fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
+        enriched = pinned + fresh
     for x in enriched:
         x.pop("_distance_km", None)
     return enriched
