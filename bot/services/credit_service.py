@@ -1,4 +1,4 @@
-"""兰花信用分：结算、等级、遮蔽、恢复（对齐蓝图档位与会话钳制）。"""
+"""兰花信用分：结算、等级、遮蔽、恢复。"""
 
 from __future__ import annotations
 
@@ -10,19 +10,18 @@ from sqlalchemy import or_, select
 from bot.db import session_scope
 from bot.models import CreditHistory, CreditTier, User, tier_from_score
 
-# ---------- 蓝图高影响 Δ（与 Bot 审核回调、API 共用）----------
 DELTA_POST_APPROVED = 15
 DELTA_REPORT_VALID_REPORTER = 10
 DELTA_REPORT_VALID_TARGET = -30
-DELTA_MALICIOUS_REPORT = -15  # 驳回恶意/无效报告时扣举报人
+DELTA_MALICIOUS_REPORT = -15
 SESSION_DELTA_MAX = 28
 SESSION_DELTA_MIN = -15
 SHADOW_MIN_DAYS = 3
 DAILY_RECOVERY_POINTS = 5
+DEFAULT_SCORE = 320  # 新月中段；新用户不是暗月，也不自动遮蔽
 
-# 档位说明（0–199 / 200–399 / 400–599 / 600–799 / 800+）
 TIER_RANGES = [
-    {"tier": CreditTier.DARK.value, "min": 0, "max": 199, "label": "暗月 · 月影遮蔽"},
+    {"tier": CreditTier.DARK.value, "min": 0, "max": 199, "label": "暗月"},
     {"tier": CreditTier.NEW.value, "min": 200, "max": 399, "label": "新月"},
     {"tier": CreditTier.SILVER.value, "min": 400, "max": 599, "label": "银月"},
     {"tier": CreditTier.GOLD.value, "min": 600, "max": 799, "label": "金月"},
@@ -44,21 +43,23 @@ def _user_to_dict(u: User) -> Dict[str, Any]:
         "total_deducted": u.total_deducted,
         "is_shadowed": u.is_shadowed,
         "role": getattr(u, "role", None),
+        "guest_alias": getattr(u, "guest_alias", None),
+        "is_banned": getattr(u, "is_banned", False),
         "created_at": u.created_at,
         "updated_at": u.updated_at,
         "last_recovery_at": u.last_recovery_at,
     }
 
 
-def _apply_shadow_rules(user: User, reason: str) -> None:
-    """分数 <200 → 进入/保持遮蔽并保证天数；≥200 且天数耗尽 → 解除。"""
+def _apply_shadow_rules(user: User, reason: str, *, delta: int = 0) -> None:
+    """只有扣分跌破 200 才入影；新号低分不等于惩罚。"""
     score = int(user.lanhua_score)
-    if score < 200:
+    if int(delta) < 0 and score < 200:
         user.is_shadowed = True
         user.shadow_days = max(int(user.shadow_days or 0), SHADOW_MIN_DAYS)
         if reason:
             user.shadow_reason = reason[:256]
-    elif user.is_shadowed and int(user.shadow_days or 0) <= 0:
+    elif user.is_shadowed and int(user.shadow_days or 0) <= 0 and score >= 200:
         user.is_shadowed = False
         user.shadow_reason = None
 
@@ -84,8 +85,8 @@ async def ensure_user(
             user_id=user_id,
             username=username,
             full_name=full_name,
-            lanhua_score=100,
-            tier=tier_from_score(100).value,
+            lanhua_score=DEFAULT_SCORE,
+            tier=tier_from_score(DEFAULT_SCORE).value,
             is_shadowed=False,
             shadow_days=0,
         )
@@ -94,9 +95,7 @@ async def ensure_user(
         return _user_to_dict(user)
 
 
-
 async def set_user_role(user_id: int, role: str) -> Dict[str, Any]:
-    """设置 Mini App 身份：teacher / guest / merchant。"""
     from bot.models import UserRole
 
     allowed = {UserRole.TEACHER.value, UserRole.GUEST.value, UserRole.MERCHANT.value}
@@ -134,8 +133,8 @@ async def settle_lanhua(
         if not user:
             user = User(
                 user_id=user_id,
-                lanhua_score=100,
-                tier=tier_from_score(100).value,
+                lanhua_score=DEFAULT_SCORE,
+                tier=tier_from_score(DEFAULT_SCORE).value,
                 is_shadowed=False,
                 shadow_days=0,
             )
@@ -154,7 +153,7 @@ async def settle_lanhua(
         elif delta < 0:
             user.total_deducted = int(user.total_deducted or 0) + (-delta)
 
-        _apply_shadow_rules(user, reason)
+        _apply_shadow_rules(user, reason, delta=int(delta))
 
         s.add(
             CreditHistory(
@@ -192,7 +191,7 @@ async def history(user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
 
 
 async def tick_shadow_daily() -> int:
-    """每日遮蔽倒计时 + 低分缓慢恢复（面向 is_shadowed 或分数 <200）。"""
+    """每日遮蔽倒计时 + 低分缓慢恢复。不会因低分把正常新用户拉进遮蔽。"""
     async with session_scope() as s:
         res = await s.execute(
             select(User).where(
@@ -218,7 +217,7 @@ async def tick_shadow_daily() -> int:
                         related_id=None,
                     )
                 )
-            if int(u.lanhua_score) >= 200 and int(u.shadow_days or 0) <= 0:
+            if u.is_shadowed and int(u.lanhua_score) >= 200 and int(u.shadow_days or 0) <= 0:
                 u.is_shadowed = False
                 u.shadow_reason = None
             u.last_recovery_at = datetime.utcnow()
@@ -229,7 +228,7 @@ async def tick_shadow_daily() -> int:
 
 
 def format_credit_card(user: Dict[str, Any]) -> str:
-    score = user.get("lanhua_score", 100)
+    score = user.get("lanhua_score", DEFAULT_SCORE)
     tier = user.get("tier", "新月")
     shadowed = user.get("is_shadowed")
     lines = [
@@ -250,21 +249,6 @@ def compute_heuristic_q(
     duration_minutes: float = 0.0,
     reply_balance: float | None = None,
 ) -> int:
-    """
-    启发式质量分 Q ∈ [0, 100]（**无 LLM / 无付费模型依赖**；蓝图占位）。
-
-    组成说明（显式、可测）：
-    1. 基础互动（兼容旧式）：min(70, 2·I + 5·M)
-       - I = message_count（原始条数，不在此处封顶；外层 Δ 公式对 I 另有封顶）
-       - M = media_count（图片/语音等）
-    2. 时长加成：min(15, duration_minutes / 8)  → 约 2h 会话 +15
-    3. 回复均衡加成：min(15, 15 · reply_balance)
-       - reply_balance = min(A条,B条) / max(A条,B条) ∈ [0,1]
-       - 未提供时按 0.5 计（中性 +7.5），避免无落库消息时过度惩罚
-
-    有真实 LLM 质量分时：直接用外部 score 替换本函数返回值即可，
-    不必引入新依赖（requirements 中亦不包含付费 LLM SDK）。
-    """
     i = max(0, int(message_count or 0))
     m = max(0, int(media_count or 0))
     d = max(0.0, float(duration_minutes or 0.0))
@@ -286,17 +270,6 @@ def calc_session_delta(
     reply_balance: float | None = None,
     quality_score: int | None = None,
 ) -> int:
-    """
-    会话结算（无 LLM 时的启发式）：
-
-        Δ = (8 + 0.18·I + 0.12·D + 0.25·Q + Bonus) × (1 - F) - Penalty
-
-    - I：消息条数（封顶 80）
-    - D：时长分钟（封顶 120）
-    - Q：启发式质量分，见 ``compute_heuristic_q``（可用 quality_score 覆盖）
-    - Bonus：好评 +12；Penalty：被举报 40；F：刷量因子 [0,0.9]
-    - 最终钳制到 [SESSION_DELTA_MIN, SESSION_DELTA_MAX] ≈ [-15, +28]
-    """
     i = min(int(message_count or 0), 80)
     d = min(float(duration_minutes or 0), 120.0)
     if quality_score is not None:
