@@ -1,8 +1,10 @@
 (() => {
-  ["admin-hydrate.js", "admin-fill.js"].forEach((name) => {
-    if (document.querySelector('script[src*="' + name + '"]')) return;
+  ["admin-side.js", "admin-chats.js"].forEach((name) => {
+    const id = "yycj-" + name.replace(".js", "");
+    if (document.getElementById(id)) return;
     const s = document.createElement("script");
-    s.src = "./" + name + "?v=20260911aa";
-    document.body.appendChild(s);
+    s.id = id;
+    s.src = "./" + name + "?v=20260911ac";
+    document.head.appendChild(s);
   });
 })();
