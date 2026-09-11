@@ -41,11 +41,19 @@ def enrich_media(media: List[Dict[str, Any]] | None, photos: List[str] | None = 
         if not raw:
             continue
         kind = guess_kind(raw, m.get("type"))
-        item = {"type": kind, "url": raw, "preview_url": preview_url(raw)}
+        thumb = str(m.get("thumb_file_id") or m.get("thumbnail") or "").strip()
+        preview = str(m.get("preview_url") or "").strip()
+        if thumb:
+            preview = preview_url(thumb)
+        elif not preview:
+            preview = preview_url(raw)
+        item = {"type": kind, "url": raw, "preview_url": preview}
         if m.get("file_id"):
             item["file_id"] = str(m["file_id"])
         elif not is_http(raw):
             item["file_id"] = raw
+        if thumb:
+            item["thumb_file_id"] = thumb
         out.append(item)
     if not out:
         for p in photos or []:
