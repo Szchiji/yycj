@@ -117,3 +117,31 @@ async def api_admin_proxy(
     except Exception:
         pass
     return {"ok": True, "lamp": lamp, "by": admin_id}
+
+
+@router.post("/admin/listings/{lamp_id}/proxy-edit")
+async def api_admin_proxy_edit(
+    lamp_id: str,
+    body: EditBody,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    media = _normalize_media(body.media, body.photos)
+    try:
+        lamp = await listing_flow.apply_admin_edit(
+            lamp_id,
+            {
+                "city": body.city,
+                "title": body.title,
+                "price": body.price,
+                "price_text": body.price_text,
+                "tags": body.tags,
+                "description": body.description,
+                "media": media,
+                "photos": [m["url"] for m in media if m["type"] == "image"],
+                "district": body.district,
+                "approx_label": body.approx_label,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "lamp": lamp, "by": admin_id}

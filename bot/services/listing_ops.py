@@ -100,6 +100,35 @@ async def expire_due_lamps() -> int:
             logger.info("expiry remind sent %s", r)
     except Exception:
         logger.exception("expiry remind failed")
+    try:
+        purged = await purge_old_hidden(30)
+        if purged:
+            logger.info("Purged %s hidden listings older than 30 days", purged)
+    except Exception:
+        logger.exception("purge hidden listings failed")
+    return n
+
+
+async def purge_old_hidden(days: int = 30) -> int:
+    cutoff = datetime.utcnow() - timedelta(days=max(1, days))
+    n = 0
+    async with session_scope() as s:
+        res = await s.execute(
+            select(Lamp).where(
+                Lamp.status == LampStatus.HIDDEN.value,
+                Lamp.updated_at <= cutoff,
+            )
+        )
+        lamps = list(res.scalars().all())
+        ids = [x.lamp_id for x in lamps]
+        for lamp in lamps:
+            s.delete(lamp)
+            n += 1
+        if ids:
+            pin_res = await s.execute(select(HomepagePin).where(HomepagePin.lamp_id.in_(ids)))
+            for pin in pin_res.scalars().all():
+                s.delete(pin)
+        await s.flush()
     return n
 
 
@@ -122,6 +151,13 @@ async def list_listed(limit: int = 100) -> List[Dict[str, Any]]:
             "unlist_reason": x.unlist_reason,
             "feed_pinned": bool(x.feed_pinned),
             "user_id": x.user_id,
+            "media": list(x.media or []),
+            "photos": list(x.photos or []),
+            "description": x.description or "",
+            "tags": list(x.tags or []),
+            "district": x.district,
+            "price_text": x.price_text,
+            "updated_at": x.updated_at,
         }
         for x in rows
     ]
