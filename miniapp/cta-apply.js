@@ -1,26 +1,38 @@
 (() => {
   if (window.__yycjCtaApply) return;
   window.__yycjCtaApply = true;
+  function settings() {
+    return window.__yycjHome || {};
+  }
+  function label() {
+    return String(settings().chat_cta_label || "想聊聊").slice(0, 32);
+  }
   function apply() {
-    const s = window.__yycjHome || {};
-    const label = String(s.chat_cta_label || "想聊聊").slice(0, 32);
-    const on = s.show_chat_cta !== false;
+    const text = label();
+    const on = settings().show_chat_cta !== false;
     document.querySelectorAll("#detailChat, [data-cta='chat']").forEach((btn) => {
-      if (btn.textContent !== label) btn.textContent = label;
-      const next = on ? "" : "none";
-      if (btn.style.display !== next) btn.style.display = next;
+      if (btn.textContent !== text) btn.textContent = text;
+      btn.style.display = on ? "" : "none";
     });
   }
   async function load() {
+    const token = localStorage.getItem("yycj_token") || "";
+    if (!token) return;
     try {
-      const token = localStorage.getItem("yycj_token") || "";
       const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token } });
-      window.__yycjHome = Object.assign({}, window.__yycjHome || {}, await r.json());
+      const data = await r.json();
+      window.__yycjHome = Object.assign({}, window.__yycjHome || {}, data);
       apply();
     } catch (e) {}
   }
   load();
+  setTimeout(load, 800);
+  setTimeout(load, 2000);
+  const detail = document.getElementById("detail");
+  if (detail) {
+    new MutationObserver(apply).observe(detail, { childList: true });
+  }
   document.addEventListener("click", (ev) => {
-    if (ev.target.closest("[data-id], #detailChat, #feed, #pins")) setTimeout(apply, 120);
+    if (ev.target.closest("[data-id]")) setTimeout(apply, 200);
   });
 })();
