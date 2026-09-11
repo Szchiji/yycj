@@ -1,8 +1,24 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
+  function role() {
+    try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; }
+    catch (e) { return "guest"; }
+  }
   function mount() {
     const me = document.getElementById("view-me");
-    if (!me || document.getElementById("myListings")) return;
+    if (!me) return;
+    if (!document.getElementById("myReviews")) {
+      const hold = document.createElement("div");
+      hold.id = "myReviews";
+      hold.className = "hidden";
+      me.appendChild(hold);
+    }
+    if (role() === "guest") {
+      const old = document.getElementById("myListings");
+      if (old && old.parentElement) old.parentElement.remove();
+      return;
+    }
+    if (document.getElementById("myListings")) return;
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = "<h3>我的上架</h3><div id=\"myListings\" class=\"muted\">加载中…</div>";
@@ -11,8 +27,9 @@
     else me.prepend(card);
   }
   async function load() {
+    mount();
     const box = document.getElementById("myListings");
-    if (!box || !token()) return;
+    if (!box || !token() || role() === "guest") return;
     try {
       const r = await fetch("/api/me/listings", { headers: { Authorization: "Bearer " + token() } });
       const data = await r.json();
@@ -33,16 +50,12 @@
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-edit");
           const item = items.find((x) => x.lamp_id === id);
-          window.__editLamp = item;
           document.querySelector('[data-nav="publish"]')?.click();
           const form = document.getElementById("publishForm");
           if (!form || !item) return;
-          if (document.getElementById("editLampId")) document.getElementById("editLampId").value = item.lamp_id;
-          else {
-            const h = document.createElement("input");
-            h.type = "hidden"; h.id = "editLampId"; h.value = item.lamp_id;
-            form.appendChild(h);
-          }
+          let h = document.getElementById("editLampId");
+          if (!h) { h = document.createElement("input"); h.type = "hidden"; h.id = "editLampId"; form.appendChild(h); }
+          h.value = item.lamp_id;
           const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
           set("pubTitle", item.title);
           set("pubCity", item.city);

@@ -4,7 +4,7 @@
     const s = String(u || "").trim();
     if (!s) return "";
     if (s.startsWith("http") || s.startsWith("/") || s.startsWith("blob:")) return s;
-    if (s.startsWith("file_id:")) return srcOf(s.slice(8).trim());
+    if (s.toLowerCase().startsWith("file_id:")) return srcOf(s.slice(8).trim());
     return "/api/media/file/" + encodeURIComponent(s);
   }
   function isVideo(m, raw) {
@@ -25,6 +25,15 @@
     });
     return out;
   }
+  function hideFileIdText(box) {
+    box.querySelectorAll("p, li, span, pre, code, div").forEach((n) => {
+      if (n.closest(".gallery")) return;
+      const t = (n.textContent || "").replace(/\s+/g, " ").trim();
+      if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) {
+        n.style.display = "none";
+      }
+    });
+  }
   function renderGallery(box, items) {
     if (!items.length) return;
     let wrap = box.querySelector(".gallery");
@@ -34,7 +43,11 @@
       const card = box.querySelector(".card") || box;
       card.insertBefore(wrap, card.firstChild);
     }
-    let idx = Number(wrap.dataset.idx || 0);
+    let idx = Number(wrap.dataset.idx || -1);
+    if (idx < 0) {
+      idx = items.findIndex((x) => x.type !== "video");
+      if (idx < 0) idx = 0;
+    }
     if (idx >= items.length) idx = 0;
     const cur = items[idx];
     wrap.innerHTML = `
@@ -46,7 +59,9 @@
       <div class="gallery-thumbs">
         ${items.map((m, i) => `
           <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
-            ${m.type === "video" ? `<video src="${m.src}" muted preload="metadata"></video><span class="play">▶</span>` : `<img src="${m.src}" alt="" loading="lazy" />`}
+            ${m.type === "video"
+              ? `<span class="play">▶</span>`
+              : `<img src="${m.src}" alt="" loading="lazy" />`}
           </button>`).join("")}
       </div>`;
     wrap.dataset.idx = String(idx);
@@ -68,10 +83,8 @@
       const data = await r.json();
       const lamp = data.lamp || data.item || data;
       renderGallery(box, collect(lamp));
-      box.querySelectorAll("p, li, span, pre, code").forEach((n) => {
-        const t = (n.textContent || "").trim();
-        if (/^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) n.remove();
-      });
+      hideFileIdText(box);
+      setTimeout(() => hideFileIdText(box), 200);
     } catch (e) {
       console.warn(e);
     }
@@ -80,6 +93,9 @@
     const card = ev.target.closest("[data-id]");
     if (!card || ev.target.closest("[data-fav]")) return;
     const id = card.getAttribute("data-id");
+    const box = document.getElementById("detail");
+    const g = box && box.querySelector(".gallery");
+    if (g) g.dataset.idx = "-1";
     setTimeout(() => paint(id), 280);
   });
 })();
