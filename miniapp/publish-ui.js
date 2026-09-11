@@ -63,13 +63,19 @@
     if (!title) return toast("请填称呼");
     const media = uploaded.filter((m) => m.file_id || m.url).map((m) => ({ type: m.type, url: m.file_id || m.url, file_id: m.file_id, thumb_file_id: m.thumb_file_id, preview_url: m.preview_url }));
     if (!media.length) return toast("请先上传至少 1 个媒体");
+    const extras = {};
+    document.querySelectorAll("[data-extra]").forEach((inp) => {
+      const k = (inp.getAttribute("data-extra") || "").trim();
+      const v = (inp.value || "").trim();
+      if (k && v) extras[k] = v;
+    });
     const body = {
       city: $("#pubCity")?.value, title,
       price_text: ($("#pubPrice")?.value || "").trim(),
       district: ($("#pubDistrict")?.value || "").trim(),
       approx_label: ($("#pubApprox")?.value || "").trim(),
       tags: ($("#pubTags")?.value || "").trim().split(/\s+/).filter(Boolean).slice(0, 5),
-      description: ($("#pubDesc")?.value || "").trim(), media,
+      description: ($("#pubDesc")?.value || "").trim(), media, extras,
     };
     const digits = (body.price_text || "").replace(/\D/g, "");
     if (digits) body.price = parseInt(digits, 10);
