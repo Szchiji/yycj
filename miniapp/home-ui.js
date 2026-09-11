@@ -131,20 +131,12 @@
       if (found.length) fillCities(found, localStorage.getItem("yycj_city") || "");
     }).observe(list, { childList: true });
   }
-  setInterval(() => {
-    const pins = $("#pins");
-    if (!pins || pins.classList.contains("hidden") || !pins.querySelector(".pin-card")) return;
-    const card = pins.querySelector(".pin-card");
-    const step = card ? card.getBoundingClientRect().width + 10 : 160;
-    if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
-    else pins.scrollBy({ left: step, behavior: "smooth" });
-  }, 4000);
   ["lazy.js", "share.js", "boot-extra.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911al";
+    s.src = "./" + name + "?v=20260911as";
     document.head.appendChild(s);
   });
   async function boot() {
