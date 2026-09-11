@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -10,6 +11,8 @@ from sqlalchemy import or_, select
 from bot.db import session_scope
 from bot.models import HomepagePin, Lamp, LampStatus
 from bot.services import home_service
+
+logger = logging.getLogger(__name__)
 
 
 async def _listing_days() -> int:
@@ -90,6 +93,13 @@ async def expire_due_lamps() -> int:
             for pin in pin_res.scalars().all():
                 s.delete(pin)
         await s.flush()
+    try:
+        from bot.services import listing_flow
+        r = await listing_flow.remind_expiring(3)
+        if r:
+            logger.info("expiry remind sent %s", r)
+    except Exception:
+        logger.exception("expiry remind failed")
     return n
 
 
