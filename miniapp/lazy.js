@@ -23,6 +23,13 @@
       seen.add(el);
       io.observe(el);
     });
+    document.querySelectorAll("#detail video, .gallery-hero video").forEach((v) => {
+      v.muted = true;
+      v.loop = true;
+      v.autoplay = true;
+      v.setAttribute("playsinline", "");
+      v.play().catch(() => {});
+    });
   }
   scan();
   new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true });
