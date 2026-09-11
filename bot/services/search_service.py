@@ -1,5 +1,4 @@
 """灯笼搜索（关键词 + 城市 + 价位 + 模糊距离）。"""
-
 from __future__ import annotations
 
 import math
@@ -8,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import String, and_, cast, or_, select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus
@@ -106,11 +105,12 @@ def parse_query(text: str) -> Dict[str, Any]:
     elif len(prices) == 1:
         p = prices[0]
         price_min, price_max = int(p * 0.7), int(p * 1.3)
-    kw = text
+    raw = re.sub(r"[/\uff0f]+", " ", text)
+    kw = raw
     if city:
         kw = kw.replace(city, " ")
     kw = re.sub(r"\d{3,6}", " ", kw)
-    keywords = [t for t in re.split(r"[\s,，、/|]+", kw) if t.strip()]
+    keywords = [t for t in re.split(r"[\s,，、|]+", kw) if t.strip()]
     return {"city": city, "price_min": price_min, "price_max": price_max, "keywords": keywords, "raw": text}
 
 
@@ -133,7 +133,15 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                 conditions.append(or_(Lamp.price.is_(None), Lamp.price <= parsed["price_max"]))
             for kw in (parsed["keywords"] or [keyword]):
                 like = f"%{kw}%"
-                conditions.append(or_(Lamp.title.ilike(like), Lamp.description.ilike(like), Lamp.city.ilike(like)))
+                conditions.append(or_(
+                    Lamp.title.ilike(like),
+                    Lamp.description.ilike(like),
+                    Lamp.city.ilike(like),
+                    Lamp.district.ilike(like),
+                    Lamp.price_text.ilike(like),
+                    Lamp.approx_label.ilike(like),
+                    cast(Lamp.tags, String).ilike(like),
+                ))
         off = max(0, int(offset or 0))
         stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.authenticity_score.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
         res = await s.execute(stmt)
