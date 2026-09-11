@@ -55,7 +55,7 @@
     const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
     return `<div class="feed-card compact cover-card" data-id="${esc(t.lamp_id)}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" data-src="${esc(img)}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
+        ${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
         <button class="fav-btn" type="button" data-fav="${esc(t.lamp_id)}">♡</button>
         ${loc ? `<span class="badge-loc">${esc(loc)}</span>` : ""}
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
@@ -71,14 +71,14 @@
   }
   function paint() {
     const feed = $("#feed");
-    if (feed && lastItems.length) {
+    if (feed) {
       feed.classList.add("has-cover");
-      feed.innerHTML = lastItems.map(cardHtml).join("");
+      feed.innerHTML = lastItems.length ? lastItems.map(cardHtml).join("") : (q ? "<p class='muted'>没有匹配的资料</p>" : "");
     }
     const pins = $("#pins");
-    if (pins && lastPins.length) {
+    if (pins) {
       pins.innerHTML = lastPins.map(pinHtml).join("");
-      pins.classList.remove("hidden");
+      pins.classList.toggle("hidden", !lastPins.length || !!q);
     }
   }
   async function loadFeed(reset) {
@@ -87,12 +87,13 @@
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
-      const params = new URLSearchParams({ limit: "6", offset: String(offset) });
-      if (city) params.set("city", city);
+      q = (($("#homeQ") && $("#homeQ").value.trim()) || q || "");
+      const params = new URLSearchParams({ limit: "12", offset: String(offset) });
       if (q) params.set("q", q);
+      else if (city) params.set("city", city);
       const data = await api("/api/home?" + params);
       fillCities(data.enabled_cities || cities, data.city || city);
-      lastPins = data.pins || [];
+      lastPins = q ? [] : (data.pins || []);
       const batch = data.items || [];
       lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
       offset += batch.length;
@@ -118,6 +119,8 @@
     if (opt) {
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
+      if ($("#homeQ")) $("#homeQ").value = "";
+      q = "";
       loadFeed(true);
     }
   }, true);
@@ -130,8 +133,9 @@
   }
   setInterval(() => {
     const pins = $("#pins");
-    if (!pins || !pins.querySelector(".pin-card")) return;
-    const step = Math.round((pins.clientWidth || 300) * 0.82);
+    if (!pins || pins.classList.contains("hidden") || !pins.querySelector(".pin-card")) return;
+    const card = pins.querySelector(".pin-card");
+    const step = card ? card.getBoundingClientRect().width + 10 : 160;
     if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
     else pins.scrollBy({ left: step, behavior: "smooth" });
   }, 4000);
@@ -139,15 +143,15 @@
     const l = document.createElement("link");
     l.id = "yycj-home-fix-css";
     l.rel = "stylesheet";
-    l.href = "./home-fix.css?v=20260911ad";
+    l.href = "./home-fix.css?v=20260911aj";
     document.head.appendChild(l);
   }
-  ["lazy.js", "share.js", "boot-extra.js", "boot-rescue.js"].forEach((name) => {
+  ["lazy.js", "share.js", "boot-extra.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911ad";
+    s.src = "./" + name + "?v=20260911aj";
     document.head.appendChild(s);
   });
   async function boot() {
