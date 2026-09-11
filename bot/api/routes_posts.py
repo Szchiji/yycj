@@ -25,8 +25,6 @@ from bot.api.routes_core import (
 
 logger = logging.getLogger(__name__)
 
-# ---------- posts / reports ----------
-
 
 @router.post("/posts")
 async def api_create_post(
@@ -83,24 +81,8 @@ async def api_create_post(
         )
 
     try:
-        from bot.main import bot
-        from bot.keyboards import admin_post_kb
-
-        media_hint = f"\n媒体：{len(media)} 个" if media else "\n媒体：无"
-        card = (
-            f"🆕 新投稿（月影车姬） <code>{post_id[:8]}</code>\n"
-            f"用户：{user_id} · 身份：{_ROLE_LABEL.get(role, role)}\n"
-            f"城市：{lamp_data['city']} {(lamp_data.get('district') or '')}\n"
-            f"称呼：{lamp_data['title']}\n"
-            f"价位：{lamp_data.get('price_text')}\n"
-            f"{(lamp_data.get('description') or '')[:300]}"
-            f"{media_hint}"
-        )
-        for admin_id in get_settings().admin_id_list:
-            try:
-                await bot.send_message(admin_id, card, reply_markup=admin_post_kb(post_id))
-            except Exception:
-                pass
+        from bot.services.listing_notify import notify_admins_new_post
+        await notify_admins_new_post(post_id, user_id, lamp_data)
     except Exception:
         logger.exception("notify admins of post failed")
 
@@ -111,6 +93,7 @@ async def api_create_post(
         "media": media,
         "photos": photos,
     }
+
 
 @router.post("/reports")
 async def api_create_report(
@@ -158,7 +141,6 @@ async def api_create_report(
 
     return {"ok": True, "report_id": report_id, "status": ReportStatus.PENDING.value}
 
-# ---------- reviews ----------
 
 @router.post("/reviews")
 async def api_create_review(
@@ -167,7 +149,6 @@ async def api_create_review(
 ) -> Dict[str, Any]:
     u = await credit_service.ensure_user(user_id)
     if u.get("role") and u.get("role") != UserRole.GUEST.value:
-        # 允许未设角色时提交；有角色则须为客人
         raise HTTPException(status_code=403, detail="评价需以客人身份提交")
     lamp = await search_service.get_lamp(body.lamp_id)
     if not lamp:
@@ -192,6 +173,7 @@ async def api_create_review(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     rev["created_at"] = _ser_dt(rev.get("created_at"))
     return {"ok": True, "review": rev}
+
 
 @router.get("/reviews/mine")
 async def api_my_reviews(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
