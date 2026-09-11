@@ -28,6 +28,7 @@
     setVal("opsChats", chats);
     setVal("opsPromo", s.approve_promo_text);
     setVal("opsChannel", s.broadcast_channel);
+    setVal("opsBroadcastTpl", s.broadcast_template);
   }
   document.getElementById("btnRefresh")?.addEventListener("click", () => hydrate().catch(() => {}));
   setTimeout(() => hydrate().catch(() => {}), 900);
