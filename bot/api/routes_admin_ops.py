@@ -31,6 +31,7 @@ class ExtraOpsBody(BaseModel):
     home_feed_page_size: Optional[int] = None
     approve_promo_text: Optional[str] = None
     broadcast_channel: Optional[str] = None
+    media_channel_id: Optional[str] = None
 
 
 class ShadowBody(BaseModel):
