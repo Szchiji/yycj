@@ -1,5 +1,4 @@
 """媒体上传与 Telegram file_id 预览代理。"""
-
 from __future__ import annotations
 
 import logging
@@ -61,6 +60,7 @@ async def api_media_upload(
             continue
         if len(data) > MAX_BYTES:
             raise HTTPException(status_code=400, detail=f"文件过大：{uf.filename or 'unknown'}（≤20MB）")
+        thumb_id = None
         kind = _guess_type(uf.filename or "", uf.content_type)
         safe_name = (uf.filename or ("video.mp4" if kind == "video" else "image.jpg")).replace("/", "_")
         buf = BufferedInputFile(data, filename=safe_name)
@@ -71,6 +71,8 @@ async def api_media_upload(
                     file_id = (msg.video.file_id if msg.video else None) or (
                         msg.document.file_id if msg.document else None
                     )
+                    if msg.video and getattr(msg.video, "thumbnail", None):
+                        thumb_id = msg.video.thumbnail.file_id
                 except Exception:
                     msg = await bot.send_document(chat_id, buf, disable_notification=True)
                     file_id = msg.document.file_id if msg.document else None
@@ -82,12 +84,16 @@ async def api_media_upload(
             raise HTTPException(status_code=502, detail=f"上传失败：{exc}") from exc
         if not file_id:
             continue
-        results.append({
+        item = {
             "type": kind,
             "file_id": file_id,
             "url": file_id,
             "preview_url": f"/api/media/file/{file_id}",
-        })
+        }
+        if kind == "video" and thumb_id:
+            item["thumb_file_id"] = thumb_id
+            item["preview_url"] = f"/api/media/file/{thumb_id}"
+        results.append(item)
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
     return {"ok": True, "items": results, "count": len(results)}
