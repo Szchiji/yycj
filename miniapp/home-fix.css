@@ -6,18 +6,20 @@
 .topbar .brand { justify-self: center; font-weight: 700; }
 .topbar .city-wrap { justify-self: end; position: relative; }
 .city-drop {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 80;
   min-width: 132px; background: #151b2b; border: 1px solid #2a3348; border-radius: 12px; padding: 6px;
 }
+.city-drop.hidden { display: none !important; }
 .city-drop .city-opt { display: block; width: 100%; border: 0; background: transparent; color: #e8eefc; padding: 8px 10px; text-align: left; }
 #citySheet { display: none !important; }
 .pins {
   display: flex !important;
   gap: 10px;
-  overflow-x: auto;
+  overflow-x: auto !important;
   scroll-snap-type: x mandatory;
-  margin: 6px 0 10px !important;
+  -webkit-overflow-scrolling: touch;
 }
+.pin-track { display: contents; animation: none !important; }
 #pins .pin-card, .pin-card, .pin-card.short {
   position: relative !important;
   flex: 0 0 78% !important;
@@ -31,7 +33,6 @@
   scroll-snap-align: start;
   background-size: cover !important;
   background-position: center !important;
-  writing-mode: horizontal-tb !important;
 }
 .pin-card > *:not(.pin-copy) { display: none !important; }
 .pin-card .pin-copy {
@@ -42,42 +43,26 @@
   background: linear-gradient(transparent, rgba(0,0,0,.72));
   color: #fff;
 }
-.pin-card .pin-copy b { display: block; font-size: 14px; }
 #feed.has-cover, #favList {
   display: grid !important;
   grid-template-columns: 1fr 1fr 1fr !important;
   gap: 8px !important;
 }
-#feed.has-cover .feed-card:not(.cover-card) { display: none !important; }
-#feed .cover-wrap .thumb,
-#feed .cover-card img.thumb,
-#favList .cover-wrap .thumb {
-  width: 100% !important;
-  height: 220px !important;
-  object-fit: cover !important;
-  display: block !important;
+#feed .cover-wrap .thumb, #favList .cover-wrap .thumb {
+  width: 100% !important; height: 200px !important; object-fit: cover !important; display: block !important;
 }
+.cover-wrap { position: relative; }
 .fav-btn {
   position: absolute; top: 6px; left: 6px; width: 26px; height: 26px;
   border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff;
 }
-.fav-btn.on { color: #ff6b8a; }
-body.role-host .fav-btn { display: none !important; }
 .badge-loc, .badge-tag, .badge-n {
   position: absolute; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 999px;
 }
 .badge-loc { top: 6px; right: 6px; background: rgba(20,40,90,.82); }
 .badge-tag { left: 6px; bottom: 6px; background: #6d4aff; }
 .badge-n { right: 6px; bottom: 6px; background: rgba(0,0,0,.5); }
-.cover-card { padding: 0 !important; overflow: hidden; }
+.cover-card { padding: 0 !important; }
 .cover-card .body { padding: 6px; }
-.cover-card .body h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cover-card .price { color: #7ea8ff; font-size: 12px; font-weight: 600; }
-.gallery-hero img, .gallery-hero video { width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px; }
-.gallery-thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
-.g-thumb { position: relative; flex: 0 0 54px; height: 54px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #111; }
-.g-thumb.on { border-color: #7ea8ff; }
-.g-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.g-thumb .play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); }
+#detail .media-grid { display: none !important; }
 .nav-item.hidden { display: none !important; }
-.unfav { margin-top: 6px; font-size: 12px; }
