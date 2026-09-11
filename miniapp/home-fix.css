@@ -10,55 +10,86 @@
 .city-drop {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
   min-width: 132px; background: #151b2b; border: 1px solid #2a3348;
-  border-radius: 12px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  border-radius: 12px; padding: 6px;
 }
 .city-drop .city-opt {
   display: block; width: 100%; text-align: left; border: 0;
   background: transparent; color: #e8eefc; padding: 8px 10px; border-radius: 8px;
 }
-.city-drop .city-opt.on, .city-drop .city-opt:active { background: #2a3348; }
+.city-drop .city-opt.on { background: #2a3348; }
 #citySheet { display: none !important; }
-.pins { display: flex; gap: 8px; overflow-x: auto; }
-.pin-card, .pin-card.short {
+.pins {
   display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+}
+.pin-card, .pin-card.short {
+  position: relative;
+  display: block !important;
   writing-mode: horizontal-tb !important;
-  min-width: 148px; height: 56px !important; min-height: 56px !important;
+  flex: 0 0 78%;
+  height: 148px !important;
+  min-height: 148px !important;
+  max-height: 148px !important;
+  border-radius: 14px;
   overflow: hidden !important;
+  scroll-snap-align: start;
+  padding: 0 !important;
 }
-.pin-card *, .pin-copy, .pin-copy b, .pin-copy span {
+.pin-card .thumb {
+  width: 100% !important;
+  height: 148px !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+.pin-card .pin-copy {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 18px 10px 8px;
+  background: linear-gradient(transparent, rgba(0,0,0,.72));
+  color: #fff;
+}
+.pin-card .pin-copy b {
+  display: block;
   writing-mode: horizontal-tb !important;
-  white-space: nowrap !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
 }
-.pin-card .thumb { width: 44px !important; height: 44px !important; flex: 0 0 44px !important; }
+.pin-card .badge-pin { display: none !important; }
 #feed.has-cover, .feed.feed-3.has-cover {
   display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 10px !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
+  gap: 8px !important;
 }
 #feed.has-cover .feed-card:not(.cover-card) { display: none !important; }
 .feed-card.cover-card { padding: 0; overflow: hidden; }
 .cover-wrap { position: relative; }
 .cover-wrap .thumb, .cover-wrap .thumb.ph {
-  width: 100% !important; height: 176px !important; object-fit: cover;
-  border-radius: 12px 12px 0 0; display: block; background: #1a2030;
+  width: 100% !important;
+  height: 132px !important;
+  object-fit: cover;
+  border-radius: 10px 10px 0 0;
+  display: block;
+  background: #1a2030;
 }
 .fav-btn {
-  position: absolute; top: 8px; left: 8px; width: 30px; height: 30px;
-  border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff;
+  position: absolute; top: 6px; left: 6px; width: 26px; height: 26px;
+  border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 13px;
 }
 .fav-btn.on { color: #ff6b8a; }
 body.role-host .fav-btn { display: none !important; }
 .badge-loc, .badge-tag, .badge-n {
-  position: absolute; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 999px;
+  position: absolute; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 999px;
 }
-.badge-loc { top: 8px; right: 8px; background: rgba(20,40,90,.82); }
-.badge-tag { left: 8px; bottom: 8px; background: #6d4aff; }
-.badge-n { right: 8px; bottom: 8px; background: rgba(0,0,0,.5); }
-.cover-card .body { padding: 8px 10px 10px; }
-.cover-card .body h3 { margin: 0 0 2px; font-size: 14px; }
-.cover-card .price { color: #7ea8ff; font-weight: 600; }
+.badge-loc { top: 6px; right: 6px; background: rgba(20,40,90,.82); }
+.badge-tag { left: 6px; bottom: 6px; background: #6d4aff; }
+.badge-n { right: 6px; bottom: 6px; background: rgba(0,0,0,.5); }
+.cover-card .body { padding: 6px 7px 8px; }
+.cover-card .body h3 { margin: 0 0 2px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cover-card .price { color: #7ea8ff; font-weight: 600; font-size: 12px; }
 .gallery-hero img, .gallery-hero video { width: 100%; max-height: 360px; object-fit: cover; border-radius: 12px; }
 .gallery-thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
 .g-thumb { position: relative; flex: 0 0 56px; height: 56px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #111; }
@@ -66,6 +97,5 @@ body.role-host .fav-btn { display: none !important; }
 .g-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .g-thumb .play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); }
 .nav-item.hidden { display: none !important; }
-#favList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-#pubPreview { display: flex; flex-wrap: wrap; gap: 6px; }
-#pubPreview .up-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
+#favList { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+#citySheet { display: none !important; }
