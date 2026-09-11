@@ -10,7 +10,6 @@
 .pick-now .meta{flex:1;min-width:0;}
 .pick-now .meta strong{display:block;}
 .pick-item{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center;padding:10px;border:1px solid #2a3352;border-radius:14px;margin:8px 0;background:#151b2f;}
-.pick-item .meta{min-width:0;}
 .pick-item .hrs{width:100%;margin:0;grid-column:1 / -1;}
 #btnSide{display:none!important;}`;
     document.head.appendChild(st);
@@ -48,10 +47,7 @@
     const loc = [item.city, item.district].filter(Boolean).join(" · ");
     return `<div class="pick-now">
       ${src ? `<img class="admin-thumb" src="${esc(src)}" alt="" />` : `<div class="admin-thumb ph"></div>`}
-      <div class="meta">
-        <strong>${esc(item.title || "未命名")}</strong>
-        <div class="muted">${esc(loc || item.city || "")}</div>
-      </div>
+      <div class="meta"><strong>${esc(item.title || "未命名")}</strong><div class="muted">${esc(loc || item.city || "")}</div></div>
       ${btnHtml}
     </div>`;
   }
@@ -72,16 +68,14 @@
         return card(item, `<button class="btn danger" data-admin="pin-del" data-id="${p.id}">移除</button>`);
       }).join("") || "<p class='muted'>暂无轮播</p>";
     }
-    document.querySelectorAll(".hrs").forEach((el) => {
-      el.placeholder = "有效小时，空= 长期";
-    });
+    document.querySelectorAll(".hrs").forEach((el) => { el.placeholder = "有效小时，空=长期"; });
   }
   document.getElementById("btnRefresh")?.addEventListener("click", () => setTimeout(() => paintCurrent().catch(() => {}), 700));
   setTimeout(() => paintCurrent().catch(() => {}), 1800);
   if (!document.getElementById("yycj-admin-boot")) {
     const s = document.createElement("script");
     s.id = "yycj-admin-boot";
-    s.src = "./admin-boot.js?v=20260911an";
+    s.src = "./admin-boot.js?v=20260911aq";
     document.head.appendChild(s);
   }
 })();
