@@ -1,7 +1,4 @@
 (() => {
-  const st = document.createElement("style");
-  st.textContent = "#feed:not(.yycj-on),#pins:not(.yycj-on){visibility:hidden!important;}";
-  document.head.appendChild(st);
   function showBoot(msg) {
     const boot = document.querySelector("#boot");
     if (!boot) return;
