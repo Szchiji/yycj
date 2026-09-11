@@ -10,6 +10,7 @@
     tg?.setHeaderColor?.(BG);
     tg?.expand?.();
   } catch (e) {}
+  const isAdmin = !!(body && body.classList.contains("admin-body")) || !!document.getElementById("console");
   function viewportH() {
     if (window.visualViewport && window.visualViewport.height) return window.visualViewport.height;
     return window.innerHeight || 0;
@@ -17,6 +18,22 @@
   function apply() {
     const h = Math.max(240, Math.round(viewportH()));
     root.style.setProperty("--app-h", h + "px");
+    if (isAdmin) {
+      if (body) {
+        body.style.height = "auto";
+        body.style.minHeight = h + "px";
+        body.style.overflow = "auto";
+        body.style.webkitOverflowScrolling = "touch";
+      }
+      const main = document.querySelector(".admin-main") || document.getElementById("console");
+      if (main) {
+        main.style.overflow = "auto";
+        main.style.webkitOverflowScrolling = "touch";
+        main.style.maxHeight = "none";
+        main.style.height = "auto";
+      }
+      return;
+    }
     ["app", "boot", "gate"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) {
