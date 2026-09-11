@@ -64,6 +64,11 @@
           set("pubDistrict", item.district);
           set("pubApprox", item.approx_label);
           set("pubTags", (item.tags || []).join(" "));
+          const extras = item.extras || {};
+          document.querySelectorAll("[data-extra]").forEach((inp) => {
+            const k = inp.getAttribute("data-extra");
+            if (k && extras[k] != null) inp.value = extras[k];
+          });
           const t = document.getElementById("publishTitle");
           if (t) t.textContent = "改资料（需再审）";
         });
