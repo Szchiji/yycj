@@ -11,17 +11,60 @@
     <label>城市</label><input id="proxyCity" placeholder="深圳" />
     <label>价位</label><input id="proxyPrice" />
     <label>简介</label><textarea id="proxyDesc" rows="3"></textarea>
-    <label>图片 URL 或 file_id（一行一个）</label><textarea id="proxyMedia" rows="3"></textarea>
+    <label>相册</label>
+    <input id="proxyFiles" type="file" accept="image/*,video/*" multiple />
+    <div id="proxyPreview" class="media-preview"></div>
     <button class="btn primary" type="button" id="btnProxy">直接上架</button>`;
   pane.prepend(box);
+  const uploaded = [];
+  function token() { return localStorage.getItem("yycj_token") || ""; }
+  function preview() {
+    const el = document.getElementById("proxyPreview");
+    if (!el) return;
+    el.innerHTML = uploaded.map((m) => {
+      const src = m.local || m.preview_url || (m.file_id ? "/api/media/file/" + encodeURIComponent(m.file_id) : "");
+      return m.type === "video"
+        ? `<video class="up-thumb" src="${src}" muted playsinline></video>`
+        : `<img class="up-thumb" src="${src}" alt="" />`;
+    }).join("");
+  }
+  document.getElementById("proxyFiles")?.addEventListener("change", async (ev) => {
+    const files = [...(ev.target.files || [])];
+    ev.target.value = "";
+    for (const file of files) {
+      const local = URL.createObjectURL(file);
+      const fd = new FormData();
+      fd.append("files", file);
+      try {
+        const r = await fetch("/api/media/upload", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token() },
+          body: fd,
+        });
+        const data = await r.json();
+        const item = (data.items && data.items[0]) || data.media || data;
+        uploaded.push({
+          type: file.type.startsWith("video") ? "video" : "image",
+          file_id: item.file_id || item.fileId || "",
+          preview_url: item.preview_url || "",
+          url: item.url || item.file_id || "",
+          local,
+        });
+        preview();
+      } catch (e) { alert(e.message || "上传失败"); }
+    }
+  });
   document.getElementById("btnProxy")?.addEventListener("click", async () => {
-    const token = localStorage.getItem("yycj_token") || "";
-    const lines = (document.getElementById("proxyMedia").value || "").split("\n").map((s) => s.trim()).filter(Boolean);
-    const media = lines.map((u) => ({ type: "image", url: u }));
+    const media = uploaded.map((m) => ({
+      type: m.type,
+      file_id: m.file_id,
+      url: m.url || m.file_id,
+      preview_url: m.preview_url,
+    }));
     try {
       const r = await fetch("/api/admin/listings/proxy", {
         method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        headers: { Authorization: "Bearer " + token(), "Content-Type": "application/json" },
         body: JSON.stringify({
           target_user_id: parseInt(document.getElementById("proxyUid").value, 10),
           title: document.getElementById("proxyTitle").value,
@@ -35,6 +78,8 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "失败");
       alert("已代上架：" + ((data.lamp || {}).title || ""));
+      uploaded.length = 0;
+      preview();
       document.getElementById("btnRefresh")?.click();
     } catch (e) { alert(e.message || String(e)); }
   });

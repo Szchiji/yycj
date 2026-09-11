@@ -1,51 +1,16 @@
-.admin-body { min-height: 100vh; }
-.admin-shell {
-  display: grid;
-  grid-template-columns: 132px 1fr;
-  gap: 0;
-  max-width: 1100px;
-  margin: 0 auto;
-  min-height: calc(100vh - 58px);
+.admin-body { background:#0b1020; color:#e8eefc; }
+.admin-shell { display:flex; min-height:100vh; }
+.admin-side { width:120px; padding:12px 8px; border-right:1px solid #243049; }
+.admin-side button { display:block; width:100%; margin:0 0 6px; text-align:left; }
+.admin-side button.active { background:#2a3348; }
+.admin-main { flex:1; padding:12px; }
+.admin-pane { display:none; }
+.admin-pane.active { display:block; }
+.admin-thumb {
+  width:56px; height:56px; object-fit:cover; border-radius:8px; background:#1a2030; flex:0 0 56px;
 }
-.admin-side {
-  border-right: 1px solid var(--line);
-  background: rgba(11,16,32,.96);
-  padding: 10px 8px 24px;
-  position: sticky;
-  top: 58px;
-  height: calc(100vh - 58px);
-  overflow: auto;
-}
-.admin-side button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  color: var(--muted);
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin: 2px 0;
-  cursor: pointer;
-  font-size: .88rem;
-}
-.admin-side button.active {
-  background: #1c2748;
-  color: var(--text);
-  font-weight: 600;
-}
-.admin-main { padding: 8px 12px 32px; min-width: 0; }
-.admin-pane { display: none; }
-.admin-pane.active { display: block; }
-.pick-list { max-height: 420px; overflow: auto; }
-.pick-item {
-  display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 8px 0;
-  background: var(--card);
-}
-.pick-item .meta { min-width: 0; }
-@media (max-width: 720px) {
-  .admin-shell { grid-template-columns: 92px 1fr; }
-  .admin-side { padding: 8px 4px; }
-  .admin-side button { font-size: .78rem; padding: 9px 8px; }
+.admin-thumb.ph { background:#1a2030; }
+#proxyPreview, .media-preview { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+#proxyPreview .up-thumb, .media-preview .up-thumb {
+  width:56px; height:56px; object-fit:cover; border-radius:8px;
 }
