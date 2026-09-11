@@ -44,12 +44,14 @@ def fill_template(tpl: str, lamp: Dict[str, Any], extras: Optional[Dict[str, Any
     mapping = {
         "称呼": lamp.get("title") or "",
         "title": lamp.get("title") or "",
+        "花名": lamp.get("title") or "",
         "城市": city,
         "简介": (lamp.get("description") or "").strip(),
         "desc": (lamp.get("description") or "").strip(),
         "价位": lamp.get("price_text") or "面议",
         "price": lamp.get("price_text") or "面议",
         "区域": district,
+        "地区": loc or district or city,
         "大致位置": lamp.get("approx_label") or "",
         "标签": tags,
         "tags": tags,
@@ -61,6 +63,10 @@ def fill_template(tpl: str, lamp: Dict[str, Any], extras: Optional[Dict[str, Any
     for key, val in extras.items():
         if key:
             mapping[str(key)] = "" if val is None else str(val)
+    if mapping.get("联系") and not mapping.get("微信"):
+        mapping["微信"] = mapping["联系"]
+    if mapping.get("微信") and not mapping.get("联系"):
+        mapping["联系"] = mapping["微信"]
     text = tpl or DEFAULT_TPL
     for key, val in mapping.items():
         text = text.replace("{" + key + "}", str(val))
