@@ -6,8 +6,7 @@
   }
   function mediaSrc(item) {
     const lamp = (item && item.lamp) || item || {};
-    const list = lamp.media || [];
-    for (const m of list) {
+    for (const m of lamp.media || []) {
       if ((m && m.type) === "video") continue;
       const raw = String((m && (m.preview_url || m.file_id || m.url)) || "").trim();
       if (!raw) continue;
@@ -58,7 +57,6 @@
         return card(item, `<button class="btn danger" data-admin="pin-del" data-id="${p.id}">移除</button>`);
       }).join("") || "<p class='muted'>暂无轮播</p>";
     }
-    return home;
   }
   async function search(q, boxId, kind) {
     const box = $(boxId);
@@ -67,8 +65,7 @@
     const items = (data.items || []).filter((x) => {
       if ((x.status || "active") !== "active") return false;
       if (!q) return true;
-      const blob = `${x.title || ""} ${x.city || ""} ${x.lamp_id || ""}`.toLowerCase();
-      return blob.includes(q.toLowerCase());
+      return `${x.title || ""} ${x.city || ""} ${x.lamp_id || ""}`.toLowerCase().includes(q.toLowerCase());
     }).slice(0, 20);
     box.innerHTML = items.map((x) => card(x,
       kind === "pin"
@@ -77,10 +74,10 @@
     )).join("") || "<p class='muted'>无匹配</p>";
   }
   document.getElementById("btnFeedPinSearch")?.addEventListener("click", () => {
-    search(("#feedPinQ" && $("#feedPinQ").value) || "", "#feedPinResults", "feed").catch((e) => alert(e.message));
+    search((document.getElementById("feedPinQ") || {}).value || "", "#feedPinResults", "feed").catch((e) => alert(e.message));
   });
   document.getElementById("btnPinSearch")?.addEventListener("click", () => {
-    search((("#pinQ" && $("#pinQ").value) || ""), "#pinResults", "pin").catch((e) => alert(e.message));
+    search((document.getElementById("pinQ") || {}).value || "", "#pinResults", "pin").catch((e) => alert(e.message));
   });
   document.addEventListener("click", async (ev) => {
     const feed = ev.target.closest("[data-pick-feed]");
@@ -94,7 +91,7 @@
         await paintCurrent();
       }
       if (pin) {
-        const hoursRaw = ($("#pinHours") && $("#pinHours").value) || "";
+        const hoursRaw = (document.getElementById("pinHours") || {}).value || "";
         await api("/api/admin/homepage/pins", {
           method: "POST",
           body: JSON.stringify({
