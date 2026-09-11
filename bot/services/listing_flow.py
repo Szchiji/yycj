@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus, Post, PostStatus, UserRole
-from bot.services import credit_service, home_service, listing_ops, search_service
-from bot.services.media_urls import enrich_media, is_http
+from bot.services import credit_service, listing_ops, search_service
+from bot.services.media_urls import enrich_media
 
 logger = logging.getLogger(__name__)
 
@@ -156,50 +156,6 @@ async def remind_expiring(days: int = 3) -> int:
     return n
 
 
-async def broadcast_listing(lamp: Dict[str, Any]) -> bool:
-    site = await home_service.get_or_create_settings()
-    chat = (site.get("broadcast_channel") or "").strip()
-    if not chat:
-        return False
-    from bot.main import bot
-    from bot.services import bot_info
-
-    ident = await bot_info.get_bot_identity()
-    link = bot_info.bot_tme_url(ident.get("username") or "")
-    title = lamp.get("title") or ""
-    city = lamp.get("city") or ""
-    district = lamp.get("district") or ""
-    loc = " · ".join([x for x in (city, district) if x])
-    price = lamp.get("price_text") or "面议"
-    tags = " ".join("#" + t for t in (lamp.get("tags") or [])[:4] if t)
-    desc = (lamp.get("description") or "").strip().replace("\n", " ")[:80]
-    caption = (
-        "🌙 <b>月影车姬 · 新上架</b>\n"
-        "────────────\n"
-        f"<b>{title}</b>\n"
-        f"📍 {loc or '城市面议'}\n"
-        f"💰 {price}\n"
-    )
-    if tags:
-        caption += f"🏷 {tags}\n"
-    if desc:
-        caption += f"\n{desc}\n"
-    caption += "────────────"
-    if link:
-        caption += f"\n打开小程序查看相册\n{link}"
-    media = enrich_media(lamp.get("media"), lamp.get("photos"))
-    file_id = None
-    for m in media:
-        raw = (m.get("file_id") or m.get("url") or "").strip()
-        if raw and not is_http(raw) and (m.get("type") or "image") == "image":
-            file_id = raw
-            break
-    try:
-        if file_id:
-            await bot.send_photo(chat, file_id, caption=caption, parse_mode="HTML")
-        else:
-            await bot.send_message(chat, caption, parse_mode="HTML", disable_web_page_preview=False)
-        return True
-    except Exception:
-        logger.exception("broadcast to %s failed", chat)
-        return False
+async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None):
+    from bot.services.broadcast import broadcast_listing as _send
+    return await _send(lamp, extras)
