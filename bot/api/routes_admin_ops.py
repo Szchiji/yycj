@@ -32,6 +32,8 @@ class ExtraOpsBody(BaseModel):
     approve_promo_text: Optional[str] = None
     broadcast_channel: Optional[str] = None
     media_channel_id: Optional[str] = None
+    broadcast_template: Optional[str] = None
+    listing_fields: Optional[List[Dict[str, Any]]] = None
 
 
 class ShadowBody(BaseModel):
