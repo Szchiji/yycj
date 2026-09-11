@@ -102,15 +102,11 @@
     }
     const card = ev.target.closest("#favList [data-id]");
     if (card) {
+      ev.preventDefault();
       ev.stopPropagation();
       const id = card.getAttribute("data-id");
-      showView("view-detail");
-      const back = document.getElementById("btnBackHome");
-      if (back) back.onclick = () => showView("view-fav");
-      setTimeout(() => {
-        document.querySelector("#feed [data-id='" + id + "']")?.click();
-        showView("view-detail");
-      }, 20);
+      if (window.openLamp) window.openLamp(id);
+      else showView("view-detail");
     }
   }, true);
   setTimeout(load, 1400);
