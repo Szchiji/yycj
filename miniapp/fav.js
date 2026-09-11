@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjFav) return;
+  window.__yycjFav = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   let ids = new Set();
   let items = [];
@@ -9,13 +11,28 @@
   function mediaSrc(u) {
     const s = String(u || "").trim();
     if (!s) return "";
+    if (s.toLowerCase().startsWith("file_id:")) return mediaSrc(s.slice(8));
     if (s.startsWith("http") || s.startsWith("/")) return s;
     return "/api/media/file/" + encodeURIComponent(s);
   }
+  function isVideo(u) {
+    const s = String(u || "");
+    return s.startsWith("BAAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
+  }
   function cover(item) {
     for (const m of item.media || []) {
-      if ((m && m.type) === "video") continue;
+      const raw = (m && (m.file_id || m.url)) || "";
+      if ((m && m.type) === "video" || isVideo(raw)) {
+        const thumb = mediaSrc((m && (m.thumb_file_id || m.preview_url)) || "");
+        if (thumb && !isVideo(m.thumb_file_id || m.preview_url || "")) return thumb;
+        continue;
+      }
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
+      if (u) return u;
+    }
+    for (const p of item.photos || []) {
+      if (isVideo(p)) continue;
+      const u = mediaSrc(p);
       if (u) return u;
     }
     return "";
@@ -28,10 +45,10 @@
     const img = cover(x);
     const loc = [x.city, x.district].filter(Boolean).join("·");
     const tag = (x.tags && x.tags[0]) || "";
-    const n = (x.media && x.media.length) || 0;
+    const n = (x.media && x.media.length) || (x.photos && x.photos.length) || 0;
     return `<div class="feed-card compact cover-card" data-id="${x.lamp_id}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" data-src="${img}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
+        ${img ? `<img class="thumb" src="${img}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
         ${loc ? `<span class="badge-loc">${loc}</span>` : ""}
         ${tag ? `<span class="badge-tag">${tag}</span>` : ""}
         ${n ? `<span class="badge-n">${n}图</span>` : ""}
@@ -110,7 +127,7 @@
       ev.preventDefault();
       ev.stopPropagation();
       window.__yycjBack = "fav";
-      if (window.openLamp) window.openLamp(card.getAttribute("data-id"));
+      card.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     }
   }, true);
   document.getElementById("btnBackHome")?.addEventListener("click", (ev) => {
@@ -123,5 +140,5 @@
       window.__yycjBack = "home";
     }
   }, true);
-  setTimeout(load, 1400);
+  setTimeout(load, 1200);
 })();
