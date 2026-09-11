@@ -15,8 +15,11 @@
     const box = $("#pubPreview");
     if (!box) return;
     if (!uploaded.length) { box.innerHTML = ""; return; }
-    box.innerHTML = `<div class="muted">已上传 ${uploaded.length} 个媒体</div>` +
-      uploaded.map((m, i) => `<span class="up-chip">${m.type === "video" ? "视频" : "图"}${i + 1}</span>`).join(" ");
+    box.innerHTML = uploaded.map((m) => {
+      const src = m.preview_url || (m.file_id ? "/api/media/file/" + encodeURIComponent(m.file_id) : "");
+      if (m.type === "video") return `<video class="up-thumb" src="${src}" muted></video>`;
+      return `<img class="up-thumb" src="${src}" alt="" />`;
+    }).join("");
   }
 
   $("#pubFiles")?.addEventListener("change", async (ev) => {
@@ -25,10 +28,7 @@
     const fd = new FormData();
     files.slice(0, 9).forEach((f) => fd.append("files", f));
     const start = Date.now();
-    const tick = () => {
-      const sec = Math.floor((Date.now() - start) / 1000);
-      toast(`正在上传 ${files.length} 个文件… ${sec} 秒`);
-    };
+    const tick = () => toast(`正在上传 ${files.length} 个文件… ${Math.floor((Date.now() - start) / 1000)} 秒`);
     tick();
     timer = setInterval(tick, 1000);
     try {
@@ -86,13 +86,11 @@
       if (!r.ok) throw new Error(data.detail || "提交失败");
       uploaded = [];
       if ($("#editLampId")) $("#editLampId").value = "";
-      if ($("#publishTitle")) $("#publishTitle").textContent = "上架";
       form.reset();
       previewBox();
       const done = document.createElement("div");
       done.className = "card";
-      done.innerHTML = `<h3>${editId ? "改稿已交审" : "已提交审核"}</h3>
-        <p class="muted">管理员通过后会出现在首页。</p>
+      done.innerHTML = `<h3>已提交审核</h3><p class="muted">管理员通过后会出现在首页。</p>
         <button class="btn primary block" type="button" id="pubAgain">返回上架</button>`;
       form.classList.add("hidden");
       form.parentNode.insertBefore(done, form.nextSibling);

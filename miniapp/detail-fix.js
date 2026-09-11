@@ -7,57 +7,55 @@
     if (s.startsWith("file_id:")) return srcOf(s.slice(8).trim());
     return "/api/media/file/" + encodeURIComponent(s);
   }
-  function stripFileIdText(el) {
-    if (!el) return;
-    el.querySelectorAll("p, div, li, span").forEach((n) => {
-      const t = n.textContent || "";
-      if (/file_id\s*:/i.test(t) || /AgACAg/.test(t)) n.remove();
+  function stripIds(el) {
+    el.querySelectorAll("p, li, span, pre, code").forEach((n) => {
+      const t = (n.textContent || "").trim();
+      if (/^file_id\s*:/i.test(t) || /^AgACAg/.test(t)) n.remove();
     });
   }
   async function paint(id) {
     const box = document.getElementById("detail");
-    if (!box || !id) return;
+    if (!box || !id || box.dataset.painted === id) return;
     try {
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), {
         headers: { Authorization: "Bearer " + token() },
       });
       const data = await r.json();
       const lamp = data.lamp || data.item || data;
-      const media = lamp.media || [];
-      const photos = lamp.photos || [];
       const urls = [];
-      media.forEach((m) => {
+      (lamp.media || []).forEach((m) => {
         const u = srcOf((m && (m.preview_url || m.file_id || m.url)) || "");
         if (u) urls.push({ type: (m && m.type) || "image", src: u });
       });
-      if (!urls.length) photos.forEach((p) => { const u = srcOf(p); if (u) urls.push({ type: "image", src: u }); });
-      stripFileIdText(box);
+      if (!urls.length) (lamp.photos || []).forEach((p) => {
+        const u = srcOf(p);
+        if (u) urls.push({ type: "image", src: u });
+      });
+      stripIds(box);
       let grid = box.querySelector(".media-grid");
       if (!grid) {
         grid = document.createElement("div");
         grid.className = "media-grid";
-        box.insertBefore(grid, box.firstChild);
+        const card = box.querySelector(".card") || box;
+        card.insertBefore(grid, card.firstChild);
       }
       grid.innerHTML = urls.map((m) =>
         m.type === "video"
           ? `<video src="${m.src}" controls playsinline></video>`
           : `<img src="${m.src}" alt="" />`
       ).join("");
+      box.dataset.painted = id;
     } catch (e) {
       console.warn(e);
     }
   }
   document.addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-id]");
-    if (card) {
-      window.__lastLampId = card.getAttribute("data-id");
-      setTimeout(() => paint(window.__lastLampId), 300);
-    }
+    if (!card) return;
+    const id = card.getAttribute("data-id");
+    window.__lastLampId = id;
+    const box = document.getElementById("detail");
+    if (box) box.dataset.painted = "";
+    setTimeout(() => paint(id), 350);
   });
-  const detail = document.getElementById("detail");
-  if (detail) {
-    new MutationObserver(() => {
-      if (window.__lastLampId) paint(window.__lastLampId);
-    }).observe(detail, { childList: true, subtree: true });
-  }
 })();
