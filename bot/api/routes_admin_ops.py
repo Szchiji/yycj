@@ -28,6 +28,7 @@ class ExtraOpsBody(BaseModel):
     admin_contact: Optional[str] = None
     required_chats: Optional[List[Dict[str, Any]]] = None
     chat_cta_label: Optional[str] = None
+    show_chat_cta: Optional[bool] = None
     home_feed_page_size: Optional[int] = None
     approve_promo_text: Optional[str] = None
     broadcast_channel: Optional[str] = None
