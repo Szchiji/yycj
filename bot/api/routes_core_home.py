@@ -80,6 +80,7 @@ async def api_home(
         "has_more": len(items) >= limit,
         "scoring_rules": home_service.SCORING_RULES,
         "chat_cta_label": settings.get("chat_cta_label") or "想聊聊",
+        "show_chat_cta": settings.get("show_chat_cta") is not False,
         "media_max_count": int(settings.get("media_max_count") or 6),
         "page_size": int(settings.get("home_feed_page_size") or 3),
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
