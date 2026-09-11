@@ -7,11 +7,16 @@
   function label() {
     return String(settings().chat_cta_label || "想聊聊").slice(0, 32);
   }
+  function shown() {
+    const v = settings().show_chat_cta;
+    return !(v === false || v === 0 || v === "0" || v === "false");
+  }
   function apply() {
     const text = label();
-    const on = settings().show_chat_cta !== false;
+    const on = shown();
     document.querySelectorAll("#detailChat, [data-cta='chat']").forEach((btn) => {
-      if (btn.textContent !== text) btn.textContent = text;
+      if (on && btn.textContent !== text) btn.textContent = text;
+      btn.hidden = !on;
       btn.style.display = on ? "" : "none";
     });
   }
@@ -29,9 +34,7 @@
   setTimeout(load, 800);
   setTimeout(load, 2000);
   const detail = document.getElementById("detail");
-  if (detail) {
-    new MutationObserver(apply).observe(detail, { childList: true });
-  }
+  if (detail) new MutationObserver(apply).observe(detail, { childList: true });
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-id]")) setTimeout(apply, 200);
   });

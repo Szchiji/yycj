@@ -5,13 +5,25 @@
   if (!document.getElementById("yycj-extras-css")) {
     const st = document.createElement("style");
     st.id = "yycj-extras-css";
-    st.textContent = `#yycjExtras{margin:8px 0 2px;padding:0;background:none;border:none;box-shadow:none;}
-#yycjExtras .ex-line{display:flex;gap:8px;align-items:baseline;margin:4px 0;font-size:.92rem;line-height:1.45;color:inherit;}
+    st.textContent = `#yycjExtras{margin:6px 0 2px;padding:0;background:none;border:none;box-shadow:none;}
+#yycjExtras .ex-line{display:flex;gap:8px;align-items:baseline;margin:4px 0;font-size:.92rem;line-height:1.45;}
 #yycjExtras .ex-k{opacity:.72;min-width:3em;flex:0 0 auto;}
-#yycjExtras .ex-v{word-break:break-all;}`;
+#yycjExtras .ex-v{word-break:break-all;}
+#pins{padding-bottom:0!important;margin-bottom:4px!important;}
+#feed{margin-top:4px!important;}`;
     document.head.appendChild(st);
   }
-  function paint(extras) {
+  function paintApprox(lamp) {
+    const label = String((lamp && lamp.approx_label) || "").trim();
+    const card = document.querySelector("#detail .card") || document.getElementById("detail");
+    if (!card || !label) return;
+    const loc = [...card.querySelectorAll(".muted")].find((x) => (x.textContent || "").includes("📍"));
+    if (loc && !loc.dataset.approx) {
+      loc.textContent = loc.textContent.replace(/\s+$/, "") + " · " + label;
+      loc.dataset.approx = "1";
+    }
+  }
+  function paintExtras(extras) {
     const detail = document.getElementById("detail");
     if (!detail) return;
     const data = extras && typeof extras === "object" ? extras : {};
@@ -41,7 +53,8 @@
       if (!r.ok) return;
       const data = await r.json();
       const lamp = data.lamp || data;
-      paint(lamp.extras || data.extras || {});
+      paintApprox(lamp);
+      paintExtras(lamp.extras || data.extras || {});
     } catch (e) {}
   }
   document.addEventListener("click", (ev) => {
