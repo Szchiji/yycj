@@ -78,8 +78,7 @@
     }
     const pins = $("#pins");
     if (pins && lastPins.length) {
-      const html = lastPins.map(pinHtml).join("");
-      pins.innerHTML = `<div class="pin-track">${html}${html}</div>`;
+      pins.innerHTML = lastPins.map(pinHtml).join("");
       pins.classList.remove("hidden");
     }
   }
