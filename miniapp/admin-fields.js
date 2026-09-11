@@ -30,17 +30,10 @@
     if (!el) return;
     if (!fields.length) fields = DEFAULT_FIELDS.map((x) => ({ ...x }));
     window.__listingFields = fields;
-    const chips = fields.map((x) =>
-      `<span class="ph-chip">${x.form ? "上架栏" : "仅模板"} {${x.key}} <button type="button" data-ph="${x.key}">插入</button> <button type="button" data-del-field="${x.key}">删除</button></span>`
+    const rows = fields.map((x) =>
+      `<div class="ph-row"><span class="ph-name">{${x.key}}</span><span class="muted">${x.form ? "上架页显示" : "只用于推送"}</span><button class="btn" type="button" data-ph="${x.key}">插入</button><button class="btn" type="button" data-del-field="${x.key}">删除</button></div>`
     ).join("");
-    el.innerHTML = `
-      <p class="muted" style="margin:8px 0 4px">删除后上架页不再出现该栏。点插入写入推送模板。</p>
-      <div class="ph-list">${chips}</div>
-      <div class="row" style="margin-top:8px">
-        <input id="newFieldLabel" placeholder="新增栏，如 微信 / 服务时间" style="flex:1;margin:0" />
-        <button class="btn" type="button" id="btnAddField">添加栏</button>
-      </div>
-      <button class="btn" type="button" id="btnResetFields" style="margin-top:8px">恢复默认占位符</button>`;
+    el.innerHTML = `<p class="muted" style="margin:8px 0 6px">插入写入上面的推送模板。删除后上架页不再出现该栏。</p><div class="ph-list">${rows}</div><div class="row" style="margin-top:8px"><input id="newFieldLabel" placeholder="新增栏，如 微信 / 服务时间" style="flex:1;margin:0" /><button class="btn" type="button" id="btnAddField">添加栏</button></div><button class="btn" type="button" id="btnResetFields" style="margin-top:8px">恢复默认占位符</button> <button class="btn" type="button" id="btnZhTpl" style="margin-top:8px">换成中文模板</button>`;
   }
   function insertPh(key) {
     const ta = document.getElementById("opsBroadcastTpl");
@@ -63,6 +56,13 @@
     if (ev.target.id === "btnResetFields") {
       fields = DEFAULT_FIELDS.map((x) => ({ ...x }));
       paint();
+    }
+    if (ev.target.id === "btnZhTpl") {
+      const ta = document.getElementById("opsBroadcastTpl");
+      if (ta) {
+        ta.value = "🌙 月影车姬 · 新上架\n{称呼}\n📍 {地点}\n💰 {价位}\n{标签}\n{简介}\n{链接}";
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     }
     if (ev.target.id === "btnAddField") {
       const label = (document.getElementById("newFieldLabel")?.value || "").trim().slice(0, 16);
