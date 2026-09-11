@@ -61,7 +61,8 @@
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
         ${n ? `<span class="badge-n">${n}图</span>` : ""}
       </div>
-      <div class="body"><h3>${pin}${esc(t.title || "")}</h3><div class="muted price">${esc(t.price_text || "面议")}</div></div>
+      <div class="body"><h3>${pin}${esc(t.title || "")}</h3><div class="muted price">${esc(t.price_text || "面议")}</div>
+      <button class="share-btn" type="button" data-share="${esc(t.lamp_id)}">分享</button></div>
     </div>`;
   }
   function pinHtml(p) {
@@ -103,6 +104,7 @@
     finally { painting = false; }
   }
   document.addEventListener("click", (ev) => {
+    if (ev.target.closest("[data-share]")) return;
     if (ev.target.closest("#feed [data-id], #pins [data-id]")) window.__yycjBack = "home";
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
@@ -135,12 +137,14 @@
     if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
     else pins.scrollBy({ left: step, behavior: "smooth" });
   }, 4000);
-  if (!document.getElementById("yycj-lazy")) {
+  ["lazy.js", "detail-autoplay.js", "share.js", "boot-extra.js"].forEach((name) => {
+    const id = "yycj-" + name.replace(".js", "");
+    if (document.getElementById(id)) return;
     const s = document.createElement("script");
-    s.id = "yycj-lazy";
-    s.src = "./lazy.js?v=20260911z";
+    s.id = id;
+    s.src = "./" + name + "?v=20260911aa";
     document.head.appendChild(s);
-  }
+  });
   async function boot() {
     for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
