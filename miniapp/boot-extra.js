@@ -1,17 +1,15 @@
 (() => {
   if (window.__yycjBootExtra) return;
   window.__yycjBootExtra = true;
-  const st = document.getElementById("yycj-home-hide") || document.createElement("style");
-  st.id = "yycj-home-hide";
-  st.textContent = "#topMeta,.top-meta{display:none!important;}";
+  const st = document.createElement("style");
+  st.textContent = "#topMeta,.top-meta{display:none!important;}#yycjGallery .gallery-hero video{width:100%;background:#111;}";
   document.head.appendChild(st);
-  document.getElementById("topMeta")?.classList.add("hidden");
-  ["scroll-perf.js", "carousel-sync.js", "keyboard-fix.js", "deep-open.js", "share.js", "boot-rescue.js", "pin-fix.js", "share-fix.js", "home-head.js", "search-ui.js", "detail-polish.js", "sheet-fix.js", "me-polish.js"].forEach((name) => {
+  ["carousel-sync.js", "keyboard-fix.js", "deep-open.js", "share.js", "home-head.js", "search-ui.js", "detail-polish.js", "sheet-fix.js", "me-polish.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911be";
+    s.src = "./" + name + "?v=20260911bf";
     document.head.appendChild(s);
   });
 })();
