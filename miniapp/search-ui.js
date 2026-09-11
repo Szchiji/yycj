@@ -37,7 +37,7 @@
     const q = (input && input.value.trim()) || "";
     const city = localStorage.getItem("yycj_city") || "";
     const hint = document.getElementById("searchHint");
-    if (hint) hint.textContent = q ? (“搜索「" + q + "」 · 仅限" + (city || "当前城市")) : "";
+    if (hint) hint.textContent = q ? ("搜索「" + q + "」 · 仅限" + (city || "当前城市")) : "";
     document.getElementById("btnSearch")?.click();
   }
   input?.addEventListener("input", () => {
