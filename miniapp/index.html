@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260911h" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260911h" />
+  <link rel="stylesheet" href="./styles.css?v=20260911i" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260911i" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -38,6 +38,9 @@
         </div>
         <div id="feed" class="feed feed-3"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
+      </section>
+      <section id="view-fav" class="view hidden">
+        <div class="card"><h3>我的收藏</h3><div id="favList"></div></div>
       </section>
       <section id="view-publish" class="view hidden">
         <form id="publishForm" class="card form">
@@ -81,7 +84,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260911h">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260911i">管理后台</a>
           </div>
         </div>
       </section>
@@ -101,20 +104,21 @@
     </main>
     <nav class="bottom-nav nav-3">
       <button data-nav="home" class="nav-item active" type="button"><span>首页</span></button>
+      <button data-nav="fav" class="nav-item hidden" type="button"><span>收藏</span></button>
       <button data-nav="publish" class="nav-item" type="button"><span>上架</span></button>
       <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
     </nav>
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
-  <script src="./boot-inline.js?v=20260911h"></script>
-  <script src="./app.js?v=20260911h"></script>
-  <script src="./home-ui.js?v=20260911h"></script>
-  <script src="./publish-ui.js?v=20260911h"></script>
-  <script src="./home-media.js?v=20260911h"></script>
-  <script src="./me-listings.js?v=20260911h"></script>
-  <script src="./detail-fix.js?v=20260911h"></script>
-  <script src="./role-nav.js?v=20260911h"></script>
-  <script src="./fav.js?v=20260911h"></script>
+  <script src="./boot-inline.js?v=20260911i"></script>
+  <script src="./app.js?v=20260911i"></script>
+  <script src="./home-ui.js?v=20260911i"></script>
+  <script src="./publish-ui.js?v=20260911i"></script>
+  <script src="./home-media.js?v=20260911i"></script>
+  <script src="./me-listings.js?v=20260911i"></script>
+  <script src="./detail-fix.js?v=20260911i"></script>
+  <script src="./role-nav.js?v=20260911i"></script>
+  <script src="./fav.js?v=20260911i"></script>
 </body>
 </html>
