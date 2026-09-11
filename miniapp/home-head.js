@@ -1,5 +1,6 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
+  document.getElementById("topMeta")?.classList.add("hidden");
   function openUrl(url) {
     if (!url) return false;
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -17,6 +18,7 @@
   }
   function paintMe(home) {
     document.getElementById("meGuide")?.remove();
+    document.getElementById("topMeta")?.classList.add("hidden");
     const user = (home && home.user) || JSON.parse(localStorage.getItem("yycj_user") || "{}");
     const roleMap = { guest: "客人", teacher: "老师", merchant: "商家" };
     let box = document.getElementById("meCredit");
@@ -34,9 +36,9 @@
     }
   }
   async function bind() {
+    document.getElementById("topMeta")?.classList.add("hidden");
     const brand = document.getElementById("brandTitle");
     const admin = document.getElementById("topAdmin");
-    document.getElementById("topMeta")?.classList.add("hidden");
     let contacts = {}, home = {};
     try {
       const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token() } });
@@ -66,5 +68,5 @@
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-nav='me']")) setTimeout(bind, 200);
   });
-  setTimeout(bind, 600);
+  setTimeout(bind, 400);
 })();
