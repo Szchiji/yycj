@@ -64,10 +64,10 @@
     wrap.innerHTML = `
       <div class="gallery-hero">${cur.type === "video"
         ? `<video src="${cur.src}" controls playsinline webkit-playsinline></video>`
-        : `<img src="${cur.src}" alt="" />`}</div>
+        : `<img src="${cur.src}" alt="" decoding="async" />`}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `
         <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
-          ${m.type === "video" ? `<span class="play">▶</span>` : `<img src="${m.src}" alt="" />`}
+          ${m.type === "video" ? `<span class="play">▶</span>` : `<img data-src="${m.src}" alt="" loading="lazy" decoding="async" />`}
         </button>`).join("")}</div>`;
     wrap.dataset.idx = String(idx);
     wrap.dataset.ready = "1";
