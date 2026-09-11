@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Tuple
 
 import httpx
 from aiogram.types import BufferedInputFile
@@ -18,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 MAX_FILES = 9
 MAX_BYTES = 20 * 1024 * 1024
+_PATH_CACHE: Dict[str, Tuple[str, float]] = {}
+_PATH_TTL = 50 * 60
 
 
 def _guess_type(filename: str, content_type: str | None) -> str:
@@ -84,12 +87,7 @@ async def api_media_upload(
             raise HTTPException(status_code=502, detail=f"上传失败：{exc}") from exc
         if not file_id:
             continue
-        item = {
-            "type": kind,
-            "file_id": file_id,
-            "url": file_id,
-            "preview_url": f"/api/media/file/{file_id}",
-        }
+        item = {"type": kind, "file_id": file_id, "url": file_id, "preview_url": f"/api/media/file/{file_id}"}
         if kind == "video" and thumb_id:
             item["thumb_file_id"] = thumb_id
             item["preview_url"] = f"/api/media/file/{thumb_id}"
@@ -104,15 +102,20 @@ async def api_media_file(file_id: str, request: Request):
     settings = get_settings()
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
-    from bot.main import bot
-    try:
-        tg_file = await bot.get_file(file_id)
-    except Exception as exc:
-        logger.warning("get_file failed: %s", exc)
-        raise HTTPException(status_code=404, detail="文件不存在或已失效") from exc
-    path = tg_file.file_path
+    now = time.time()
+    cached = _PATH_CACHE.get(file_id)
+    path = cached[0] if cached and cached[1] > now else ""
     if not path:
-        raise HTTPException(status_code=404, detail="无 file_path")
+        from bot.main import bot
+        try:
+            tg_file = await bot.get_file(file_id)
+        except Exception as exc:
+            logger.warning("get_file failed: %s", exc)
+            raise HTTPException(status_code=404, detail="文件不存在或已失效") from exc
+        path = tg_file.file_path or ""
+        if not path:
+            raise HTTPException(status_code=404, detail="无 file_path")
+        _PATH_CACHE[file_id] = (path, now + _PATH_TTL)
     url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
     mime = _mime_for(file_id, path)
     headers = {}
@@ -129,6 +132,7 @@ async def api_media_file(file_id: str, request: Request):
     if resp.status_code not in (200, 206):
         await resp.aclose()
         await client.aclose()
+        _PATH_CACHE.pop(file_id, None)
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
 
     async def stream():
@@ -140,7 +144,7 @@ async def api_media_file(file_id: str, request: Request):
             await client.aclose()
 
     out = {
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "public, max-age=86400",
         "Accept-Ranges": "bytes",
         "Content-Disposition": "inline",
     }
