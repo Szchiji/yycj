@@ -1,13 +1,7 @@
 (() => {
   function role() {
-    try {
-      const raw = localStorage.getItem("yycj_user");
-      if (raw) return (JSON.parse(raw).role || "guest");
-    } catch (e) {}
-    const t = document.getElementById("topMeta")?.textContent || "";
-    if (t.includes("老师")) return "teacher";
-    if (t.includes("商家")) return "merchant";
-    return "guest";
+    try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; }
+    catch (e) { return "guest"; }
   }
   function showHome() {
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
@@ -18,10 +12,11 @@
   }
   function apply() {
     const r = role();
-    const pub = document.querySelector('[data-nav="publish"]');
-    if (pub) pub.classList.toggle("hidden", r === "guest");
-    document.body.classList.toggle("role-guest", r === "guest");
-    document.body.classList.toggle("role-host", r === "teacher" || r === "merchant");
+    const guest = r === "guest";
+    document.querySelector('[data-nav="publish"]')?.classList.toggle("hidden", guest);
+    document.querySelector('[data-nav="fav"]')?.classList.toggle("hidden", !guest);
+    document.body.classList.toggle("role-guest", guest);
+    document.body.classList.toggle("role-host", !guest);
   }
   async function sniff() {
     const token = localStorage.getItem("yycj_token");
@@ -36,9 +31,8 @@
   apply();
   showHome();
   sniff();
-  setTimeout(() => { apply(); showHome(); }, 600);
-  setTimeout(apply, 1600);
+  setTimeout(() => { apply(); showHome(); }, 500);
   document.querySelectorAll("[data-switch]").forEach((b) => {
-    b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); }, 400));
+    b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); showHome(); }, 400));
   });
 })();
