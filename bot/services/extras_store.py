@@ -8,7 +8,7 @@ from typing import Any, Dict
 from sqlalchemy import text
 
 from bot.db import session_scope
-from bot.services import search_service
+from bot.services import listing_flow, search_service
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +25,6 @@ async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
             )
         except Exception:
             logger.exception("save extras failed")
-        if data:
-            row = (await s.execute(text("SELECT description FROM lamps WHERE lamp_id = :id"), {"id": lamp_id})).first()
-            desc = (row[0] if row else "") or ""
-            block = "\n".join(f"{k}：{v}" for k, v in data.items())
-            if block and block not in desc:
-                new_desc = (desc + ("\n" if desc else "") + block)[:2000]
-                await s.execute(text("UPDATE lamps SET description = :d WHERE lamp_id = :id"), {"d": new_desc, "id": lamp_id})
 
 
 async def load_extras(lamp_id: str) -> Dict[str, Any]:
@@ -47,6 +40,9 @@ async def load_extras(lamp_id: str) -> Dict[str, Any]:
 
 
 _orig_get = search_service.get_lamp
+_orig_apply = listing_flow.apply_edit
+_orig_admin = listing_flow.apply_admin_edit
+_orig_list = listing_flow.list_my_lamps
 
 
 async def get_lamp(lamp_id: str):
@@ -58,4 +54,26 @@ async def get_lamp(lamp_id: str):
     return lamp
 
 
+async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin: bool = False):
+    lamp = await _orig_apply(lamp_id, data, owner_id=owner_id, admin=admin)
+    await save_extras(lamp_id, (data or {}).get("extras"))
+    return lamp
+
+
+async def apply_admin_edit(lamp_id: str, data: Dict[str, Any]):
+    lamp = await _orig_admin(lamp_id, data)
+    await save_extras(lamp_id, (data or {}).get("extras"))
+    return lamp
+
+
+async def list_my_lamps(user_id: int):
+    items = await _orig_list(user_id)
+    for it in items:
+        it["extras"] = await load_extras(it.get("lamp_id") or "")
+    return items
+
+
 search_service.get_lamp = get_lamp  # type: ignore[assignment]
+listing_flow.apply_edit = apply_edit  # type: ignore[assignment]
+listing_flow.apply_admin_edit = apply_admin_edit  # type: ignore[assignment]
+listing_flow.list_my_lamps = list_my_lamps  # type: ignore[assignment]

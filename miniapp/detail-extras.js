@@ -2,11 +2,11 @@
   if (window.__yycjDetailExtras) return;
   window.__yycjDetailExtras = true;
   const token = () => localStorage.getItem("yycj_token") || "";
-  function paint(lamp) {
+  function paint(extras) {
     const detail = document.getElementById("detail");
-    if (!detail || !lamp) return;
-    const extras = lamp.extras && typeof lamp.extras === "object" ? lamp.extras : {};
-    const keys = Object.keys(extras).filter((k) => extras[k]);
+    if (!detail) return;
+    const data = extras && typeof extras === "object" ? extras : {};
+    const keys = Object.keys(data).filter((k) => String(data[k] || "").trim());
     let box = document.getElementById("yycjExtras");
     if (!keys.length) {
       if (box) box.remove();
@@ -16,9 +16,11 @@
       box = document.createElement("div");
       box.id = "yycjExtras";
       box.className = "card";
-      detail.appendChild(box);
+      const reviews = document.getElementById("yycjReviews");
+      if (reviews) detail.insertBefore(box, reviews);
+      else detail.appendChild(box);
     }
-    box.innerHTML = keys.map((k) => "<p><b>" + k + "</b>：" + String(extras[k]).replace(/[<>]/g, "") + "</p>").join("");
+    box.innerHTML = keys.map((k) => "<p><b>" + k + "</b>：" + String(data[k]).replace(/[<>]/g, "") + "</p>").join("");
   }
   async function load(id) {
     if (!id) return;
@@ -26,12 +28,15 @@
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
       if (!r.ok) return;
       const data = await r.json();
-      paint(data.lamp || data);
+      const lamp = data.lamp || data;
+      paint(lamp.extras || data.extras || {});
     } catch (e) {}
   }
   document.addEventListener("click", (ev) => {
     const card = ev.target.closest("#feed [data-id], #pins [data-id], #favList [data-id]");
     if (!card) return;
-    setTimeout(() => load(card.getAttribute("data-id")), 280);
+    const id = card.getAttribute("data-id");
+    setTimeout(() => load(id), 200);
+    setTimeout(() => load(id), 800);
   });
 })();
