@@ -43,13 +43,13 @@ async def list_my_lamps(user_id: int) -> List[Dict[str, Any]]:
     return out
 
 
-async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int) -> Dict[str, Any]:
+async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin: bool = False) -> Dict[str, Any]:
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
         lamp = res.scalar_one_or_none()
         if not lamp:
             raise ValueError("资料不存在")
-        if int(lamp.user_id) != int(owner_id):
+        if not admin and int(lamp.user_id) != int(owner_id):
             raise ValueError("只能改自己的资料")
         lamp.city = (data.get("city") or lamp.city)[:32]
         lamp.title = (data.get("title") or lamp.title)[:128]
@@ -71,6 +71,10 @@ async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int) -> Di
         lamp.updated_at = datetime.utcnow()
         await s.flush()
         return {"lamp_id": lamp.lamp_id, "title": lamp.title, "status": lamp.status, "expires_at": lamp.expires_at}
+
+
+async def apply_admin_edit(lamp_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    return await apply_edit(lamp_id, data, owner_id=0, admin=True)
 
 
 async def proxy_publish(
@@ -133,7 +137,6 @@ async def remind_expiring(days: int = 3) -> int:
     from bot.main import bot
 
     for lamp in lamps:
-        key = f"reminded:{lamp.lamp_id}"
         reason = lamp.unlist_reason or ""
         if reason.startswith("reminded:"):
             continue
