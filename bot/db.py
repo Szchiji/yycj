@@ -42,6 +42,7 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS ops_config JSONB DEFAULT '{}'::jsonb",
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS messages_purge_at TIMESTAMP",
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS quality_score INTEGER DEFAULT 50",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS extras JSONB DEFAULT '{}'::jsonb",
 ]
 
 
