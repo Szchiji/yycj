@@ -8,6 +8,15 @@ from sqlalchemy import select
 _orig = admin_ops.approve_post
 
 
+def _extras(data: dict) -> dict:
+    extra = data.get("extras") if isinstance(data.get("extras"), dict) else {}
+    out = dict(extra)
+    for key in ("联系", "频道", "微信"):
+        if data.get(key) and key not in out:
+            out[key] = data.get(key)
+    return out
+
+
 async def approve_post(post_id: str, *, notify: bool = True):
     async with session_scope() as s:
         res = await s.execute(select(Post).where(Post.post_id == post_id))
@@ -16,6 +25,7 @@ async def approve_post(post_id: str, *, notify: bool = True):
         user_id = post.user_id if post else 0
         edit_id = data.get("edit_lamp_id")
         status = post.status if post else None
+    extras = _extras(data)
     if edit_id and post and status == PostStatus.PENDING.value:
         async with session_scope() as s:
             res = await s.execute(select(Post).where(Post.post_id == post_id))
@@ -25,19 +35,21 @@ async def approve_post(post_id: str, *, notify: bool = True):
                 from datetime import datetime
                 row.reviewed_at = datetime.utcnow()
         lamp = await listing_flow.apply_edit(edit_id, data, owner_id=user_id)
-        if notify:
-            await notify_publisher_approved(user_id, lamp.get("title") or "资料")
         full = await search_service.get_lamp(edit_id)
+        album = None
         if full:
-            await listing_flow.broadcast_listing(full)
+            album = await listing_flow.broadcast_listing(full, extras)
+        if notify:
+            await notify_publisher_approved(user_id, lamp.get("title") or "资料", album)
         return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True}
     result = await _orig(post_id, notify=False)
     if notify:
         lamp = await search_service.get_lamp(result.get("lamp_id") or "")
         title = (lamp or {}).get("title") or "资料"
-        await notify_publisher_approved(result["user_id"], title)
+        album = None
         if lamp:
-            await listing_flow.broadcast_listing(lamp)
+            album = await listing_flow.broadcast_listing(lamp, extras)
+        await notify_publisher_approved(result["user_id"], title, album)
     return result
 
 

@@ -66,7 +66,7 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
         logger.warning("no admin received post %s", post_id)
 
 
-async def notify_publisher_approved(user_id: int, title: str) -> None:
+async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None) -> None:
     from bot.main import bot
     from bot.services import bot_info
 
@@ -78,6 +78,8 @@ async def notify_publisher_approved(user_id: int, title: str) -> None:
     text = f"你的资料「{title}」已通过审核并上架。"
     if promo:
         text = f"{text}\n\n{promo}"
+    if album_url:
+        text += f"\n\n频道相册：{album_url}"
     if link:
         text += f"\n\n机器人：{link}"
     try:
