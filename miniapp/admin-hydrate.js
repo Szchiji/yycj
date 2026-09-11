@@ -32,4 +32,21 @@
   }
   document.getElementById("btnRefresh")?.addEventListener("click", () => hydrate().catch(() => {}));
   setTimeout(() => hydrate().catch(() => {}), 900);
+  const orig = window.fetch;
+  window.fetch = function (url, opt) {
+    try {
+      if (String(url || "").includes("/api/admin/settings/extra") && opt && typeof opt.body === "string") {
+        const body = JSON.parse(opt.body);
+        const ch = (document.getElementById("opsChannel")?.value || "").trim();
+        const tpl = document.getElementById("opsBroadcastTpl")?.value || "";
+        const media = (document.getElementById("opsMediaChannel")?.value || "").trim();
+        if (ch) body.broadcast_channel = ch;
+        if (tpl.trim()) body.broadcast_template = tpl;
+        if (media) body.media_channel_id = media;
+        if (window.__listingFields && window.__listingFields.length) body.listing_fields = window.__listingFields;
+        opt = Object.assign({}, opt, { body: JSON.stringify(body) });
+      }
+    } catch (e) {}
+    return orig.apply(this, [url, opt]);
+  };
 })();
