@@ -61,15 +61,13 @@
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
         ${n ? `<span class="badge-n">${n}图</span>` : ""}
       </div>
-      <div class="body"><h3>${pin}${esc(t.title || "")}</h3><div class="muted price">${esc(t.price_text || "面议")}</div>
-      <button class="share-btn" type="button" data-share="${esc(t.lamp_id)}">分享</button></div>
+      <div class="body"><h3>${pin}${esc(t.title || "")}</h3><div class="muted price">${esc(t.price_text || "面议")}</div></div>
     </div>`;
   }
   function pinHtml(p) {
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
-    const bg = img ? ` data-bg="${esc(img)}"` : "";
-    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}"${bg}><div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
+    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">${img ? `<img class="pin-cover" src="${esc(img)}" alt="" />` : ""}<div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
   }
   function paint() {
     const feed = $("#feed");
@@ -137,12 +135,19 @@
     if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
     else pins.scrollBy({ left: step, behavior: "smooth" });
   }, 4000);
-  ["lazy.js", "detail-autoplay.js", "share.js", "boot-extra.js"].forEach((name) => {
+  if (!document.getElementById("yycj-home-fix-css")) {
+    const l = document.createElement("link");
+    l.id = "yycj-home-fix-css";
+    l.rel = "stylesheet";
+    l.href = "./home-fix.css?v=20260911ad";
+    document.head.appendChild(l);
+  }
+  ["lazy.js", "share.js", "boot-extra.js", "boot-rescue.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911aa";
+    s.src = "./" + name + "?v=20260911ad";
     document.head.appendChild(s);
   });
   async function boot() {
