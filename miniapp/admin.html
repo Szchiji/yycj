@@ -10,9 +10,9 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260912i" />
-  <link rel="stylesheet" href="./admin.css?v=20260912i" />
-  <link rel="stylesheet" href="./admin-ux.css?v=20260912i" />
+  <link rel="stylesheet" href="./styles.css?v=20260912j" />
+  <link rel="stylesheet" href="./admin.css?v=20260912j" />
+  <link rel="stylesheet" href="./admin-ux.css?v=20260912j" />
 </head>
 <body class="admin-body">
   <header class="topbar">
@@ -25,24 +25,24 @@
       </div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260912i">首页</a>
+      <a class="btn" href="./index.html?v=20260912j">首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
   <div id="gate" class="card">正在校验管理员身份…</div>
   <div class="side-mask" id="sideMask"></div>
+  <aside class="admin-side" id="adminSide">
+    <div class="side-label">内容</div>
+    <button type="button" class="active" data-pane="audit">审核</button>
+    <button type="button" data-pane="listings">上架资料</button>
+    <button type="button" data-pane="pin">卡片置顶</button>
+    <button type="button" data-pane="carousel">精选轮播</button>
+    <div class="side-label">运营</div>
+    <button type="button" data-pane="venue">站点设置</button>
+    <button type="button" data-pane="users">用户</button>
+    <button type="button" data-pane="more">风控</button>
+  </aside>
   <div id="console" class="admin-shell hidden">
-    <aside class="admin-side" id="adminSide">
-      <div class="side-label">内容</div>
-      <button type="button" class="active" data-pane="audit">审核</button>
-      <button type="button" data-pane="listings">上架资料</button>
-      <button type="button" data-pane="pin">卡片置顶</button>
-      <button type="button" data-pane="carousel">精选轮播</button>
-      <div class="side-label">运营</div>
-      <button type="button" data-pane="venue">站点设置</button>
-      <button type="button" data-pane="users">用户</button>
-      <button type="button" data-pane="more">风控</button>
-    </aside>
     <div class="admin-main">
       <section class="admin-pane active" id="pane-audit">
         <h3>待审核</h3>
@@ -180,17 +180,17 @@
       </section>
     </div>
   </div>
-  <script src="./admin-boot.js?v=20260912i"></script>
-  <script src="./admin.js?v=20260912i"></script>
-  <script src="./admin-ops.js?v=20260912i"></script>
-  <script src="./admin-list.js?v=20260912i"></script>
-  <script src="./admin-fields.js?v=20260912i"></script>
-  <script src="./admin-promo.js?v=20260912i"></script>
-  <script src="./admin-proxy.js?v=20260912i"></script>
-  <script src="./admin-proxy-edit.js?v=20260912i"></script>
-  <script src="./admin-picks.js?v=20260912i"></script>
-  <script src="./admin-hydrate.js?v=20260912i"></script>
-  <script src="./admin-side.js?v=20260912i"></script>
-  <script src="./admin-ux.js?v=20260912i"></script>
+  <script src="./admin-boot.js?v=20260912j"></script>
+  <script src="./admin.js?v=20260912j"></script>
+  <script src="./admin-ops.js?v=20260912j"></script>
+  <script src="./admin-list.js?v=20260912j"></script>
+  <script src="./admin-fields.js?v=20260912j"></script>
+  <script src="./admin-promo.js?v=20260912j"></script>
+  <script src="./admin-proxy.js?v=20260912j"></script>
+  <script src="./admin-proxy-edit.js?v=20260912j"></script>
+  <script src="./admin-picks.js?v=20260912j"></script>
+  <script src="./admin-hydrate.js?v=20260912j"></script>
+  <script src="./admin-side.js?v=20260912j"></script>
+  <script src="./admin-ux.js?v=20260912j"></script>
 </body>
 </html>
