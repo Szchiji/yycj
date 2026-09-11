@@ -31,7 +31,7 @@
     const n = (x.media && x.media.length) || 0;
     return `<div class="feed-card compact cover-card" data-id="${x.lamp_id}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" src="${img}" alt="" />` : `<div class="thumb ph"></div>`}
+        ${img ? `<img class="thumb" data-src="${img}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
         ${loc ? `<span class="badge-loc">${loc}</span>` : ""}
         ${tag ? `<span class="badge-tag">${tag}</span>` : ""}
         ${n ? `<span class="badge-n">${n}图</span>` : ""}
@@ -80,9 +80,7 @@
     paintList();
   }
   document.addEventListener("click", async (ev) => {
-    if (ev.target.closest("#feed [data-id], #pins [data-id]")) {
-      window.__yycjBack = "home";
-    }
+    if (ev.target.closest("#feed [data-id], #pins [data-id]")) window.__yycjBack = "home";
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
       ev.stopPropagation();
