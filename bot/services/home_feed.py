@@ -54,7 +54,7 @@ def _sanitize_listing_fields(fields, fallback=None):
         seen.add(key)
         form = False if key in ("地点", "链接") else bool(item.get("form", True))
         out.append({"key": key, "label": str(item.get("label") or key)[:16], "form": form})
-    return out
+    return out or list(fallback or [])
 
 
 def merge_ops(raw) -> Dict[str, Any]:
