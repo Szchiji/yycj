@@ -65,7 +65,13 @@ def fill_template(tpl: str, lamp: Dict[str, Any], extras: Optional[Dict[str, Any
     for key, val in mapping.items():
         text = text.replace("{" + key + "}", str(val))
     text = re.sub(r"\{[^}]{1,20}\}", "", text)
-    return text.strip()[:1024]
+    cleaned = []
+    for line in text.splitlines():
+        s = line.rstrip()
+        if s.endswith("：") or s.endswith(":"):
+            continue
+        cleaned.append(s)
+    return "\n".join(cleaned).strip()[:1024]
 
 
 def _media_items(lamp: Dict[str, Any]) -> List[Tuple[str, str]]:
@@ -100,7 +106,12 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
     from bot.services import bot_info
     ident = await bot_info.get_bot_identity()
     link = bot_info.bot_tme_url(ident.get("username") or "")
-    caption = fill_template(str(site.get("broadcast_template") or ""), lamp, extras, link)
+    merged = {}
+    if isinstance(lamp.get("extras"), dict):
+        merged.update(lamp.get("extras") or {})
+    merged.update(extras or {})
+    merged.setdefault("聊天按钮", site.get("chat_cta_label") or "想聊聊")
+    caption = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
     items = _media_items(lamp)
     try:
         msg = None
