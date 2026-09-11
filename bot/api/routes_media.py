@@ -52,9 +52,10 @@ async def api_media_upload(
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"一次最多上传 {MAX_FILES} 个文件")
     settings = get_settings()
-    chat_id = settings.media_storage_chat_id
+    from bot.services.broadcast import resolve_media_chat
+    chat_id = await resolve_media_chat() or settings.media_storage_chat_id
     if not chat_id:
-        raise HTTPException(status_code=503, detail="未配置 STORAGE_CHAT_ID / ADMIN_IDS，无法存媒体")
+        raise HTTPException(status_code=503, detail="未配置媒体存储频道，无法存媒体")
     from bot.main import bot
     results: List[Dict[str, str]] = []
     for uf in files:
