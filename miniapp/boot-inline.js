@@ -19,4 +19,9 @@
     document.querySelector("#bootRetry")?.classList.remove("hidden");
   }
   window.__yycjBoot = { showBoot, hideBoot, showBootError };
+  if (!document.querySelector('script[src*="publish-fields"]')) {
+    const s = document.createElement("script");
+    s.src = "./publish-fields.js?v=20260912j";
+    (document.body || document.documentElement).appendChild(s);
+  }
 })();
