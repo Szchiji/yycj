@@ -19,6 +19,10 @@ try:
     from bot.services import search_hooks  # noqa: F401
 except Exception:
     logger.exception("search_hooks wire skipped")
+try:
+    from bot.services import admin_ops_wire  # noqa: F401
+except Exception:
+    logger.exception("admin_ops_wire skipped")
 
 
 async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
