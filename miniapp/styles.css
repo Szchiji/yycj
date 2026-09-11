@@ -112,25 +112,46 @@ label { font-size: .85rem; color: var(--muted); }
 .announce span { display: inline-block; padding-left: 100%; animation: marquee 18s linear infinite; }
 @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 .pins {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+  display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
 }
 .pin-card, .pin-card.short {
-  min-width: 42%; flex: 0 0 42%; scroll-snap-align: start;
-  background: linear-gradient(135deg, #1e2a52, #151b2f);
-  border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px;
-  position: relative; display: flex; align-items: center; gap: 8px; min-height: 52px;
+  flex: 0 0 56%;
+  min-width: 56%;
+  width: 56%;
+  aspect-ratio: 3 / 4;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  display: block;
+  scroll-snap-align: start;
+  background: #141b2b;
+  border: 0;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
 }
-.pin-card .thumb { width: 44px; height: 44px; max-height: 44px; object-fit: cover; border-radius: 8px; margin: 0; flex: 0 0 44px; }
-.pin-card h3, .pin-copy { margin: 0; font-size: .8rem; min-width: 0; }
-.pin-copy { display: flex; flex-direction: column; }
-.pin-copy span { color: var(--muted); font-size: .7rem; }
+.pin-card .thumb,
+.pin-card img.pin-cover {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; max-height: none;
+  object-fit: cover; border-radius: 0; margin: 0; flex: none;
+}
+.pin-card h3, .pin-copy {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  margin: 0; padding: 28px 10px 10px;
+  font-size: .9rem; color: #fff;
+  background: linear-gradient(transparent, rgba(0,0,0,.72));
+  z-index: 2;
+}
+.pin-copy { display: block; }
+.pin-copy span { color: #fff; font-size: .7rem; }
 .pin-card .badge-pin {
-  position: absolute; top: 4px; right: 4px;
+  position: absolute; top: 8px; right: 8px; z-index: 3;
   background: var(--warn); color: #1a1200; font-size: .62rem; font-weight: 700;
   padding: 1px 6px; border-radius: 999px;
 }
-.feed.feed-3 {
+.feed.feed-3, #feed.has-cover {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
@@ -147,6 +168,7 @@ label { font-size: .85rem; color: var(--muted); }
   width: 100%; height: 72px; max-height: 72px; flex: none;
   object-fit: cover; border-radius: 8px; background: #0d1326;
 }
+.feed-card .cover-wrap .thumb { height: 200px; max-height: 200px; }
 .feed-card .thumb.ph { background: #1a2140; }
 .feed-card .body { flex: 1; min-width: 0; }
 .feed-card h3 { margin: 0 0 2px; font-size: .78rem; line-height: 1.2; }
