@@ -21,6 +21,7 @@ except Exception:
     logger.exception("search_hooks wire skipped")
 try:
     from bot.services import admin_ops_wire  # noqa: F401
+    from bot.services import extras_store  # noqa: F401
 except Exception:
     logger.exception("admin_ops_wire skipped")
 

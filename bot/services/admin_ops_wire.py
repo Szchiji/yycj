@@ -3,6 +3,7 @@ from bot.db import session_scope
 from bot.models import Post, PostStatus
 from bot.services import admin_ops, listing_flow, search_service
 from bot.services.listing_notify import notify_publisher_approved
+from bot.services.extras_store import save_extras
 from sqlalchemy import select
 
 _orig = admin_ops.approve_post
@@ -38,6 +39,7 @@ async def approve_post(post_id: str, *, notify: bool = True):
         full = await search_service.get_lamp(edit_id)
         album = None
         if full:
+            await save_extras((full or {}).get("lamp_id") or edit_id, extras)
             album = await listing_flow.broadcast_listing(full, extras)
         if notify:
             await notify_publisher_approved(user_id, lamp.get("title") or "资料", album)
@@ -48,6 +50,7 @@ async def approve_post(post_id: str, *, notify: bool = True):
         title = (lamp or {}).get("title") or "资料"
         album = None
         if lamp:
+            await save_extras((lamp or {}).get("lamp_id") or result.get("lamp_id"), extras)
             album = await listing_flow.broadcast_listing(lamp, extras)
         await notify_publisher_approved(result["user_id"], title, album)
     return result
