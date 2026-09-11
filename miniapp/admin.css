@@ -1,34 +1,27 @@
 :root {
   --ad-bg: #0b0f18;
-  --ad-panel: #121826;
   --ad-card: #171e2c;
   --ad-line: #2a3348;
   --ad-text: #e8eef8;
   --ad-mute: #8b97ad;
   --ad-accent: #6ea8ff;
   --ad-ok: #3dd68c;
-  --ad-warn: #f5c16c;
   --ad-bad: #ff7a9c;
   --ad-side: 168px;
   --ad-top: 56px;
 }
 html, body.admin-body {
-  height: auto !important;
-  max-height: none !important;
-  overflow: auto !important;
-  overflow-y: scroll !important;
+  height: auto !important; max-height: none !important;
+  overflow: auto !important; overflow-y: scroll !important;
   -webkit-overflow-scrolling: touch !important;
-  background: var(--ad-bg);
-  color: var(--ad-text);
+  background: var(--ad-bg); color: var(--ad-text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
 }
-.admin-body { background: var(--ad-bg); color: var(--ad-text); }
 .admin-body .topbar {
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 10px 12px;
   background: rgba(11,15,24,.92);
-  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--ad-line);
 }
 .admin-body .topbar h1 { margin: 0; font-size: 16px; font-weight: 650; }
@@ -38,44 +31,38 @@ html, body.admin-body {
   width: 36px; height: 36px; border-radius: 10px;
   border: 1px solid var(--ad-line); background: var(--ad-card); color: var(--ad-text);
 }
-.admin-shell { display: flex !important; flex-direction: row !important; min-height: calc(100dvh - var(--ad-top)); height: auto !important; overflow: visible !important; }
+.admin-shell { display: flex !important; min-height: calc(100dvh - var(--ad-top)); height: auto !important; overflow: visible !important; }
 .admin-side {
-  position: fixed; left: 0; top: var(--ad-top); bottom: 0; z-index: 40;
+  position: fixed; left: -200px; top: var(--ad-top); bottom: 0; z-index: 200;
   width: var(--ad-side); padding: 14px 10px;
   background: #0e1420; border-right: 1px solid var(--ad-line);
-  transform: translateX(-110%); transition: transform .2s ease;
-  overflow: auto;
+  transition: left .2s ease; overflow: auto;
 }
-body.side-open .admin-side { transform: translateX(0); }
+body.side-open .admin-side { left: 0; }
 .admin-side .side-label {
   font-size: 11px; color: var(--ad-mute); letter-spacing: .08em;
-  text-transform: uppercase; margin: 8px 8px 8px;
+  margin: 8px 8px 8px;
 }
 .admin-side button {
-  display: flex; align-items: center; gap: 8px;
-  width: 100%; margin: 0 0 4px; padding: 9px 10px;
+  display: flex; width: 100%; margin: 0 0 4px; padding: 9px 10px;
   text-align: left; border: 0; border-radius: 10px;
   background: transparent; color: #c9d4e8; font-size: 14px;
 }
 .admin-side button.active { background: #1b2740; color: #fff; box-shadow: inset 0 0 0 1px #2e4a78; }
-.admin-main { flex: 1; min-width: 0; padding: 14px 14px 88px; height: auto !important; overflow: visible !important; }
+.admin-main { flex: 1; min-width: 0; padding: 14px 14px 88px; }
 .admin-pane { display: none; }
 .admin-pane.active { display: block; }
 .admin-pane > h3 { margin: 0 0 12px; font-size: 18px; font-weight: 650; }
 .ops-card, .admin-pane .card, #proxyBox, #editBox {
-  background: var(--ad-card);
-  border: 1px solid var(--ad-line);
-  border-radius: 14px;
-  padding: 14px;
-  margin: 0 0 12px;
+  background: var(--ad-card); border: 1px solid var(--ad-line);
+  border-radius: 14px; padding: 14px; margin: 0 0 12px;
 }
-.ops-card h4 { margin: 0 0 10px; font-size: 13px; font-weight: 650; color: var(--ad-accent); letter-spacing: .04em; }
+.ops-card h4 { margin: 0 0 10px; font-size: 13px; font-weight: 650; color: var(--ad-accent); }
 .admin-body label { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--ad-mute); }
 .admin-body input, .admin-body textarea, .admin-body select {
   width: 100%; box-sizing: border-box;
   background: #0f1522; color: var(--ad-text);
-  border: 1px solid var(--ad-line); border-radius: 10px;
-  padding: 9px 10px; font-size: 14px;
+  border: 1px solid var(--ad-line); border-radius: 10px; padding: 9px 10px; font-size: 14px;
 }
 .admin-body .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .admin-body .row > input { flex: 1; min-width: 0; margin: 0; }
@@ -83,28 +70,26 @@ body.side-open .admin-side { transform: translateX(0); }
   border-radius: 10px; padding: 8px 12px; font-size: 13px;
   border: 1px solid var(--ad-line); background: #1a2233; color: var(--ad-text);
 }
-.admin-body .btn.primary { background: var(--ad-accent); color: #081018; border-color: transparent; font-weight: 650; }
+.admin-body .btn.primary { background: var(--ad-accent); color: #081018; border: 0; font-weight: 650; }
 .admin-body .btn.danger { background: #3a1524; color: #ffb4c8; border-color: #6b2740; }
-.side-toggle { display: none !important; }
 .side-mask { display: none; }
 body.side-open .side-mask {
   display: block; position: fixed; inset: var(--ad-top) 0 0 0;
-  background: rgba(0,0,0,.4); z-index: 30;
+  background: rgba(0,0,0,.4); z-index: 180;
 }
 .pick-item {
   display: grid; grid-template-columns: 1fr; gap: 8px;
   margin: 0 0 10px; padding: 12px;
-  border: 1px solid var(--ad-line); border-radius: 14px;
-  background: var(--ad-card);
+  border: 1px solid var(--ad-line); border-radius: 14px; background: var(--ad-card);
 }
-.pick-item .muted { color: var(--ad-mute); font-size: 12px; line-height: 1.4; }
-.admin-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; background: #1a2030; }
-#proxyPreview, #editPreview, .media-preview { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.up-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
-#listingFieldBox .btn { margin: 0 6px 6px 0; font-size: 12px; }
+.pick-item .muted { color: var(--ad-mute); font-size: 12px; }
+.st-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; }
+.st-active { background: #163528; color: var(--ad-ok); }
+.st-hidden { background: #3a1524; color: var(--ad-bad); }
+.admin-thumb, .up-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
 #gate.card { margin: 16px; }
 @media (min-width: 860px) {
-  .admin-side { transform: none; }
+  .admin-side { left: 0; }
   .admin-main { margin-left: var(--ad-side); }
   body.side-open .side-mask { display: none; }
   #btnMenu { display: none; }
