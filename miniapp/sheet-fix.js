@@ -11,49 +11,40 @@
   st.id = "yycj-sheet-css";
   st.textContent = `.sheet{z-index:120!important;align-items:flex-end;}
 .sheet-panel{margin-bottom:78px!important;max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch;}
-#btnGuide{margin:0 0 8px;}`;
+#homeSearch,.search-row{display:flex;align-items:center;gap:8px;}
+#btnGuide{flex:none;margin:0;padding:8px 10px;white-space:nowrap;}`;
   document.head.appendChild(st);
 
-  function closeSheet(id) {
-    document.getElementById(id)?.classList.add("hidden");
-  }
-  function openSheet(id) {
-    document.getElementById(id)?.classList.remove("hidden");
-  }
+  function closeSheet(id) { document.getElementById(id)?.classList.add("hidden"); }
+  function openSheet(id) { document.getElementById(id)?.classList.remove("hidden"); }
 
   let guide = document.getElementById("guideSheet");
   if (!guide) {
     guide = document.createElement("div");
     guide.id = "guideSheet";
     guide.className = "sheet hidden";
-    guide.innerHTML = `<div class="sheet-panel" id="guidePanel">
+    guide.innerHTML = `<div class="sheet-panel">
       <h3>操作教程</h3>
-      <ul id="guideList">${TUTORIAL.map((x) => `<li>${x}</li>`).join("")}</ul>
+      <ul>${TUTORIAL.map((x) => `<li>${x}</li>`).join("")}</ul>
       <button class="btn block primary" id="guideClose" type="button">知道了</button>
     </div>`;
     document.body.appendChild(guide);
   }
 
-  if (!document.getElementById("btnGuide")) {
-    const btn = document.createElement("button");
+  const row = document.getElementById("homeSearch") || document.querySelector(".search-row");
+  let btn = document.getElementById("btnGuide");
+  if (!btn) {
+    btn = document.createElement("button");
     btn.id = "btnGuide";
     btn.type = "button";
     btn.className = "btn";
-    btn.textContent = "操作教程";
-    const row = document.getElementById("homeSearch") || document.querySelector(".search-row");
-    const announce = document.getElementById("announce");
-    if (row) row.after(btn);
-    else if (announce) announce.after(btn);
-    else document.getElementById("view-home")?.insertBefore(btn, document.getElementById("pins"));
   }
+  btn.textContent = "教程";
+  if (row) row.insertBefore(btn, row.firstChild);
 
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnGuide") {
-      ev.preventDefault();
-      openSheet("guideSheet");
-    }
+    if (ev.target.id === "btnGuide") { ev.preventDefault(); openSheet("guideSheet"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") closeSheet("guideSheet");
     if (ev.target.id === "rulesClose" || ev.target.id === "rulesSheet") closeSheet("rulesSheet");
-    if (ev.target.id === "cityClose" || ev.target.id === "citySheet") closeSheet("citySheet");
   });
 })();
