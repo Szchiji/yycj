@@ -39,14 +39,11 @@ async def api_media_upload(
         raise HTTPException(status_code=400, detail="请选择文件")
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=400, detail=f"一次最多上传 {MAX_FILES} 个文件")
-
     settings = get_settings()
     chat_id = settings.media_storage_chat_id
     if not chat_id:
         raise HTTPException(status_code=503, detail="未配置 STORAGE_CHAT_ID / ADMIN_IDS，无法存媒体")
-
     from bot.main import bot
-
     results: List[Dict[str, str]] = []
     for uf in files:
         data = await uf.read()
@@ -60,22 +57,21 @@ async def api_media_upload(
         try:
             if kind == "video":
                 msg = await bot.send_video(chat_id, buf, disable_notification=True)
-                file_id = msg.video.file_id if msg.video else None
+                file_id = (msg.video.file_id if msg.video else None) or (msg.document.file_id if msg.document else None)
             else:
                 msg = await bot.send_photo(chat_id, buf, disable_notification=True)
                 file_id = msg.photo[-1].file_id if msg.photo else None
             try:
                 await bot.delete_message(chat_id, msg.message_id)
             except Exception:
-                logger.info("storage message left in chat %s", chat_id)
+                pass
         except Exception as exc:
             logger.exception("media upload send failed")
             raise HTTPException(status_code=502, detail=f"上传到 Telegram 失败：{exc}") from exc
         if not file_id:
             raise HTTPException(status_code=502, detail="未能获取 file_id")
         preview = f"/api/media/file/{quote(file_id, safe='')}"
-        results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": preview})
-
+        results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": file_id})
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
     return {"ok": True, "items": results, "count": len(results)}
@@ -87,19 +83,20 @@ async def api_media_file(file_id: str):
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
     from bot.main import bot
-
     try:
         tg_file = await bot.get_file(file_id)
     except Exception as exc:
         logger.warning("get_file failed: %s", exc)
         raise HTTPException(status_code=404, detail="文件不存在或已失效") from exc
-    path = tg_file.file_path
+    path = tg_file.file_path or ""
     if not path:
         raise HTTPException(status_code=404, detail="无 file_path")
     url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
     mime, _ = mimetypes.guess_type(path)
+    low = path.lower()
+    if file_id.startswith("BAAC") or low.endswith((".mp4", ".mov", ".webm")):
+        mime = "video/mp4"
     mime = mime or "application/octet-stream"
-
     client = httpx.AsyncClient(timeout=60.0)
     try:
         req = client.build_request("GET", url)
@@ -107,7 +104,6 @@ async def api_media_file(file_id: str):
     except Exception as exc:
         await client.aclose()
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败") from exc
-
     if resp.status_code != 200:
         await resp.aclose()
         await client.aclose()
@@ -121,8 +117,4 @@ async def api_media_file(file_id: str):
             await resp.aclose()
             await client.aclose()
 
-    return StreamingResponse(
-        stream(),
-        media_type=mime,
-        headers={"Cache-Control": "private, max-age=3600"},
-    )
+    return StreamingResponse(stream(), media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
