@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from bot.db import session_scope
-from bot.models import HomepagePin, Lamp, LampStatus, SiteSettings
+from bot.models import HomepagePin, Lamp, LampStatus
 
 DEFAULT_OPS = {
     "home_feed_page_size": 3,
@@ -23,10 +23,8 @@ DEFAULT_OPS = {
     "admin_btn_label": "管理员",
     "admin_contact": "",
     "required_chats": [],
-    "approve_promo_text": (
-        "你的资料已上架。\n"
-        "欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。"
-    ),
+    "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
+    "broadcast_channel": "",
 }
 
 
@@ -47,6 +45,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["chat_cta_label"] = str(out.get("chat_cta_label") or "想聊聊")[:32]
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
     out["approve_promo_text"] = str(out.get("approve_promo_text") or DEFAULT_OPS["approve_promo_text"])[:2000]
+    out["broadcast_channel"] = str(out.get("broadcast_channel") or "").strip()[:128]
     out["review_require_audit"] = bool(out.get("review_require_audit", True))
     try:
         out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
@@ -78,13 +77,7 @@ async def set_feed_pin(lamp_id: str, *, pinned: bool = True, pin_order: int = 0)
         lamp.feed_pin_order = int(pin_order) if pinned else 0
         lamp.updated_at = datetime.utcnow()
         await s.flush()
-        return {
-            "lamp_id": lamp.lamp_id,
-            "feed_pinned": bool(lamp.feed_pinned),
-            "feed_pin_order": int(lamp.feed_pin_order or 0),
-            "title": lamp.title,
-            "city": lamp.city,
-        }
+        return {"lamp_id": lamp.lamp_id, "feed_pinned": bool(lamp.feed_pinned), "feed_pin_order": int(lamp.feed_pin_order or 0), "title": lamp.title, "city": lamp.city}
 
 
 async def list_feed_pins() -> List[Dict[str, Any]]:
@@ -95,33 +88,13 @@ async def list_feed_pins() -> List[Dict[str, Any]]:
             .order_by(Lamp.feed_pin_order.asc(), Lamp.updated_at.desc())
         )
         lamps = list(res.scalars().all())
-    return [
-        {
-            "lamp_id": x.lamp_id,
-            "title": x.title,
-            "city": x.city,
-            "feed_pinned": True,
-            "feed_pin_order": int(x.feed_pin_order or 0),
-        }
-        for x in lamps
-    ]
+    return [{"lamp_id": x.lamp_id, "title": x.title, "city": x.city, "feed_pinned": True, "feed_pin_order": int(x.feed_pin_order or 0)} for x in lamps]
 
 
 async def list_approved_lamps_brief(limit: int = 100) -> List[Dict[str, Any]]:
     async with session_scope() as s:
         res = await s.execute(
-            select(Lamp)
-            .where(Lamp.status == LampStatus.ACTIVE.value)
-            .order_by(Lamp.updated_at.desc())
-            .limit(max(1, min(limit, 300)))
+            select(Lamp).where(Lamp.status == LampStatus.ACTIVE.value).order_by(Lamp.updated_at.desc()).limit(max(1, min(limit, 300)))
         )
         lamps = list(res.scalars().all())
-    return [
-        {
-            "lamp_id": x.lamp_id,
-            "title": x.title,
-            "city": x.city,
-            "feed_pinned": bool(getattr(x, "feed_pinned", False)),
-        }
-        for x in lamps
-    ]
+    return [{"lamp_id": x.lamp_id, "title": x.title, "city": x.city, "feed_pinned": bool(getattr(x, "feed_pinned", False))} for x in lamps]
