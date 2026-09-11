@@ -3,162 +3,192 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>管理</title>
+  <title>管理后台</title>
   <script src="./telegram-web-app.js"></script>
   <script>
   if (!(window.Telegram && window.Telegram.WebApp)) {
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260912h" />
-  <link rel="stylesheet" href="./admin.css?v=20260912h" />
-  <style>html,body{height:auto!important;overflow:auto!important;overflow-y:scroll!important;-webkit-overflow-scrolling:touch!important;}</style>
+  <link rel="stylesheet" href="./styles.css?v=20260912i" />
+  <link rel="stylesheet" href="./admin.css?v=20260912i" />
 </head>
 <body class="admin-body">
   <header class="topbar">
-    <div>
-      <h1>管理后台</h1>
-      <div id="status" class="muted"></div>
+    <div class="row" style="gap:8px;align-items:center">
+      <button class="btn" id="btnMenu" type="button" aria-label="菜单">☰</button>
+      <div>
+        <h1>月影管理</h1>
+        <div class="admin-crumb" id="adminCrumb">审核</div>
+        <div id="status" class="muted"></div>
+      </div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260912h">← 首页</a>
+      <a class="btn" href="./index.html?v=20260912i">首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
-  <div id="gate" class="card">正在校验…</div>
+  <div id="gate" class="card">正在校验管理员身份…</div>
+  <div class="side-mask" id="sideMask"></div>
   <div id="console" class="admin-shell hidden">
     <aside class="admin-side" id="adminSide">
+      <div class="side-label">内容</div>
       <button type="button" class="active" data-pane="audit">审核</button>
-      <button type="button" data-pane="pin">置顶</button>
-      <button type="button" data-pane="carousel">轮播</button>
-      <button type="button" data-pane="listings">上架</button>
+      <button type="button" data-pane="listings">上架资料</button>
+      <button type="button" data-pane="pin">卡片置顶</button>
+      <button type="button" data-pane="carousel">精选轮播</button>
+      <div class="side-label">运营</div>
+      <button type="button" data-pane="venue">站点设置</button>
       <button type="button" data-pane="users">用户</button>
-      <button type="button" data-pane="venue">设置</button>
       <button type="button" data-pane="more">风控</button>
     </aside>
     <div class="admin-main">
       <section class="admin-pane active" id="pane-audit">
-        <h3>待审列表</h3>
+        <h3>待审核</h3>
         <div id="adminPosts"></div>
         <div id="adminReviews" style="margin-top:12px"></div>
-        <button class="btn primary block" id="btnSeed" type="button" style="margin-top:12px">一键填充演示数据</button>
+        <button class="btn block" id="btnSeed" type="button" style="margin-top:12px">填充演示数据</button>
       </section>
       <section class="admin-pane" id="pane-pin">
         <h3>卡片置顶</h3>
         <div id="adminFeedPins"></div>
-        <div class="row">
-          <input id="feedPinQ" placeholder="搜花名 / 城市 / ID" style="flex:1;margin:0" />
-          <button class="btn" id="btnFeedPinSearch" type="button">搜索</button>
+        <div class="ops-card">
+          <h4>添加置顶</h4>
+          <div class="row">
+            <input id="feedPinQ" placeholder="搜花名 / 城市 / ID" />
+            <button class="btn" id="btnFeedPinSearch" type="button">搜索</button>
+          </div>
+          <div id="feedPinResults" class="pick-list"></div>
         </div>
-        <div id="feedPinResults" class="pick-list"></div>
       </section>
       <section class="admin-pane" id="pane-carousel">
         <h3>精选轮播</h3>
         <div id="adminPins"></div>
-        <label>过期小时（空=不过期）</label>
-        <input id="pinHours" type="number" value="72" />
-        <div class="row">
-          <input id="pinQ" placeholder="搜花名 / 城市 / ID" style="flex:1;margin:0" />
-          <button class="btn" id="btnPinSearch" type="button">搜索</button>
+        <div class="ops-card">
+          <h4>添加轮播</h4>
+          <label>过期小时（空=不过期）</label>
+          <input id="pinHours" type="number" value="72" />
+          <div class="row">
+            <input id="pinQ" placeholder="搜花名 / 城市 / ID" />
+            <button class="btn" id="btnPinSearch" type="button">搜索</button>
+          </div>
+          <div id="pinResults" class="pick-list"></div>
+          <button class="btn primary hidden" id="btnPin" type="button">上轮播</button>
         </div>
-        <div id="pinResults" class="pick-list"></div>
-        <button class="btn primary hidden" id="btnPin" type="button">上轮播</button>
       </section>
       <section class="admin-pane" id="pane-listings">
-        <h3>已上架 / 下架 / 续期</h3>
+        <h3>上架资料</h3>
         <div class="row">
-          <input id="listingQ" placeholder="搜花名 / 城市" style="flex:1;margin:0" />
+          <input id="listingQ" placeholder="搜花名 / 城市" />
           <button class="btn" id="btnListingSearch" type="button">筛选</button>
         </div>
         <div id="adminListings"></div>
       </section>
       <section class="admin-pane" id="pane-users">
         <h3>用户</h3>
-        <div class="row">
-          <input id="userQ" placeholder="ID / @用户名 / 昵称" style="flex:1;margin:0" />
-          <button class="btn" id="btnUserSearch" type="button">搜索</button>
+        <div class="ops-card">
+          <div class="row">
+            <input id="userQ" placeholder="ID / @用户名 / 昵称" />
+            <button class="btn" id="btnUserSearch" type="button">搜索</button>
+          </div>
+          <div id="adminUsers"></div>
         </div>
-        <div id="adminUsers"></div>
-        <h3 style="margin-top:16px">月影遮蔽</h3>
-        <label>用户 ID</label>
-        <input id="shadowUid" type="number" />
-        <label>天数</label>
-        <input id="shadowDays" type="number" min="1" max="365" value="7" />
-        <label>原因</label>
-        <input id="shadowReason" />
-        <div class="row">
-          <button class="btn danger" id="btnShadowOn" type="button">设置遮蔽</button>
-          <button class="btn" id="btnShadowOff" type="button">解除遮蔽</button>
+        <div class="ops-card">
+          <h4>月影遮蔽</h4>
+          <label>用户 ID</label>
+          <input id="shadowUid" type="number" />
+          <label>天数</label>
+          <input id="shadowDays" type="number" min="1" max="365" value="7" />
+          <label>原因</label>
+          <input id="shadowReason" />
+          <div class="row">
+            <button class="btn danger" id="btnShadowOn" type="button">设置遮蔽</button>
+            <button class="btn" id="btnShadowOff" type="button">解除遮蔽</button>
+          </div>
         </div>
       </section>
       <section class="admin-pane" id="pane-venue">
-        <h3>设置（保存在数据库，部署不会清掉）</h3>
-        <label>公告</label>
-        <input id="annText" />
-        <label class="row"><input type="checkbox" id="annOn" checked /> 显示公告</label>
-        <label>开放城市（逗号分隔）</label>
-        <input id="citiesInput" />
-        <label>首页每次加载条数</label>
-        <input id="opsPageSize" type="number" min="1" max="50" value="3" />
-        <label>聊天按钮文案</label>
-        <input id="opsCta" value="想聊聊" maxlength="32" />
-        <label>Bot /start 欢迎语</label>
-        <textarea id="opsWelcome" rows="3"></textarea>
-        <label>媒体存储频道 ID</label>
-        <input id="opsMediaChannel" placeholder="-100xxxxxxxxxx" />
-        <label>审核通过推送频道（填 @频道名 或 -100…）</label>
-        <input id="opsChannel" placeholder="@yydanganguan" />
-        <label>推送文案模板（用中文占位，点下方按钮插入）</label>
-        <textarea id="opsBroadcastTpl" rows="6" placeholder="🌙 月影车姬 · 新上架
-{称呼}
-📍 {地点}
-💰 {价位}
-{标签}
-{简介}
-{链接}"></textarea>
-        <label>上架媒体上限</label>
-        <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
-        <label>上架有效天数</label>
-        <input id="opsListingDays" type="number" min="1" max="365" value="30" />
-        <label>轮播间隔秒</label>
-        <input id="opsCarouselSec" type="number" min="2" max="15" value="4" />
-        <label>管理员联系</label>
-        <input id="opsAdminContact" />
-        <label class="row"><input type="checkbox" id="opsShowBot" checked /> 首页显示机器人</label>
-        <label class="row"><input type="checkbox" id="opsShowAdmin" checked /> 首页显示管理员</label>
-        <label>必订频道/群</label>
-        <textarea id="opsChats" rows="3"></textarea>
-        <label class="row"><input type="checkbox" id="opsReviewAudit" checked /> 评价需审核后展示</label>
-        <button class="btn primary block" id="btnOpsSave" type="button">保存设置</button>
+        <h3>站点设置</h3>
+        <div class="ops-card">
+          <h4>首页</h4>
+          <label>公告</label>
+          <input id="annText" />
+          <label class="row"><input type="checkbox" id="annOn" checked /> 显示公告</label>
+          <label>开放城市（逗号分隔）</label>
+          <input id="citiesInput" />
+          <label>首页每次加载条数</label>
+          <input id="opsPageSize" type="number" min="1" max="50" value="3" />
+          <label>轮播间隔秒</label>
+          <input id="opsCarouselSec" type="number" min="2" max="15" value="4" />
+        </div>
+        <div class="ops-card">
+          <h4>入口与联系</h4>
+          <label>聊天按钮文案</label>
+          <input id="opsCta" value="想聊聊" maxlength="32" />
+          <label>Bot /start 欢迎语</label>
+          <textarea id="opsWelcome" rows="3"></textarea>
+          <label>管理员联系</label>
+          <input id="opsAdminContact" />
+          <label class="row"><input type="checkbox" id="opsShowBot" checked /> 首页显示机器人</label>
+          <label class="row"><input type="checkbox" id="opsShowAdmin" checked /> 首页显示管理员</label>
+          <label>必订频道/群</label>
+          <textarea id="opsChats" rows="3"></textarea>
+        </div>
+        <div class="ops-card">
+          <h4>媒体与推送</h4>
+          <label>媒体存储频道 ID</label>
+          <input id="opsMediaChannel" placeholder="-100xxxxxxxxxx" />
+          <label>审核通过推送频道（@频道名 或 -100…）</label>
+          <input id="opsChannel" placeholder="@yydanganguan" />
+          <label>推送文案模板</label>
+          <textarea id="opsBroadcastTpl" rows="6"></textarea>
+        </div>
+        <div class="ops-card">
+          <h4>上架规则</h4>
+          <label>上架媒体上限</label>
+          <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
+          <label>上架有效天数</label>
+          <input id="opsListingDays" type="number" min="1" max="365" value="30" />
+          <label class="row"><input type="checkbox" id="opsReviewAudit" checked /> 评价需审核后展示</label>
+        </div>
+        <button class="btn primary block" id="btnOpsSave" type="button">保存全部设置</button>
         <button class="btn block" id="btnSyncBot" type="button">同步机器人用户名</button>
       </section>
       <section class="admin-pane" id="pane-more">
-        <h3>举报</h3>
-        <div id="adminReports"></div>
-        <h3>遮蔽名单</h3>
-        <div id="adminShadow"></div>
-        <h3>调整口碑分</h3>
-        <form id="adjForm">
-          <label>用户 ID</label>
-          <input id="adjUser" type="number" required />
-          <label>加减分</label>
-          <input id="adjDelta" type="number" required />
-          <label>备注</label>
-          <input id="adjNote" />
-          <button class="btn primary" type="submit">提交</button>
-        </form>
+        <h3>风控</h3>
+        <div class="ops-card">
+          <h4>举报</h4>
+          <div id="adminReports"></div>
+        </div>
+        <div class="ops-card">
+          <h4>遮蔽名单</h4>
+          <div id="adminShadow"></div>
+        </div>
+        <div class="ops-card">
+          <h4>调整口碑分</h4>
+          <form id="adjForm">
+            <label>用户 ID</label>
+            <input id="adjUser" type="number" required />
+            <label>加减分</label>
+            <input id="adjDelta" type="number" required />
+            <label>备注</label>
+            <input id="adjNote" />
+            <button class="btn primary" type="submit">提交</button>
+          </form>
+        </div>
       </section>
     </div>
   </div>
-  <script src="./admin-boot.js?v=20260912h"></script>
-  <script src="./admin.js?v=20260912h"></script>
-  <script src="./admin-ops.js?v=20260912h"></script>
-  <script src="./admin-list.js?v=20260912h"></script>
-  <script src="./admin-fields.js?v=20260912h"></script>
-  <script src="./admin-promo.js?v=20260912h"></script>
-  <script src="./admin-proxy.js?v=20260912h"></script>
-  <script src="./admin-proxy-edit.js?v=20260912h"></script>
-  <script src="./admin-picks.js?v=20260912h"></script>
-  <script src="./admin-hydrate.js?v=20260912h"></script>
+  <script src="./admin-boot.js?v=20260912i"></script>
+  <script src="./admin.js?v=20260912i"></script>
+  <script src="./admin-ops.js?v=20260912i"></script>
+  <script src="./admin-list.js?v=20260912i"></script>
+  <script src="./admin-fields.js?v=20260912i"></script>
+  <script src="./admin-promo.js?v=20260912i"></script>
+  <script src="./admin-proxy.js?v=20260912i"></script>
+  <script src="./admin-proxy-edit.js?v=20260912i"></script>
+  <script src="./admin-picks.js?v=20260912i"></script>
+  <script src="./admin-hydrate.js?v=20260912i"></script>
+  <script src="./admin-side.js?v=20260912i"></script>
 </body>
 </html>
