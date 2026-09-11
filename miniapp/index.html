@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260911a" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260911a" />
+  <link rel="stylesheet" href="./styles.css?v=20260911b" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260911b" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -51,18 +51,18 @@
           <label>城市</label>
           <select id="pubCity" required></select>
           <label>简介</label>
-          <textarea id="pubDesc" rows="3" maxlength="2000" placeholder="简单介绍一下"></textarea>
+          <textarea id="pubDesc" rows="3" maxlength="2000"></textarea>
           <details class="advanced">
             <summary>更多选填</summary>
             <label>价位</label>
-            <input id="pubPrice" placeholder="面议 / 6000+" />
+            <input id="pubPrice" />
             <label>区</label>
-            <input id="pubDistrict" maxlength="64" placeholder="例如：南山区" />
+            <input id="pubDistrict" />
             <label>大致位置</label>
-            <input id="pubApprox" maxlength="128" placeholder="例如：科技园附近" />
-            <label>标签（空格分隔，最多 5）</label>
-            <input id="pubTags" placeholder="清新 健谈" />
-            <textarea id="pubMedia" class="hidden" rows="1" aria-hidden="true"></textarea>
+            <input id="pubApprox" />
+            <label>标签</label>
+            <input id="pubTags" />
+            <textarea id="pubMedia" class="hidden" rows="1"></textarea>
           </details>
           <button class="btn primary block big" type="submit">提交审核</button>
         </form>
@@ -71,10 +71,9 @@
         <div id="meCard" class="card"></div>
         <div class="card">
           <h3>我的身份</h3>
-          <p class="muted hint">浏览默认是客人；上架时再选老师/商家。会话在 Telegram 对话里进行。</p>
-          <label>聊天代称（仅会话显示，不公开账号）</label>
+          <label>聊天代称</label>
           <div class="row">
-            <input id="guestNick" maxlength="16" placeholder="例如：小明" style="flex:1;margin:0" />
+            <input id="guestNick" maxlength="16" style="flex:1;margin:0" />
             <button class="btn" id="btnSaveNick" type="button">保存</button>
           </div>
           <div class="row" style="margin-top:8px">
@@ -89,7 +88,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260911a">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260911b">管理后台</a>
           </div>
         </div>
       </section>
@@ -101,11 +100,8 @@
         <form id="reviewForm" class="card form">
           <h3>提交评价</h3>
           <input type="hidden" id="revLampId" />
-          <label>星级 1-5</label>
           <input id="revStars" type="number" min="1" max="5" value="5" required />
-          <label>文字</label>
-          <textarea id="revText" rows="3" maxlength="2000"></textarea>
-          <label>图片链接（可选，空格分隔）</label>
+          <textarea id="revText" rows="3"></textarea>
           <input id="revPhotos" />
           <button class="btn primary block" type="submit">提交评价</button>
         </form>
@@ -117,24 +113,13 @@
       <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
     </nav>
   </div>
-  <div id="citySheet" class="sheet hidden">
-    <div class="sheet-panel">
-      <h3>选择城市</h3>
-      <div id="cityList"></div>
-      <button class="btn block" id="cityClose" type="button">关闭</button>
-    </div>
-  </div>
-  <div id="rulesSheet" class="sheet hidden">
-    <div class="sheet-panel">
-      <h3 id="rulesTitle">口碑分说明</h3>
-      <ul id="rulesList"></ul>
-      <button class="btn block" id="rulesClose" type="button">知道了</button>
-    </div>
-  </div>
-  <script src="./boot-inline.js?v=20260911a"></script>
-  <script src="./app.js?v=20260911a"></script>
-  <script src="./home-ui.js?v=20260911a"></script>
-  <script src="./publish-ui.js?v=20260911a"></script>
-  <script src="./home-media.js?v=20260911a"></script>
+  <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
+  <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
+  <script src="./boot-inline.js?v=20260911b"></script>
+  <script src="./app.js?v=20260911b"></script>
+  <script src="./home-ui.js?v=20260911b"></script>
+  <script src="./publish-ui.js?v=20260911b"></script>
+  <script src="./home-media.js?v=20260911b"></script>
+  <script src="./me-listings.js?v=20260911b"></script>
 </body>
 </html>
