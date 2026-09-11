@@ -14,7 +14,7 @@ from bot.models import Post, PostStatus, Report, ReportStatus, UserRole
 from bot.services import anti_brush, credit_service, home_service, search_service
 from bot.api.routes_core import (
     router,
-    PostCreateBody,
+    PostCreateBody as _PostCreateBody,
     ReportCreateBody,
     ReviewCreateBody,
     _ser_dt,
@@ -24,6 +24,10 @@ from bot.api.routes_core import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class PostCreateBody(_PostCreateBody):
+    extras: Dict[str, Any] | None = None
 
 
 @router.post("/posts")
@@ -68,6 +72,7 @@ async def api_create_post(
         "approx_lng": body.approx_lng,
         "approx_label": (body.approx_label or "").strip()[:128] or None,
         "publisher_role": role,
+        "extras": dict(body.extras or {}),
     }
     post_id = str(uuid.uuid4())
     async with session_scope() as s:
