@@ -56,8 +56,8 @@
   function pinHtml(p) {
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
-    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
-      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+    const bg = img ? ` style="background-image:url('${esc(img)}')"` : "";
+    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}"${bg}>
       <div class="pin-copy"><b>${esc(t.title || "")}</b></div>
     </div>`;
   }
@@ -75,7 +75,10 @@
   }
   function broken() {
     const feed = $("#feed");
-    return !!(lastItems.length && feed && !feed.querySelector(".cover-card"));
+    const pins = $("#pins");
+    const feedBad = lastItems.length && feed && !feed.querySelector(".cover-card");
+    const pinBad = lastPins.length && pins && !pins.querySelector(".pin-copy");
+    return !!(feedBad || pinBad);
   }
   async function loadFeed(reset) {
     if (!token() || painting) return;
@@ -91,8 +94,6 @@
       if (data.city) localStorage.setItem("yycj_city", data.city);
       const btn = $("#btnCity");
       if (btn) btn.textContent = (data.city || city || "城市") + " ▾";
-      const drop = $("#cityDrop");
-      if (drop) drop.innerHTML = (cities || []).map((c) => `<button type="button" class="city-opt" data-city="${esc(c)}">${esc(c)}</button>`).join("");
       lastPins = data.pins || [];
       const batch = data.items || [];
       lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -121,18 +122,11 @@
   async function boot() {
     for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
-    const feed = $("#feed");
-    if (feed) {
-      new MutationObserver(() => { if (!painting && broken()) paint(); }).observe(feed, { childList: true });
-    }
-    const pins = $("#pins");
-    if (pins) {
-      new MutationObserver(() => {
-        if (!painting && lastPins.length && !pins.querySelector(".pin-copy")) paint();
-      }).observe(pins, { childList: true });
-    }
-    setTimeout(() => { if (broken()) paint(); }, 400);
-    setTimeout(() => { if (broken()) paint(); }, 1200);
+    ["#feed", "#pins"].forEach((sel) => {
+      const el = $(sel);
+      if (el) new MutationObserver(() => { if (!painting && broken()) paint(); }).observe(el, { childList: true });
+    });
+    setTimeout(() => { if (broken()) paint(); }, 500);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
