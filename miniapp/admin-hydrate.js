@@ -17,6 +17,7 @@
     setVal("opsCta", s.chat_cta_label);
     setVal("opsWelcome", s.bot_welcome_text);
     setVal("opsMediaMax", s.media_max_count);
+    setVal("opsMediaChannel", s.media_channel_id);
     setVal("opsListingDays", s.listing_days);
     setVal("opsCarouselSec", s.carousel_interval_sec);
     setVal("opsAdminContact", s.admin_contact);
