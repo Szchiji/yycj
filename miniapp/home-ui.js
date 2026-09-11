@@ -1,6 +1,6 @@
 (() => {
   const $ = (s) => document.querySelector(s);
-  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [], cities = [];
+  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [];
   function token() { return localStorage.getItem("yycj_token") || ""; }
   async function api(path) {
     const r = await fetch(path, { headers: { Authorization: "Bearer " + token() } });
@@ -44,7 +44,7 @@
     const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
     return `<div class="feed-card compact cover-card" data-id="${esc(t.lamp_id)}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+        ${img ? `<img class="thumb" src="${esc(img)}" alt="" style="height:200px;object-fit:cover;width:100%" />` : `<div class="thumb ph" style="height:200px"></div>`}
         <button class="fav-btn" type="button" data-fav="${esc(t.lamp_id)}">♡</button>
         ${loc ? `<span class="badge-loc">${esc(loc)}</span>` : ""}
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
@@ -57,9 +57,7 @@
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
     const bg = img ? ` style="background-image:url('${esc(img)}')"` : "";
-    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}"${bg}>
-      <div class="pin-copy"><b>${esc(t.title || "")}</b></div>
-    </div>`;
+    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}"${bg}><div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
   }
   function paint() {
     const feed = $("#feed");
@@ -76,9 +74,7 @@
   function broken() {
     const feed = $("#feed");
     const pins = $("#pins");
-    const feedBad = lastItems.length && feed && !feed.querySelector(".cover-card");
-    const pinBad = lastPins.length && pins && !pins.querySelector(".pin-copy");
-    return !!(feedBad || pinBad);
+    return !!((lastItems.length && feed && !feed.querySelector(".cover-wrap")) || (lastPins.length && pins && !pins.querySelector(".pin-copy")));
   }
   async function loadFeed(reset) {
     if (!token() || painting) return;
@@ -90,7 +86,6 @@
       if (city) params.set("city", city);
       if (q) params.set("q", q);
       const data = await api("/api/home?" + params);
-      cities = data.enabled_cities || cities;
       if (data.city) localStorage.setItem("yycj_city", data.city);
       const btn = $("#btnCity");
       if (btn) btn.textContent = (data.city || city || "城市") + " ▾";
@@ -126,7 +121,7 @@
       const el = $(sel);
       if (el) new MutationObserver(() => { if (!painting && broken()) paint(); }).observe(el, { childList: true });
     });
-    setTimeout(() => { if (broken()) paint(); }, 500);
+    setTimeout(() => { if (broken()) paint(); }, 400);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
