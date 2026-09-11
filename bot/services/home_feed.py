@@ -1,4 +1,4 @@
-"""首页卡片流置顶与运营配置（与精选轮播 HomepagePin 独立）。"""
+"""首页卡片流置顶与运营配置。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from bot.db import session_scope
-from bot.models import Lamp, LampStatus, SiteSettings
+from bot.models import HomepagePin, Lamp, LampStatus, SiteSettings
 
 DEFAULT_OPS = {
     "home_feed_page_size": 3,
@@ -23,6 +23,10 @@ DEFAULT_OPS = {
     "admin_btn_label": "管理员",
     "admin_contact": "",
     "required_chats": [],
+    "approve_promo_text": (
+        "你的资料已上架。\n"
+        "欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。"
+    ),
 }
 
 
@@ -42,6 +46,7 @@ def merge_ops(raw) -> Dict[str, Any]:
         out["media_max_count"] = 9
     out["chat_cta_label"] = str(out.get("chat_cta_label") or "想聊聊")[:32]
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
+    out["approve_promo_text"] = str(out.get("approve_promo_text") or DEFAULT_OPS["approve_promo_text"])[:2000]
     out["review_require_audit"] = bool(out.get("review_require_audit", True))
     try:
         out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
