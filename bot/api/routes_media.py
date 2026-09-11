@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 import mimetypes
 from typing import Any, Dict, List
-from urllib.parse import quote
 
 import httpx
 from aiogram.types import BufferedInputFile
-from fastapi import Depends, File, HTTPException, UploadFile
+from fastapi import Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from bot.api.deps import get_current_user_id
@@ -28,6 +27,17 @@ def _guess_type(filename: str, content_type: str | None) -> str:
     if ct.startswith("video/") or name.endswith((".mp4", ".mov", ".webm", ".mkv")):
         return "video"
     return "image"
+
+
+def _mime_for(file_id: str, path: str) -> str:
+    fid = str(file_id or "")
+    low = str(path or "").lower()
+    mime, _ = mimetypes.guess_type(path)
+    if fid.startswith(("BAAC", "BQAC")) or low.endswith((".mp4", ".mov", ".webm", ".mkv")):
+        return "video/mp4"
+    if fid.startswith("AgAC") or low.endswith((".jpg", ".jpeg", ".png", ".webp")):
+        return mime or "image/jpeg"
+    return mime or "application/octet-stream"
 
 
 @router.post("/media/upload")
@@ -58,31 +68,33 @@ async def api_media_upload(
             if kind == "video":
                 try:
                     msg = await bot.send_video(chat_id, buf, disable_notification=True)
-                    file_id = (msg.video.file_id if msg.video else None) or (msg.document.file_id if msg.document else None)
+                    file_id = (msg.video.file_id if msg.video else None) or (
+                        msg.document.file_id if msg.document else None
+                    )
                 except Exception:
                     msg = await bot.send_document(chat_id, buf, disable_notification=True)
                     file_id = msg.document.file_id if msg.document else None
             else:
                 msg = await bot.send_photo(chat_id, buf, disable_notification=True)
                 file_id = msg.photo[-1].file_id if msg.photo else None
-            try:
-                await bot.delete_message(chat_id, msg.message_id)
-            except Exception:
-                pass
         except Exception as exc:
-            logger.exception("media upload send failed")
-            raise HTTPException(status_code=502, detail=f"上传到 Telegram 失败：{exc}") from exc
+            logger.exception("upload to telegram failed")
+            raise HTTPException(status_code=502, detail=f"上传失败：{exc}") from exc
         if not file_id:
-            raise HTTPException(status_code=502, detail="未能获取 file_id")
-        preview = f"/api/media/file/{quote(file_id, safe='')}"
-        results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": file_id})
+            continue
+        results.append({
+            "type": kind,
+            "file_id": file_id,
+            "url": file_id,
+            "preview_url": f"/api/media/file/{file_id}",
+        })
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
-    return {"ok": True, "items": results, "count": results and len(results)}
+    return {"ok": True, "items": results, "count": len(results)}
 
 
 @router.get("/media/file/{file_id:path}")
-async def api_media_file(file_id: str):
+async def api_media_file(file_id: str, request: Request):
     settings = get_settings()
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
@@ -96,24 +108,23 @@ async def api_media_file(file_id: str):
     if not path:
         raise HTTPException(status_code=404, detail="无 file_path")
     url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
-    mime, _ = mimetypes.guess_type(path)
-    fid = str(file_id or "")
-    if fid.startswith("BAAC") or str(path).lower().endswith((".mp4", ".mov", ".webm", ".mkv")):
-        mime = "video/mp4"
-    elif fid.startswith("AgAC") or str(path).lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-        mime = mime or "image/jpeg"
-    mime = mime or "application/octet-stream"
-    client = httpx.AsyncClient(timeout=60.0)
+    mime = _mime_for(file_id, path)
+    headers = {}
+    rng = request.headers.get("range")
+    if rng:
+        headers["Range"] = rng
+    client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
     try:
-        req = client.build_request("GET", url)
+        req = client.build_request("GET", url, headers=headers)
         resp = await client.send(req, stream=True)
     except Exception as exc:
         await client.aclose()
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败") from exc
-    if resp.status_code != 200:
+    if resp.status_code not in (200, 206):
         await resp.aclose()
         await client.aclose()
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
+
     async def stream():
         try:
             async for chunk in resp.aiter_bytes(64 * 1024):
@@ -121,8 +132,14 @@ async def api_media_file(file_id: str):
         finally:
             await resp.aclose()
             await client.aclose()
-    return StreamingResponse(stream(), media_type=mime, headers={
+
+    out = {
         "Cache-Control": "private, max-age=3600",
         "Accept-Ranges": "bytes",
         "Content-Disposition": "inline",
-    })
+    }
+    if resp.headers.get("content-range"):
+        out["Content-Range"] = resp.headers["content-range"]
+    if resp.headers.get("content-length"):
+        out["Content-Length"] = resp.headers["content-length"]
+    return StreamingResponse(stream(), status_code=resp.status_code, media_type=mime, headers=out)
