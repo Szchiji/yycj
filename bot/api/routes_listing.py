@@ -11,6 +11,7 @@ from bot.api.routes_core import MediaItem, _normalize_media, _ser_dt, router
 from bot.models import UserRole
 from bot.services import credit_service, listing_flow, listing_notify
 from bot.services.admin_ops import notify_user_best_effort
+from bot.services.extras_store import save_extras
 
 
 class EditBody(BaseModel):
@@ -24,6 +25,7 @@ class EditBody(BaseModel):
     media: List[MediaItem] = Field(default_factory=list)
     district: Optional[str] = None
     approx_label: Optional[str] = None
+    extras: Optional[Dict[str, Any]] = None
 
 
 class ProxyBody(EditBody):
@@ -68,6 +70,7 @@ async def api_me_edit(
         "district": (body.district or "").strip()[:64] or None,
         "approx_label": (body.approx_label or "").strip()[:128] or None,
         "publisher_role": u.get("role") or UserRole.TEACHER.value,
+        "extras": dict(body.extras or {}),
     }
     mine = await listing_flow.list_my_lamps(user_id)
     if lamp_id not in {x["lamp_id"] for x in mine}:
@@ -106,7 +109,8 @@ async def api_admin_proxy(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
-        await listing_flow.broadcast_listing(lamp)
+        await save_extras((lamp or {}).get("lamp_id"), body.extras)
+        await listing_flow.broadcast_listing(lamp, body.extras)
     except Exception:
         pass
     try:
@@ -140,8 +144,13 @@ async def api_admin_proxy_edit(
                 "photos": [m["url"] for m in media if m["type"] == "image"],
                 "district": body.district,
                 "approx_label": body.approx_label,
+                "extras": dict(body.extras or {}),
             },
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        await save_extras(lamp_id, body.extras)
+    except Exception:
+        pass
     return {"ok": True, "lamp": lamp, "by": admin_id}
