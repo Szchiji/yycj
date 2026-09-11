@@ -52,51 +52,12 @@
       }).join("") || "<p class='muted'>暂无轮播</p>";
     }
   }
-  async function search(q, boxId, kind) {
-    const box = $(boxId);
-    if (!box) return;
-    const data = await api("/api/admin/listings");
-    const items = (data.items || []).filter((x) => {
-      if ((x.status || "active") !== "active") return false;
-      if (!q) return true;
-      return `${x.title || ""} ${x.city || ""} ${x.lamp_id || ""}`.toLowerCase().includes(q.toLowerCase());
-    }).slice(0, 20);
-    box.innerHTML = items.map((x) => card(x,
-      kind === "pin"
-        ? `<button class="btn primary" data-pick-pin="${esc(x.lamp_id)}">上轮播</button>`
-        : `<button class="btn primary" data-pick-feed="${esc(x.lamp_id)}">置顶</button>`
-    )).join("") || "<p class='muted'>无匹配</p>";
-  }
-  document.getElementById("btnFeedPinSearch")?.addEventListener("click", () => {
-    search((document.getElementById("feedPinQ") || {}).value || "", "#feedPinResults", "feed").catch((e) => alert(e.message));
-  });
-  document.getElementById("btnPinSearch")?.addEventListener("click", () => {
-    search((document.getElementById("pinQ") || {}).value || "", "#pinResults", "pin").catch((e) => alert(e.message));
-  });
-  document.addEventListener("click", async (ev) => {
-    const feed = ev.target.closest("[data-pick-feed]");
-    const pin = ev.target.closest("[data-pick-pin]");
-    try {
-      if (feed) {
-        await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id: feed.getAttribute("data-pick-feed"), pinned: true }) });
-        await paintCurrent();
-      }
-      if (pin) {
-        const hoursRaw = (document.getElementById("pinHours") || {}).value || "";
-        await api("/api/admin/homepage/pins", {
-          method: "POST",
-          body: JSON.stringify({ lamp_id: pin.getAttribute("data-pick-pin"), sort_order: 0, expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10) }),
-        });
-        await paintCurrent();
-      }
-    } catch (e) { alert(e.message || String(e)); }
-  });
   document.getElementById("btnRefresh")?.addEventListener("click", () => setTimeout(() => paintCurrent().catch(() => {}), 700));
   setTimeout(() => paintCurrent().catch(() => {}), 1800);
-  if (!document.getElementById("yycj-admin-side")) {
+  if (!document.getElementById("yycj-admin-boot")) {
     const s = document.createElement("script");
-    s.id = "yycj-admin-side";
-    s.src = "./admin-side.js?v=20260911aa";
+    s.id = "yycj-admin-boot";
+    s.src = "./admin-boot.js?v=20260911ac";
     document.head.appendChild(s);
   }
 })();
