@@ -11,7 +11,7 @@
     s.src = "./scroll-perf.js?v=20260911ar";
     document.head.appendChild(s);
   }
-  ["admin-side.js", "admin-chats.js"].forEach((name) => {
+  ["admin-chats.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
