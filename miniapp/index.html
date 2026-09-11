@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260912b" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260912b" />
+  <link rel="stylesheet" href="./styles.css?v=20260912c" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260912c" />
   <style>
     #feed,#pins{visibility:visible!important;}
+    #topMeta{display:none!important;}
     #pins { display:flex !important; gap:10px; overflow-x:auto !important; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
     #pins .pin-card { flex:0 0 46%!important; width:46%!important; min-width:46%!important; aspect-ratio:3/4!important; height:auto!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; scroll-snap-align:start; display:block!important; }
     #pins .pin-card img.pin-cover, #pins .pin-card img.thumb { display:block!important; position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
@@ -25,7 +26,7 @@
     #citySheet { display:none !important; }
     .city-drop.hidden { display:none !important; }
     #detail .media-grid { display:none !important; }
-    #topMeta { display:none !important; }
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
   </style>
 </head>
 <body>
@@ -104,7 +105,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260912b">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260912c">管理后台</a>
           </div>
         </div>
       </section>
@@ -131,13 +132,19 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
-  <script src="./boot-inline.js?v=20260912b"></script>
-  <script src="./app.js?v=20260912b"></script>
-  <script src="./home-ui.js?v=20260912b"></script>
-  <script src="./publish-ui.js?v=20260912b"></script>
-  <script src="./me-listings.js?v=20260912b"></script>
-  <script src="./detail-fix.js?v=20260912b"></script>
-  <script src="./role-nav.js?v=20260912b"></script>
-  <script src="./fav.js?v=20260912b"></script>
+  <script src="./boot-inline.js?v=20260912c"></script>
+  <script src="./app.js?v=20260912c"></script>
+  <script src="./home-ui.js?v=20260912c"></script>
+  <script src="./publish-ui.js?v=20260912c"></script>
+  <script src="./me-listings.js?v=20260912c"></script>
+  <script src="./detail-fix.js?v=20260912c"></script>
+  <script src="./detail-polish.js?v=20260912c"></script>
+  <script src="./role-nav.js?v=20260912c"></script>
+  <script src="./fav.js?v=20260912c"></script>
+  <script src="./share.js?v=20260912c"></script>
+  <script src="./keyboard-fix.js?v=20260912c"></script>
+  <script src="./deep-open.js?v=20260912c"></script>
+  <script src="./home-head.js?v=20260912c"></script>
+  <script src="./me-polish.js?v=20260912c"></script>
 </body>
 </html>
