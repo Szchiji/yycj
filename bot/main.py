@@ -105,11 +105,13 @@ async def _startup() -> None:
         logger.info("Database connected")
         try:
             from bot.services import home_service
-            seed = await home_service.seed_demo_if_empty()
-            if seed.get("seeded"):
-                logger.info("Demo seed: %s", seed.get("lamp_ids"))
+            from bot.services.demo_purge import purge_demo_listings
+            home_service.seed_demo_if_empty = purge_demo_listings
+            purged = await purge_demo_listings()
+            if purged.get("purged"):
+                logger.info("Demo purged: %s", purged.get("lamp_ids"))
         except Exception:
-            logger.exception("demo seed skipped")
+            logger.exception("demo purge skipped")
         await anti_brush.allow("__warmup__", limit=1, window_sec=1)
         _schedule_jobs()
         try:
