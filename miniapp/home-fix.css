@@ -25,3 +25,15 @@
 }
 .pin-copy { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .pin-card .muted { display: none; }
+#pubPreview img, #pubPreview video { display: none !important; }
+.up-chip {
+  display: inline-block;
+  margin: 4px 4px 0 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: .75rem;
+  color: var(--muted);
+}
+#detail .media-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+#detail .media-grid img, #detail .media-grid video { width: 100%; border-radius: 10px; max-height: 180px; object-fit: cover; }
