@@ -12,6 +12,7 @@ from bot.models import HomepagePin, Lamp, LampStatus
 DEFAULT_OPS = {
     "home_feed_page_size": 3,
     "chat_cta_label": "想聊聊",
+    "show_chat_cta": True,
     "bot_welcome_text": "",
     "media_max_count": 6,
     "review_require_audit": True,
@@ -37,6 +38,7 @@ DEFAULT_OPS = {
         {"key": "标签", "label": "标签", "form": True},
         {"key": "地点", "label": "地点", "form": False},
         {"key": "链接", "label": "链接", "form": False},
+        {"key": "聊天按钮", "label": "聊天按钮", "form": False},
     ],
 }
 
@@ -52,7 +54,7 @@ def _sanitize_listing_fields(fields, fallback=None):
         if not key or key in seen:
             continue
         seen.add(key)
-        form = False if key in ("地点", "链接") else bool(item.get("form", True))
+        form = False if key in ("地点", "链接", "聊天按钮") else bool(item.get("form", True))
         out.append({"key": key, "label": str(item.get("label") or key)[:16], "form": form})
     return out or list(fallback or [])
 
@@ -72,6 +74,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     except (TypeError, ValueError):
         out["media_max_count"] = 9
     out["chat_cta_label"] = str(out.get("chat_cta_label") or "想聊聊")[:32]
+    out["show_chat_cta"] = bool(out.get("show_chat_cta", True))
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
     out["approve_promo_text"] = str(out.get("approve_promo_text") or DEFAULT_OPS["approve_promo_text"])[:2000]
     out["broadcast_channel"] = str(out.get("broadcast_channel") or "").strip()[:128]
