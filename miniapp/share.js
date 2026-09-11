@@ -38,7 +38,8 @@
     try {
       const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + (localStorage.getItem("yycj_token") || "") } });
       const data = await r.json();
-      const name = (data.bot && (data.bot.username || data.bot)) || data.bot_username || "";
+      const c = data.contacts || {};
+      const name = c.bot_username || (data.bot && data.bot.username) || data.bot_username || "";
       if (name) {
         window.__yycjBot = String(name).replace(/^@/, "");
         localStorage.setItem("yycj_bot", window.__yycjBot);
@@ -54,7 +55,7 @@
       id = id.slice(0,8)+"-"+id.slice(8,12)+"-"+id.slice(12,16)+"-"+id.slice(16,20)+"-"+id.slice(20);
     }
     if (id && window.openLamp) setTimeout(() => window.openLamp(id), 600);
-    else if (id) setTimeout(() => openShared(), 400);
+    else if (id) setTimeout(openShared, 400);
   }
   rememberBot();
   setTimeout(openShared, 800);
