@@ -4,7 +4,7 @@
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911ae";
+    s.src = "./" + name + "?v=20260911af";
     document.head.appendChild(s);
   });
 })();
