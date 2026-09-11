@@ -2,9 +2,10 @@
   if (!document.getElementById("yycj-pin-css")) {
     const st = document.createElement("style");
     st.id = "yycj-pin-css";
-    st.textContent = `#pins .pin-card{position:relative!important;overflow:hidden!important;min-height:148px!important;background-color:#141b2b!important;}
-#pins .pin-card img.pin-cover{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:contain!important;display:block!important;z-index:1!important;background:#141b2b!important;}
-#pins .pin-copy{position:absolute!important;left:8px!important;bottom:8px!important;z-index:2!important;color:#fff!important;text-shadow:0 1px 4px #000!important;}`;
+    st.textContent = `#pins{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+#pins .pin-card{flex:0 0 56%!important;aspect-ratio:3/4!important;height:auto!important;min-height:0!important;scroll-snap-align:start;border-radius:12px;overflow:hidden;position:relative!important;background-color:#141b2b!important;background-size:cover!important;background-position:center!important;}
+#pins .pin-card img.pin-cover{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important;display:block!important;z-index:1!important;}
+#pins .pin-copy{position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:2!important;padding:28px 10px 10px!important;color:#fff!important;background:linear-gradient(transparent,rgba(0,0,0,.72))!important;}`;
     document.head.appendChild(st);
   }
   const cache = {};
@@ -63,7 +64,6 @@
       card.insertBefore(img, card.firstChild);
     }
     if (img.getAttribute("src") !== url) img.setAttribute("src", url);
-    card.style.backgroundImage = "none";
   }
   async function fixAll() {
     const pins = document.getElementById("pins");
