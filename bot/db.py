@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
-# create_all 不会给已有表加列；启动时幂等补齐（PostgreSQL）。
 _ALTER_STATEMENTS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS district VARCHAR(64)",
@@ -35,6 +34,7 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pin_order INTEGER DEFAULT 0",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS unlist_reason VARCHAR(64)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS feed_pin_expires_at TIMESTAMP",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason VARCHAR(256)",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS guest_alias VARCHAR(32)",
