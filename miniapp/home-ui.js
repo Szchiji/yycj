@@ -2,13 +2,11 @@
   const $ = (s) => document.querySelector(s);
   let offset = 0;
   let q = "";
-  let carouselTimer = null;
   let booted = false;
   let painting = false;
-  let cities = [];
   let lastItems = [];
   let lastPins = [];
-  let lastSec = 4;
+  let lastHtml = "";
 
   function token() { return localStorage.getItem("yycj_token") || ""; }
   async function api(path) {
@@ -50,7 +48,6 @@
   function mediaCount(item) {
     return (item.media && item.media.length) || (item.photos && item.photos.length) || 0;
   }
-  function currentCity() { return localStorage.getItem("yycj_city") || ""; }
   function cardHtml(t) {
     const img = cover(t);
     const loc = [t.city, t.district].filter(Boolean).join("·");
@@ -74,21 +71,21 @@
     return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
       <span class="badge-pin">精选</span>
       ${img ? `<img class="thumb" loading="lazy" src="${esc(img)}" alt="" />` : ""}
-      <div class="pin-copy"><b>${esc(t.title || "")}</b><span>${esc(t.city || "")}</span></div>
+      <div class="pin-copy"><b>${esc(t.title || "")}</b></div>
     </div>`;
   }
   function paintAll() {
     const feed = $("#feed");
-    if (feed && lastItems.length) feed.innerHTML = lastItems.map(cardHtml).join("");
+    if (!feed || !lastItems.length) return;
+    const html = lastItems.map(cardHtml).join("");
+    if (html === lastHtml && feed.querySelector(".cover-card")) return;
+    lastHtml = html;
+    feed.innerHTML = html;
     const pins = $("#pins");
     if (pins && lastPins.length) {
       pins.innerHTML = lastPins.map(pinHtml).join("");
       pins.classList.remove("hidden");
     }
-  }
-  function needsPaint() {
-    const feed = $("#feed");
-    return !!(lastItems.length && feed && !feed.querySelector(".cover-card"));
   }
   async function loadFeed(reset) {
     if (!token() || painting) return;
@@ -96,29 +93,29 @@
     try {
       if (reset) offset = 0;
       const params = new URLSearchParams();
-      const city = currentCity();
+      const city = localStorage.getItem("yycj_city") || "";
       if (city) params.set("city", city);
       if (q) params.set("q", q);
       params.set("limit", "6");
       params.set("offset", String(offset));
       const data = await api(`/api/home?${params}`);
-      cities = data.enabled_cities || cities;
-      if (city) $("#btnCity") && ($("#btnCity").textContent = `${data.city || city} ▾`);
       lastPins = data.pins || [];
-      lastSec = data.carousel_interval_sec || 4;
       const batch = data.items || [];
       lastItems = (reset || offset === 0) ? batch : lastItems.concat(batch);
       offset += batch.length;
+      lastHtml = "";
       paintAll();
       $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
     } finally {
-      setTimeout(() => { painting = false; }, 50);
+      painting = false;
     }
   }
-  document.addEventListener("click", async (ev) => {
-    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; await loadFeed(true); }
-    if (ev.target.id === "btnLoadMore") await loadFeed(false);
-    if (ev.target.closest("[data-nav='home']")) setTimeout(() => { if (lastItems.length) paintAll(); else loadFeed(true); }, 30);
+  document.addEventListener("click", (ev) => {
+    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
+    if (ev.target.id === "btnLoadMore") loadFeed(false);
+    if (ev.target.closest("[data-nav='home']")) {
+      requestAnimationFrame(() => paintAll());
+    }
     if (ev.target.id === "btnCity" || ev.target.closest("#btnCity")) {
       ev.preventDefault(); $("#cityDrop")?.classList.toggle("hidden");
     }
@@ -126,7 +123,7 @@
     if (opt) {
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
-      await loadFeed(true);
+      loadFeed(true);
     }
   });
   async function boot() {
@@ -135,9 +132,7 @@
     if (!token()) return;
     booted = true;
     await loadFeed(true);
-    setTimeout(() => { if (needsPaint()) paintAll(); }, 300);
-    setTimeout(() => { if (needsPaint()) paintAll(); }, 900);
-    setInterval(() => { if (needsPaint()) paintAll(); }, 800);
+    setTimeout(paintAll, 200);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);

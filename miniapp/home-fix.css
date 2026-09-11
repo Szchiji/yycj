@@ -1,3 +1,10 @@
+/* 旧卡直接隐藏，避免和新卡互抢闪炼 */
+#feed .feed-card:not(.cover-card) { display: none !important; }
+.feed.feed-3, #feed.feed, #feed {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+}
 .pin-card, .pin-card.short {
   display: flex !important;
   flex-direction: row !important;
@@ -7,60 +14,64 @@
   height: 56px;
 }
 .pin-card .thumb { width: 44px !important; height: 44px !important; flex: 0 0 44px !important; }
-.pin-copy { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.pin-copy b, .pin-copy span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; writing-mode: horizontal-tb !important; }
-.pin-card .muted { display: none; }
+.pin-copy { flex: 1; min-width: 0; }
+.pin-copy b, .pin-copy span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #pubPreview { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 #pubPreview img.up-thumb, #pubPreview video.up-thumb {
-  display: block !important; width: 56px !important; height: 56px !important; object-fit: cover; border-radius: 8px;
+  width: 56px !important; height: 56px !important; object-fit: cover; border-radius: 8px;
 }
 .feed-card.cover-card { padding: 0; overflow: hidden; }
 .cover-wrap { position: relative; }
 .cover-wrap .thumb, .cover-wrap .thumb.ph {
   width: 100% !important;
-  height: 118px !important;
+  height: 176px !important;
   object-fit: cover;
   border-radius: 12px 12px 0 0;
   display: block;
+  background: #1a2030;
 }
 .fav-btn {
-  position: absolute; top: 6px; left: 6px;
-  width: 28px; height: 28px; border-radius: 50%;
-  border: 0; background: rgba(0,0,0,.45); color: #fff; font-size: 14px;
+  position: absolute; top: 8px; left: 8px;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 0; background: rgba(0,0,0,.45); color: #fff; font-size: 15px;
 }
+.fav-btn.on { color: #ff6b8a; }
 body.role-host .fav-btn { display: none !important; }
 .badge-loc {
-  position: absolute; top: 6px; right: 6px;
+  position: absolute; top: 8px; right: 8px;
   background: rgba(20,40,90,.82); color: #fff; font-size: 10px;
-  padding: 2px 6px; border-radius: 999px;
+  padding: 2px 7px; border-radius: 999px;
 }
 .badge-tag {
-  position: absolute; left: 6px; bottom: 6px;
+  position: absolute; left: 8px; bottom: 8px;
   background: #6d4aff; color: #fff; font-size: 10px;
-  padding: 2px 6px; border-radius: 999px;
+  padding: 2px 7px; border-radius: 999px;
 }
 .badge-n {
-  position: absolute; right: 6px; bottom: 6px;
+  position: absolute; right: 8px; bottom: 8px;
   background: rgba(0,0,0,.5); color: #fff; font-size: 10px;
-  padding: 2px 6px; border-radius: 999px;
+  padding: 2px 7px; border-radius: 999px;
 }
-.cover-card .body { padding: 8px;
-}
-.cover-card .body h3 { font-size: 13px; margin: 0 0 2px; }
+.cover-card .body { padding: 8px 10px 10px; }
+.cover-card .body h3 { font-size: 14px; margin: 0 0 2px; }
 .cover-card .price { color: #7ea8ff; font-weight: 600; }
 .gallery { margin-bottom: 10px; }
 .gallery-hero img, .gallery-hero video {
-  width: 100%; max-height: 320px; object-fit: cover; border-radius: 12px; background: #111;
+  width: 100%; max-height: 360px; object-fit: cover; border-radius: 12px; background: #111;
 }
-.gallery-thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 4px; }
+.gallery-thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
 .g-thumb {
-  position: relative; flex: 0 0 54px; width: 54px; height: 54px; padding: 0;
+  position: relative; flex: 0 0 56px; width: 56px; height: 56px; padding: 0;
   border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #111;
 }
 .g-thumb.on { border-color: #7ea8ff; }
 .g-thumb img, .g-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .g-thumb .play {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  color: #fff; background: rgba(0,0,0,.35); font-size: 12px;
+  color: #fff; background: rgba(0,0,0,.35);
 }
 .nav-item.hidden { display: none !important; }
+.unfav {
+  margin-top: 8px;
+}
+#favList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
