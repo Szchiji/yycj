@@ -38,3 +38,17 @@
 .ad-more-menu.hidden { display: none; }
 .ad-more-menu .btn { width: 100%; text-align: left; }
 @media (min-width: 860px) { .ad-savebar { left: 168px; } }
+.ph-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 8px; }
+.ph-row {
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  gap: 6px; align-items: center;
+  padding: 8px 10px; border: 1px solid #2a3348; border-radius: 10px;
+  background: #121826;
+}
+.ph-name { font-size: 14px; color: #e8eef8; }
+.ph-row .muted { font-size: 11px; }
+.ph-row .btn { padding: 4px 8px; font-size: 12px; }
+@media (max-width: 420px) {
+  .ph-row { grid-template-columns: 1fr auto; }
+  .ph-row .muted { display: none; }
+}
