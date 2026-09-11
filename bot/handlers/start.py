@@ -25,10 +25,9 @@ async def _force_join(message: Message, lamp_id: str | None = None) -> bool:
     missing = await missing_required(user.id)
     if not missing:
         return False
-    key = lamp_id or "home"
     await message.answer(
         "请先加入以下频道/群，再点「我已关注」。",
-        reply_markup=join_kb(missing, key),
+        reply_markup=join_kb(missing, lamp_id or "home"),
     )
     return True
 
@@ -38,15 +37,16 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
     user = message.from_user
     if not user:
         return
-    await credit_service.ensure_user(
+    profile = await credit_service.ensure_user(
         user.id,
         username=user.username,
         full_name=user.full_name,
     )
-    try:
-        await credit_service.set_user_role(user.id, "guest")
-    except Exception:
-        pass
+    if not profile.get("role"):
+        try:
+            await credit_service.set_user_role(user.id, "guest")
+        except Exception:
+            pass
     arg = (command.args if command else "") or ""
     if not arg and message.text:
         parts = message.text.split(maxsplit=1)
@@ -58,7 +58,6 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
         kb = open_card_kb(lamp_id)
         await message.answer("点下方打开分享的资料。", reply_markup=kb or remove_kb())
         return
-
     settings = get_settings()
     tip = "点左下角「首页」开始。" if settings.normalized_webapp_url else "请先配置 WEBAPP_URL。"
     welcome = f"欢迎使用 <b>月影车姬</b>\n{tip}"
