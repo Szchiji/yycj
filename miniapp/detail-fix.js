@@ -1,6 +1,7 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
   const cache = {};
+  const posters = {};
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
@@ -17,10 +18,10 @@
         border:2px solid transparent; border-radius:8px; overflow:hidden; background:#111;
       }
       #yycjGallery .g-thumb.on { border-color:#7ea8ff; }
-      #yycjGallery .g-thumb img, #yycjGallery .g-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+      #yycjGallery .g-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
       #yycjGallery .g-thumb .play {
         position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-        color:#fff; background:rgba(0,0,0,.3); font-size:13px;
+        color:#fff; background:rgba(0,0,0,.28); font-size:13px; pointer-events:none;
       }
     `;
     document.head.appendChild(st);
@@ -57,13 +58,38 @@
       const src = srcOf(m && (m.file_id || m.url || m.preview_url));
       if (!src) return;
       const vid = isVideo(m, raw);
-      out.push({ type: vid ? "video" : "image", src, poster: srcOf(m && (m.thumb_file_id || m.thumbnail || "")) });
+      const poster = posters[src] || srcOf(m && (m.thumb_file_id || m.thumbnail || ""));
+      out.push({ type: vid ? "video" : "image", src, poster });
     });
     if (!out.length) (lamp.photos || []).forEach((p) => {
       const src = srcOf(p);
-      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: "" });
+      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: posters[src] || "" });
     });
     return out;
+  }
+  function grabFrame(src, done) {
+    if (posters[src]) { done(posters[src]); return; }
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.src = src;
+    const finish = () => {
+      try {
+        if (!v.videoWidth) return;
+        const c = document.createElement("canvas");
+        c.width = v.videoWidth;
+        c.height = v.videoHeight;
+        c.getContext("2d").drawImage(v, 0, 0);
+        posters[src] = c.toDataURL("image/jpeg", 0.7);
+        done(posters[src]);
+      } catch (e) {}
+    };
+    v.addEventListener("loadeddata", () => {
+      try { v.currentTime = 0.2; } catch (e) { finish(); }
+    });
+    v.addEventListener("seeked", finish);
+    v.addEventListener("error", () => done(""));
   }
   function playHero(v) {
     if (!v) return;
@@ -75,28 +101,6 @@
     const go = () => v.play().catch(() => {});
     go();
     v.addEventListener("canplay", go, { once: true });
-  }
-  function snap(v) {
-    if (!v) return;
-    v.muted = true;
-    v.playsInline = true;
-    const go = () => { try { v.currentTime = 0.15; } catch (e) {} };
-    v.addEventListener("loadeddata", go);
-  }
-  function ensureShare() {
-    const box = document.getElementById("detail");
-    if (!box) return;
-    let btn = document.getElementById("detailShare");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "detailShare";
-      btn.className = "btn";
-      btn.type = "button";
-      btn.textContent = "分享";
-    }
-    btn.setAttribute("data-share", box.getAttribute("data-lamp") || "1");
-    const row = box.querySelector("#detailChat")?.parentElement || box.querySelector(".row");
-    if (row && btn.parentElement !== row) row.appendChild(btn);
   }
   function render(items, lampId, idx) {
     const el = host();
@@ -110,7 +114,7 @@
       : `<img src="${cur.src}" alt="" />`}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
         m.type === "video"
-          ? (m.poster ? `<img src="${m.poster}" alt="" />` : `<video src="${m.src}" muted preload="auto" playsinline></video>`) + `<span class="play">▶</span>`
+          ? `<img src="${m.poster || ""}" alt="" /><span class="play">▶</span>`
           : `<img src="${m.src}" alt="" />`
       }</button>`).join("")}</div>`;
     el.querySelectorAll("[data-g]").forEach((btn) => {
@@ -120,10 +124,19 @@
         render(items, lampId, Number(btn.getAttribute("data-g") || 0));
       };
     });
-    el.querySelectorAll(".g-thumb video").forEach(snap);
+    items.forEach((m, i) => {
+      if (m.type !== "video" || m.poster) return;
+      grabFrame(m.src, (url) => {
+        if (!url) return;
+        items[i].poster = url;
+        const img = el.querySelectorAll(".g-thumb img")[i];
+        if (img) img.src = url;
+        const hero = el.querySelector(".gallery-hero video");
+        if (hero && Number(el.dataset.idx) === i) hero.setAttribute("poster", url);
+      });
+    });
     if (cur.type === "video") playHero(el.querySelector(".gallery-hero video"));
     document.querySelectorAll("#detail .media-grid").forEach((n) => { n.style.display = "none"; });
-    ensureShare();
   }
   async function paint(id) {
     if (!id) return;
@@ -136,8 +149,7 @@
         });
         cache[id] = await r.json();
       }
-      const items = collect(cache[id].lamp || cache[id].item || cache[id]);
-      render(items, id, 0);
+      render(collect(cache[id].lamp || cache[id].item || cache[id]), id, 0);
     } catch (e) { console.warn(e); }
   }
   window.openLamp = function (id) {
