@@ -1,68 +1,12 @@
-.topbar.topbar-3 {
-  display: grid !important;
-  grid-template-columns: 76px 1fr auto !important;
-  align-items: center !important;
+#pins { display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+#pins .pin-card {
+  flex:0 0 78%; scroll-snap-align:start; height:148px !important;
+  border-radius:12px; overflow:hidden; background:#141b2b no-repeat center / contain !important;
+  position:relative;
 }
-.topbar .brand { justify-self: center; font-weight: 700; }
-.topbar .city-wrap { justify-self: end; position: relative; }
-.city-drop {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 80;
-  min-width: 132px; background: #151b2b; border: 1px solid #2a3348; border-radius: 12px; padding: 6px;
+#pins .pin-card img.pin-cover {
+  width:100%; height:100%; object-fit:contain; background:#141b2b; display:block;
 }
-.city-drop.hidden { display: none !important; }
-.city-drop .city-opt { display: block; width: 100%; border: 0; background: transparent; color: #e8eefc; padding: 8px 10px; text-align: left; }
-#citySheet { display: none !important; }
-.pins {
-  display: flex !important;
-  gap: 10px;
-  overflow-x: auto !important;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-}
-.pin-track { display: contents; animation: none !important; }
-#pins .pin-card, .pin-card, .pin-card.short {
-  position: relative !important;
-  flex: 0 0 78% !important;
-  width: 78% !important;
-  height: 108px !important;
-  min-height: 108px !important;
-  max-height: 108px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border-radius: 14px !important;
-  scroll-snap-align: start;
-  background-size: cover !important;
-  background-position: center !important;
-}
-.pin-card > *:not(.pin-copy) { display: none !important; }
-.pin-card .pin-copy {
-  position: absolute !important;
-  left: 0; right: 0; bottom: 0; z-index: 2;
-  display: block !important;
-  padding: 16px 10px 8px;
-  background: linear-gradient(transparent, rgba(0,0,0,.72));
-  color: #fff;
-}
-#feed.has-cover, #favList {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr 1fr !important;
-  gap: 8px !important;
-}
-#feed .cover-wrap .thumb, #favList .cover-wrap .thumb {
-  width: 100% !important; height: 200px !important; object-fit: cover !important; display: block !important;
-}
-.cover-wrap { position: relative; }
-.fav-btn {
-  position: absolute; top: 6px; left: 6px; width: 26px; height: 26px;
-  border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff;
-}
-.badge-loc, .badge-tag, .badge-n {
-  position: absolute; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 999px;
-}
-.badge-loc { top: 6px; right: 6px; background: rgba(20,40,90,.82); }
-.badge-tag { left: 6px; bottom: 6px; background: #6d4aff; }
-.badge-n { right: 6px; bottom: 6px; background: rgba(0,0,0,.5); }
-.cover-card { padding: 0 !important; }
-.cover-card .body { padding: 6px; }
-#detail .media-grid { display: none !important; }
-.nav-item.hidden { display: none !important; }
+#pins .pin-copy { position:absolute; left:8px; bottom:8px; color:#fff; text-shadow:0 1px 4px #000; }
+.feed-3, #feed.has-cover { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+#feed .cover-wrap .thumb { width:100%; height:200px !important; object-fit:cover; }
