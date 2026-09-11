@@ -14,9 +14,19 @@ def preview_url(url: str) -> str:
     u = (url or "").strip()
     if not u:
         return ""
+    if u.lower().startswith("file_id:"):
+        u = u.split(":", 1)[-1].strip()
     if is_http(u):
         return u
     return f"/api/media/file/{quote(u, safe='')}"
+
+
+def guess_kind(raw: str, declared: str | None = None) -> str:
+    kind = (declared or "image").lower()
+    u = (raw or "").strip()
+    if kind == "video" or u.startswith("BAAC") or u.lower().endswith((".mp4", ".mov", ".webm", ".mkv")):
+        return "video"
+    return "image" if kind not in ("image", "video") else kind
 
 
 def enrich_media(media: List[Dict[str, Any]] | None, photos: List[str] | None = None) -> List[Dict[str, str]]:
@@ -25,21 +35,21 @@ def enrich_media(media: List[Dict[str, Any]] | None, photos: List[str] | None = 
         if not isinstance(m, dict):
             u = str(m).strip()
             if u:
-                out.append({"type": "image", "url": u, "preview_url": preview_url(u)})
+                out.append({"type": guess_kind(u), "url": u, "preview_url": preview_url(u)})
             continue
-        raw = (m.get("url") or m.get("file_id") or "").strip()
+        raw = (m.get("file_id") or m.get("url") or "").strip()
         if not raw:
             continue
-        kind = (m.get("type") or "image").lower()
-        if kind not in ("image", "video"):
-            kind = "image"
+        kind = guess_kind(raw, m.get("type"))
         item = {"type": kind, "url": raw, "preview_url": m.get("preview_url") or preview_url(raw)}
         if m.get("file_id"):
             item["file_id"] = str(m["file_id"])
+        elif not is_http(raw):
+            item["file_id"] = raw
         out.append(item)
     if not out:
         for p in photos or []:
             u = str(p).strip()
             if u:
-                out.append({"type": "image", "url": u, "preview_url": preview_url(u)})
+                out.append({"type": guess_kind(u), "url": u, "preview_url": preview_url(u)})
     return out
