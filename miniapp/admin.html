@@ -10,8 +10,8 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260912g" />
-  <link rel="stylesheet" href="./admin.css?v=20260912g" />
+  <link rel="stylesheet" href="./styles.css?v=20260912h" />
+  <link rel="stylesheet" href="./admin.css?v=20260912h" />
   <style>html,body{height:auto!important;overflow:auto!important;overflow-y:scroll!important;-webkit-overflow-scrolling:touch!important;}</style>
 </head>
 <body class="admin-body">
@@ -21,7 +21,7 @@
       <div id="status" class="muted"></div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260912g">← 首页</a>
+      <a class="btn" href="./index.html?v=20260912h">← 首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
@@ -106,16 +106,16 @@
         <textarea id="opsWelcome" rows="3"></textarea>
         <label>媒体存储频道 ID</label>
         <input id="opsMediaChannel" placeholder="-100xxxxxxxxxx" />
-        <label>审核通过推送频道</label>
-        <input id="opsChannel" placeholder="-100... 或 @channel" />
-        <label>推送文案模板（{title} {loc} {price} {tags} {desc} {link}）</label>
+        <label>审核通过推送频道（填 @频道名 或 -100…）</label>
+        <input id="opsChannel" placeholder="@yydanganguan" />
+        <label>推送文案模板（用中文占位，点下方按钮插入）</label>
         <textarea id="opsBroadcastTpl" rows="6" placeholder="🌙 月影车姬 · 新上架
-{title}
-📍 {loc}
-💰 {price}
-{tags}
-{desc}
-{link}"></textarea>
+{称呼}
+📍 {地点}
+💰 {价位}
+{标签}
+{简介}
+{链接}"></textarea>
         <label>上架媒体上限</label>
         <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
         <label>上架有效天数</label>
@@ -150,14 +150,15 @@
       </section>
     </div>
   </div>
-  <script src="./admin-boot.js?v=20260912g"></script>
-  <script src="./admin.js?v=20260912g"></script>
-  <script src="./admin-ops.js?v=20260912g"></script>
-  <script src="./admin-list.js?v=20260912g"></script>
-  <script src="./admin-promo.js?v=20260912g"></script>
-  <script src="./admin-proxy.js?v=20260912g"></script>
-  <script src="./admin-proxy-edit.js?v=20260912g"></script>
-  <script src="./admin-picks.js?v=20260912g"></script>
-  <script src="./admin-hydrate.js?v=20260912g"></script>
+  <script src="./admin-boot.js?v=20260912h"></script>
+  <script src="./admin.js?v=20260912h"></script>
+  <script src="./admin-ops.js?v=20260912h"></script>
+  <script src="./admin-list.js?v=20260912h"></script>
+  <script src="./admin-fields.js?v=20260912h"></script>
+  <script src="./admin-promo.js?v=20260912h"></script>
+  <script src="./admin-proxy.js?v=20260912h"></script>
+  <script src="./admin-proxy-edit.js?v=20260912h"></script>
+  <script src="./admin-picks.js?v=20260912h"></script>
+  <script src="./admin-hydrate.js?v=20260912h"></script>
 </body>
 </html>
