@@ -1,6 +1,6 @@
 (() => {
   const $ = (s) => document.querySelector(s);
-  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [];
+  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [], cities = [];
   function token() { return localStorage.getItem("yycj_token") || ""; }
   async function api(path) {
     const r = await fetch(path, { headers: { Authorization: "Bearer " + token() } });
@@ -36,6 +36,17 @@
     }
     return "";
   }
+  function fillCities(list, current) {
+    cities = list && list.length ? list : cities;
+    const drop = $("#cityDrop");
+    if (drop) {
+      drop.innerHTML = (cities || []).map((c) =>
+        `<button type="button" class="city-opt${c === current ? " on" : ""}" data-city="${esc(c)}">${esc(c)}</button>`
+      ).join("") || "<div class='muted' style='padding:8px'>暂无城市</div>";
+    }
+    const btn = $("#btnCity");
+    if (btn) btn.textContent = (current || "城市") + " ▾";
+  }
   function cardHtml(t) {
     const img = cover(t);
     const loc = [t.city, t.district].filter(Boolean).join("·");
@@ -44,7 +55,7 @@
     const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
     return `<div class="feed-card compact cover-card" data-id="${esc(t.lamp_id)}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" src="${esc(img)}" alt="" style="height:200px;object-fit:cover;width:100%" />` : `<div class="thumb ph" style="height:200px"></div>`}
+        ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
         <button class="fav-btn" type="button" data-fav="${esc(t.lamp_id)}">♡</button>
         ${loc ? `<span class="badge-loc">${esc(loc)}</span>` : ""}
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
@@ -67,14 +78,10 @@
     }
     const pins = $("#pins");
     if (pins && lastPins.length) {
-      pins.innerHTML = lastPins.map(pinHtml).join("");
+      const html = lastPins.map(pinHtml).join("");
+      pins.innerHTML = `<div class="pin-track">${html}${html}</div>`;
       pins.classList.remove("hidden");
     }
-  }
-  function broken() {
-    const feed = $("#feed");
-    const pins = $("#pins");
-    return !!((lastItems.length && feed && !feed.querySelector(".cover-wrap")) || (lastPins.length && pins && !pins.querySelector(".pin-copy")));
   }
   async function loadFeed(reset) {
     if (!token() || painting) return;
@@ -86,9 +93,7 @@
       if (city) params.set("city", city);
       if (q) params.set("q", q);
       const data = await api("/api/home?" + params);
-      if (data.city) localStorage.setItem("yycj_city", data.city);
-      const btn = $("#btnCity");
-      if (btn) btn.textContent = (data.city || city || "城市") + " ▾";
+      fillCities(data.enabled_cities || cities, data.city || city);
       lastPins = data.pins || [];
       const batch = data.items || [];
       lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -99,12 +104,15 @@
     finally { painting = false; }
   }
   document.addEventListener("click", (ev) => {
+    if (ev.target.closest("#feed [data-id], #pins [data-id]")) window.__yycjBack = "home";
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest("[data-nav='home']")) loadFeed(true);
     if (ev.target.id === "btnCity" || ev.target.closest("#btnCity")) {
-      ev.preventDefault(); ev.stopPropagation();
+      ev.preventDefault();
+      ev.stopPropagation();
       $("#citySheet")?.classList.add("hidden");
+      if (!$("#cityDrop")?.innerHTML) fillCities(cities, localStorage.getItem("yycj_city") || "");
       $("#cityDrop")?.classList.toggle("hidden");
     }
     const opt = ev.target.closest("#cityDrop [data-city]");
@@ -114,14 +122,16 @@
       loadFeed(true);
     }
   }, true);
+  const list = document.getElementById("cityList");
+  if (list) {
+    new MutationObserver(() => {
+      const found = [...list.querySelectorAll("[data-city]")].map((b) => b.getAttribute("data-city")).filter(Boolean);
+      if (found.length) fillCities(found, localStorage.getItem("yycj_city") || "");
+    }).observe(list, { childList: true });
+  }
   async function boot() {
     for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
-    ["#feed", "#pins"].forEach((sel) => {
-      const el = $(sel);
-      if (el) new MutationObserver(() => { if (!painting && broken()) paint(); }).observe(el, { childList: true });
-    });
-    setTimeout(() => { if (broken()) paint(); }, 400);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);

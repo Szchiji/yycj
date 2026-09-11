@@ -3,16 +3,8 @@
     try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; }
     catch (e) { return "guest"; }
   }
-  function showHome() {
-    document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-    document.getElementById("view-home")?.classList.remove("hidden");
-    document.querySelectorAll(".nav-item").forEach((b) => {
-      b.classList.toggle("active", b.getAttribute("data-nav") === "home");
-    });
-  }
   function apply() {
-    const r = role();
-    const guest = r === "guest";
+    const guest = role() === "guest";
     document.querySelector('[data-nav="publish"]')?.classList.toggle("hidden", guest);
     document.querySelector('[data-nav="fav"]')?.classList.toggle("hidden", !guest);
     document.body.classList.toggle("role-guest", guest);
@@ -29,10 +21,9 @@
     apply();
   }
   apply();
-  showHome();
   sniff();
-  setTimeout(() => { apply(); showHome(); }, 500);
+  setTimeout(apply, 800);
   document.querySelectorAll("[data-switch]").forEach((b) => {
-    b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); showHome(); }, 400));
+    b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); }, 400));
   });
 })();
