@@ -2,6 +2,7 @@
   if (window.__yycjAdminList) return;
   window.__yycjAdminList = true;
   const token = () => localStorage.getItem("yycj_token") || "";
+  const note = (msg) => (window.yycjToast || alert)(msg);
   async function call(path, body) {
     const r = await fetch(path, {
       method: "POST",
@@ -26,19 +27,19 @@
         const raw = prompt("续期天数", "30");
         if (raw == null) return;
         const days = parseInt(raw, 10);
-        if (!days || days < 1) return alert("请输入有效天数");
+        if (!days || days < 1) return note("请输入有效天数");
         await call("/api/admin/listings/" + encodeURIComponent(id) + "/renew", { days });
-        alert("已续期 " + days + " 天");
+        note("已续期 " + days + " 天");
       } else if (act === "unlist") {
         await call("/api/admin/listings/" + encodeURIComponent(id) + "/unlist", { reason: "admin" });
-        alert("已下架");
+        note("已下架");
       } else if (act === "relist") {
         await call("/api/admin/listings/" + encodeURIComponent(id) + "/relist", {});
-        alert("已重新上架");
+        note("已重新上架");
       } else return;
       document.getElementById("btnRefresh")?.click();
     } catch (e) {
-      alert(e.message || String(e));
+      note(e.message || String(e));
     } finally {
       btn.disabled = false;
     }
