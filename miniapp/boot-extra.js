@@ -1,10 +1,10 @@
 (() => {
-  ["share.js", "boot-rescue.js", "pin-fix.js", "share-fix.js", "home-head.js", "search-ui.js"].forEach((name) => {
+  ["share.js", "boot-rescue.js", "pin-fix.js", "share-fix.js", "home-head.js", "search-ui.js", "filter-bar.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911aj";
+    s.src = "./" + name + "?v=20260911ak";
     document.head.appendChild(s);
   });
   const st = document.getElementById("yycj-pin-size") || document.createElement("style");
