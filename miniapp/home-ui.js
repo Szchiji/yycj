@@ -29,16 +29,27 @@
     if (s.startsWith("file_id:")) return mediaSrc(s.slice(8));
     return "/api/media/file/" + encodeURIComponent(s);
   }
+  function isVideoUrl(u) {
+    const s = String(u || "");
+    return s.startsWith("BAAC") || /\.(mp4|mov|webm|mkv)(\?|$)/i.test(s);
+  }
   function cover(item) {
     for (const m of item.media || []) {
+      const raw = (m && (m.file_id || m.url)) || "";
+      if ((m && m.type) === "video" || isVideoUrl(raw)) continue;
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
       if (u) return u;
     }
     for (const p of item.photos || []) {
+      if (isVideoUrl(p)) continue;
       const u = mediaSrc(p);
       if (u) return u;
     }
     return null;
+  }
+  function mediaCount(item) {
+    const n = (item.media && item.media.length) || (item.photos && item.photos.length) || 0;
+    return n;
   }
   function renderHeader(data) {
     const c = data.contacts || {};
@@ -47,7 +58,6 @@
       if (c.bot_url) {
         brand.setAttribute("href", c.bot_url);
         brand.setAttribute("target", "_blank");
-        brand.setAttribute("rel", "noopener");
       } else brand.removeAttribute("href");
     }
     const admin = $("#topAdmin");
@@ -89,22 +99,27 @@
     const img = cover(t);
     return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
       <span class="badge-pin">精选</span>
-      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
+      ${img ? `<img class="thumb" loading="lazy" decoding="async" src="${esc(img)}" alt="" />` : ""}
       <div class="pin-copy"><b>${esc(t.title || "")}</b><span>${esc(t.city || "")}${t.price_text ? " · " + esc(t.price_text) : ""}</span></div>
     </div>`;
   }
   function cardHtml(t) {
     const img = cover(t);
+    const loc = [t.city, t.district].filter(Boolean).join("·");
+    const tag = (t.tags && t.tags[0]) || "";
+    const n = mediaCount(t);
     const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
-    return `<div class="feed-card compact" data-id="${esc(t.lamp_id)}">
-      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+    return `<div class="feed-card compact cover-card" data-id="${esc(t.lamp_id)}">
+      <div class="cover-wrap">
+        ${img ? `<img class="thumb" loading="lazy" decoding="async" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+        <button class="fav-btn" type="button" data-fav="${esc(t.lamp_id)}">♡</button>
+        ${loc ? `<span class="badge-loc">${esc(loc)}</span>` : ""}
+        ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
+        ${n ? `<span class="badge-n">${n}图</span>` : ""}
+      </div>
       <div class="body">
         <h3>${pin}${esc(t.title || "")}</h3>
-        <div class="muted">${esc(t.price_text || "面议")}</div>
-        <div class="row">
-          <button class="btn primary" data-act="detail" type="button">查看</button>
-          <button class="btn" data-act="chat" type="button">${esc(cta)}</button>
-        </div>
+        <div class="muted price">${esc(t.price_text || "面议")}</div>
       </div>
     </div>`;
   }
@@ -117,7 +132,7 @@
       const params = new URLSearchParams();
       if (city) params.set("city", city);
       if (q) params.set("q", q);
-      params.set("limit", "3");
+      params.set("limit", "6");
       params.set("offset", String(offset));
       const data = await api(`/api/home?${params}`);
       renderHeader(data);
@@ -138,7 +153,7 @@
       startCarousel(data.carousel_interval_sec);
       return data;
     } finally {
-      setTimeout(() => { painting = false; }, 50);
+      setTimeout(() => { painting = false; }, 80);
     }
   }
 
@@ -166,18 +181,10 @@
 
   async function boot() {
     if (booted) return;
-    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 200));
+    for (let i = 0; i < 30 && !token(); i += 1) await new Promise((r) => setTimeout(r, 160));
     if (!token()) return;
     booted = true;
     try { await loadFeed(true); } catch (e) { console.warn(e); }
-    const feed = $("#feed");
-    const pins = $("#pins");
-    const redo = () => {
-      if (painting) return;
-      if (feed && !feed.querySelector(".feed-card.compact")) loadFeed(true).catch(() => {});
-    };
-    if (feed) new MutationObserver(redo).observe(feed, { childList: true });
-    setTimeout(redo, 800);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
