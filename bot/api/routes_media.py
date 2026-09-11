@@ -19,7 +19,7 @@ from bot.config import get_settings
 logger = logging.getLogger(__name__)
 
 MAX_FILES = 9
-MAX_BYTES = 20 * 1024 * 1024  # 20MB per file
+MAX_BYTES = 20 * 1024 * 1024
 
 
 def _guess_type(filename: str, content_type: str | None) -> str:
@@ -35,7 +35,6 @@ async def api_media_upload(
     files: List[UploadFile] = File(...),
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    """multipart 上传图/视频 → Bot 发到存储会话 → 返回 file_id + preview_url。"""
     if not files:
         raise HTTPException(status_code=400, detail="请选择文件")
     if len(files) > MAX_FILES:
@@ -60,18 +59,22 @@ async def api_media_upload(
         buf = BufferedInputFile(data, filename=safe_name)
         try:
             if kind == "video":
-                msg = await bot.send_video(chat_id, buf, caption=f"upload by {user_id}")
+                msg = await bot.send_video(chat_id, buf, disable_notification=True)
                 file_id = msg.video.file_id if msg.video else None
             else:
-                msg = await bot.send_photo(chat_id, buf, caption=f"upload by {user_id}")
+                msg = await bot.send_photo(chat_id, buf, disable_notification=True)
                 file_id = msg.photo[-1].file_id if msg.photo else None
+            try:
+                await bot.delete_message(chat_id, msg.message_id)
+            except Exception:
+                logger.info("storage message left in chat %s", chat_id)
         except Exception as exc:
             logger.exception("media upload send failed")
             raise HTTPException(status_code=502, detail=f"上传到 Telegram 失败：{exc}") from exc
         if not file_id:
             raise HTTPException(status_code=502, detail="未能获取 file_id")
         preview = f"/api/media/file/{quote(file_id, safe='')}"
-        results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": file_id})
+        results.append({"type": kind, "file_id": file_id, "preview_url": preview, "url": preview})
 
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
@@ -80,10 +83,6 @@ async def api_media_upload(
 
 @router.get("/media/file/{file_id:path}")
 async def api_media_file(file_id: str):
-    """代理 Telegram getFile，供 Mini App <img>/<video> 预览。
-
-    不要求 Authorization：file_id 本身近似能力令牌，且浏览器标签无法带 Bearer。
-    """
     settings = get_settings()
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
