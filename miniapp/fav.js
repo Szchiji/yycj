@@ -18,15 +18,34 @@
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
       if (u) return u;
     }
-    return null;
+    return "";
   }
   function showView(id) {
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById(id)?.classList.remove("hidden");
     document.querySelectorAll(".nav-item").forEach((b) => {
       const nav = b.getAttribute("data-nav");
-      b.classList.toggle("active", (id === "view-fav" && nav === "fav") || (id === "view-home" && nav === "home"));
+      b.classList.toggle("active", (id === "view-fav" && nav === "fav") || (id === "view-home" && nav === "home") || (id === "view-me" && nav === "me"));
     });
+  }
+  function cardHtml(x) {
+    const img = cover(x);
+    const loc = [x.city, x.district].filter(Boolean).join("·");
+    const tag = (x.tags && x.tags[0]) || "";
+    const n = (x.media && x.media.length) || 0;
+    return `<div class="feed-card compact cover-card" data-id="${x.lamp_id}">
+      <div class="cover-wrap">
+        ${img ? `<img class="thumb" src="${img}" alt="" />` : `<div class="thumb ph"></div>`}
+        ${loc ? `<span class="badge-loc">${loc}</span>` : ""}
+        ${tag ? `<span class="badge-tag">${tag}</span>` : ""}
+        ${n ? `<span class="badge-n">${n}图</span>` : ""}
+      </div>
+      <div class="body">
+        <h3>${x.title || ""}</h3>
+        <div class="muted price">${x.price_text || ""}</div>
+        <button class="btn unfav" type="button" data-unfav="${x.lamp_id}">取消收藏</button>
+      </div>
+    </div>`;
   }
   function paintHearts() {
     document.querySelectorAll("[data-fav]").forEach((b) => {
@@ -37,20 +56,7 @@
   }
   function paintList() {
     const box = document.getElementById("favList");
-    if (!box) return;
-    box.innerHTML = items.map((x) => {
-      const img = cover(x);
-      return `<div class="feed-card compact cover-card" data-id="${x.lamp_id}">
-        <div class="cover-wrap">
-          ${img ? `<img class="thumb" src="${img}" alt="" />` : `<div class="thumb ph"></div>`}
-        </div>
-        <div class="body">
-          <h3>${x.title || ""}</h3>
-          <div class="muted price">${x.city || ""} · ${x.price_text || ""}</div>
-          <button class="btn unfav" type="button" data-unfav="${x.lamp_id}">取消收藏</button>
-        </div>
-      </div>`;
-    }).join("") || "<p class='muted'>还没有收藏</p>";
+    if (box) box.innerHTML = items.map(cardHtml).join("") || "<p class='muted'>还没有收藏</p>";
   }
   async function load() {
     if (!token() || !isGuest()) return;
@@ -77,14 +83,27 @@
     paintHearts();
     paintList();
   }
-  document.addEventListener("click", async (ev) => {
-    if (ev.target.closest("[data-nav='fav']")) {
+  function bindBackToFav() {
+    window.__yycjBack = "fav";
+    const back = document.getElementById("btnBackHome");
+    if (!back) return;
+    back.onclick = (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       showView("view-fav");
       load();
+    };
+  }
+  document.addEventListener("click", async (ev) => {
+    if (ev.target.closest("[data-nav='fav']")) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.__yycjBack = "fav";
+      showView("view-fav");
+      load();
       return;
     }
+    if (ev.target.closest("[data-nav='home']")) window.__yycjBack = "home";
     const un = ev.target.closest("[data-unfav]");
     if (un) {
       ev.preventDefault();
@@ -104,9 +123,17 @@
     if (card) {
       ev.preventDefault();
       ev.stopPropagation();
-      const id = card.getAttribute("data-id");
-      if (window.openLamp) window.openLamp(id);
+      bindBackToFav();
+      if (window.openLamp) window.openLamp(card.getAttribute("data-id"));
       else showView("view-detail");
+    }
+  }, true);
+  document.getElementById("btnBackHome")?.addEventListener("click", (ev) => {
+    if (window.__yycjBack === "fav") {
+      ev.preventDefault();
+      ev.stopPropagation();
+      showView("view-fav");
+      load();
     }
   }, true);
   setTimeout(load, 1400);
