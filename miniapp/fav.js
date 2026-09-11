@@ -23,10 +23,6 @@
   function showView(id) {
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById(id)?.classList.remove("hidden");
-    document.querySelectorAll(".nav-item").forEach((b) => {
-      const nav = b.getAttribute("data-nav");
-      b.classList.toggle("active", (id === "view-fav" && nav === "fav") || (id === "view-home" && nav === "home") || (id === "view-me" && nav === "me"));
-    });
   }
   function cardHtml(x) {
     const img = cover(x);
@@ -83,18 +79,10 @@
     paintHearts();
     paintList();
   }
-  function bindBackToFav() {
-    window.__yycjBack = "fav";
-    const back = document.getElementById("btnBackHome");
-    if (!back) return;
-    back.onclick = (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      showView("view-fav");
-      load();
-    };
-  }
   document.addEventListener("click", async (ev) => {
+    if (ev.target.closest("#feed [data-id], #pins [data-id]")) {
+      window.__yycjBack = "home";
+    }
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -123,9 +111,8 @@
     if (card) {
       ev.preventDefault();
       ev.stopPropagation();
-      bindBackToFav();
+      window.__yycjBack = "fav";
       if (window.openLamp) window.openLamp(card.getAttribute("data-id"));
-      else showView("view-detail");
     }
   }, true);
   document.getElementById("btnBackHome")?.addEventListener("click", (ev) => {
@@ -134,6 +121,8 @@
       ev.stopPropagation();
       showView("view-fav");
       load();
+    } else {
+      window.__yycjBack = "home";
     }
   }, true);
   setTimeout(load, 1400);

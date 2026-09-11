@@ -5,8 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260911u" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260911u" />
+  <link rel="stylesheet" href="./styles.css?v=20260911w" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260911w" />
+  <style>
+    #pins { display:flex !important; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; }
+    #pins .pin-card {
+      flex:0 0 78% !important; width:78% !important; height:108px !important;
+      min-height:108px !important; max-height:108px !important; padding:0 !important;
+      position:relative !important; overflow:hidden !important; border-radius:14px !important;
+      background-size:cover !important; background-position:center !important;
+    }
+    #pins .pin-card > *:not(.pin-copy) { display:none !important; }
+    #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:16px 10px 8px;
+      background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
+    #feed.has-cover, #favList {
+      display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important;
+    }
+    #feed .cover-wrap, #favList .cover-wrap { position:relative !important; display:block !important; }
+    #feed .cover-wrap .thumb, #feed .cover-card img.thumb, #favList .cover-wrap .thumb {
+      width:100% !important; height:200px !important; min-height:200px !important;
+      object-fit:cover !important; display:block !important; border-radius:12px 12px 0 0 !important;
+    }
+    .cover-card { padding:0 !important; overflow:hidden !important; }
+    .fav-btn { position:absolute !important; top:6px; left:6px; width:26px; height:26px; border:0; border-radius:50%;
+      background:rgba(0,0,0,.45); color:#fff; z-index:3; }
+    .badge-loc,.badge-tag,.badge-n { position:absolute !important; color:#fff; font-size:9px; padding:2px 6px; border-radius:999px; z-index:3; }
+    .badge-loc { top:6px; right:6px; background:rgba(20,40,90,.82); }
+    .badge-tag { left:6px; bottom:6px; background:#6d4aff; }
+    .badge-n { right:6px; bottom:6px; background:rgba(0,0,0,.5); }
+    .cover-card .body { padding:6px !important; }
+    .cover-card .body h3 { margin:0; font-size:12px; }
+    #citySheet { display:none !important; }
+  </style>
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -84,7 +114,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./admin.html?v=20260911u">管理后台</a>
+            <a class="btn primary" href="./admin.html?v=20260911w">管理后台</a>
           </div>
         </div>
       </section>
@@ -111,13 +141,25 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
-  <script src="./boot-inline.js?v=20260911u"></script>
-  <script src="./app.js?v=20260911u"></script>
-  <script src="./home-ui.js?v=20260911u"></script>
-  <script src="./publish-ui.js?v=20260911u"></script>
-  <script src="./me-listings.js?v=20260911u"></script>
-  <script src="./detail-fix.js?v=20260911u"></script>
-  <script src="./role-nav.js?v=20260911u"></script>
-  <script src="./fav.js?v=20260911u"></script>
+  <script src="./boot-inline.js?v=20260911w"></script>
+  <script src="./app.js?v=20260911w"></script>
+  <script src="./home-ui.js?v=20260911w"></script>
+  <script src="./publish-ui.js?v=20260911w"></script>
+  <script src="./me-listings.js?v=20260911w"></script>
+  <script src="./detail-fix.js?v=20260911w"></script>
+  <script src="./role-nav.js?v=20260911w"></script>
+  <script src="./fav.js?v=20260911w"></script>
+  <script>
+    (function(){
+      const pins = document.getElementById('pins');
+      if (!pins) return;
+      setInterval(function(){
+        if (!pins.querySelector('.pin-card')) return;
+        const w = pins.clientWidth || 300;
+        if (pins.scrollLeft + w >= pins.scrollWidth - 8) pins.scrollTo({left:0, behavior:'smooth'});
+        else pins.scrollBy({left: w * 0.82, behavior:'smooth'});
+      }, 3200);
+    })();
+  </script>
 </body>
 </html>
