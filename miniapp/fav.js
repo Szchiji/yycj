@@ -24,7 +24,7 @@
       const raw = (m && (m.file_id || m.url)) || "";
       if ((m && m.type) === "video" || isVideo(raw)) {
         const thumb = mediaSrc((m && (m.thumb_file_id || m.preview_url)) || "");
-        if (thumb && !isVideo(m.thumb_file_id || m.preview_url || "")) return thumb;
+        if (thumb && !isVideo(String(m.thumb_file_id || ""))) return thumb;
         continue;
       }
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
@@ -97,7 +97,6 @@
     paintList();
   }
   document.addEventListener("click", async (ev) => {
-    if (ev.target.closest("#feed [data-id], #pins [data-id]")) window.__yycjBack = "home";
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
       ev.stopPropagation();
@@ -122,13 +121,7 @@
       try { await toggle(heart.getAttribute("data-fav")); } catch (e) {}
       return;
     }
-    const card = ev.target.closest("#favList [data-id]");
-    if (card) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      window.__yycjBack = "fav";
-      card.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    }
+    if (ev.target.closest("#favList [data-id]")) window.__yycjBack = "fav";
   }, true);
   document.getElementById("btnBackHome")?.addEventListener("click", (ev) => {
     if (window.__yycjBack === "fav") {
@@ -140,5 +133,5 @@
       window.__yycjBack = "home";
     }
   }, true);
-  setTimeout(load, 1200);
+  setTimeout(load, 800);
 })();
