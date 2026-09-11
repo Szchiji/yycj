@@ -4,15 +4,15 @@
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911ai";
+    s.src = "./" + name + "?v=20260911aj";
     document.head.appendChild(s);
   });
-  if (!document.getElementById("yycj-pin-size")) {
-    const st = document.createElement("style");
-    st.id = "yycj-pin-size";
-    st.textContent = `#topMeta{display:none!important;}
-#pins .pin-card{flex:0 0 42%!important;width:42%!important;min-width:42%!important;aspect-ratio:3/4!important;height:auto!important;max-height:none!important;}
-#feed .cover-wrap .thumb,#feed .cover-card img.thumb,#favList .cover-wrap .thumb{height:168px!important;min-height:168px!important;max-height:168px!important;}`;
-    document.head.appendChild(st);
-  }
+  const st = document.getElementById("yycj-pin-size") || document.createElement("style");
+  st.id = "yycj-pin-size";
+  st.textContent = `#topMeta{display:none!important;}
+#homeSearch{display:flex;gap:8px;align-items:center;margin:8px 0;}
+#homeSearch input{flex:1;margin:0;}
+#pins .pin-card{flex:0 0 38%!important;width:38%!important;min-width:38%!important;aspect-ratio:3/4!important;height:auto!important;max-height:none!important;}
+#feed .cover-wrap .thumb,#feed .cover-card img.thumb,#favList .cover-wrap .thumb{height:148px!important;min-height:148px!important;max-height:148px!important;}`;
+  if (!st.parentNode) document.head.appendChild(st);
 })();
