@@ -10,7 +10,25 @@
     "大致位置": "pubApprox",
     "标签": "pubTags",
   };
-  const DEFAULT_FORM = Object.keys(FORM_MAP);
+  const LABELS = { pubPrice: "价位", pubDistrict: "区域", pubApprox: "大致位置", pubTags: "标签" };
+  function unwrap() {
+    const form = document.getElementById("publishForm");
+    const det = form && form.querySelector("details.advanced");
+    if (!form || !det) return;
+    ["pubPrice", "pubDistrict", "pubApprox", "pubTags"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (!(el.previousElementSibling && el.previousElementSibling.tagName === "LABEL")) {
+        const lab = document.createElement("label");
+        lab.textContent = LABELS[id] || id;
+        form.insertBefore(lab, det);
+      } else {
+        form.insertBefore(el.previousElementSibling, det);
+      }
+      form.insertBefore(el, det);
+    });
+    det.remove();
+  }
   function extraWrap() {
     let el = document.getElementById("pubExtras");
     if (el) return el;
@@ -18,8 +36,7 @@
     if (!form) return null;
     el = document.createElement("div");
     el.id = "pubExtras";
-    const more = form.querySelector("details.advanced");
-    form.insertBefore(el, more || form.querySelector("button[type=submit]") || null);
+    form.insertBefore(el, form.querySelector("button[type=submit]") || null);
     return el;
   }
   function toggleInput(id, on) {
@@ -31,6 +48,7 @@
     if (!on) el.removeAttribute("required");
   }
   async function load() {
+    unwrap();
     const wrap = extraWrap();
     if (!wrap) return;
     let fields = [];
@@ -40,7 +58,7 @@
       const data = await r.json();
       fields = Array.isArray(data.listing_fields) ? data.listing_fields : [];
     } catch (e) {}
-    const enabled = (fields.length ? fields : DEFAULT_FORM.map((k) => ({ key: k, form: true })))
+    const enabled = (fields.length ? fields : Object.keys(FORM_MAP).map((k) => ({ key: k, form: true })))
       .filter((f) => f && f.key && f.form !== false && f.key !== "地点" && f.key !== "链接")
       .map((f) => String(f.key));
     Object.keys(FORM_MAP).forEach((key) => toggleInput(FORM_MAP[key], enabled.includes(key)));
@@ -48,14 +66,6 @@
       const safe = k.replace(/"/g, "");
       return `<label>${safe}</label><input data-extra="${safe}" maxlength="64" placeholder="${safe}" />`;
     }).join("");
-    const details = document.querySelector("#publishForm details.advanced");
-    if (details) {
-      const any = ["pubPrice", "pubDistrict", "pubApprox", "pubTags"].some((id) => {
-        const el = document.getElementById(id);
-        return el && el.style.display !== "none";
-      });
-      details.style.display = any ? "" : "none";
-    }
   }
   const origFetch = window.fetch;
   window.fetch = function (url, opt) {
@@ -74,8 +84,8 @@
     } catch (e) {}
     return origFetch.apply(this, [url, opt]);
   };
-  setTimeout(load, 700);
+  setTimeout(load, 500);
   document.addEventListener("click", (ev) => {
-    if (ev.target.closest("[data-nav='publish'], [data-view='publish']")) setTimeout(load, 200);
+    if (ev.target.closest("[data-nav='publish'], [data-view='publish']")) setTimeout(load, 150);
   });
 })();
