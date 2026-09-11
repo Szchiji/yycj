@@ -22,7 +22,7 @@
   ["publish-fields.js", "cta-apply.js", "detail-extras.js", "publish-status.js"].forEach((name) => {
     if (document.querySelector('script[src*="' + name + '"]')) return;
     const s = document.createElement("script");
-    s.src = "./" + name + "?v=20260912k";
+    s.src = "./" + name + "?v=20260912m";
     (document.body || document.documentElement).appendChild(s);
   });
 })();

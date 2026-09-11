@@ -47,6 +47,15 @@
     if (lab && lab.tagName === "LABEL") lab.style.display = on ? "" : "none";
     if (!on) el.removeAttribute("required");
   }
+  function readExtras() {
+    const extras = {};
+    document.querySelectorAll("[data-extra]").forEach((inp) => {
+      const k = (inp.getAttribute("data-extra") || "").trim();
+      const v = (inp.value || "").trim();
+      if (k && v) extras[k] = v;
+    });
+    return extras;
+  }
   async function load() {
     unwrap();
     const wrap = extraWrap();
@@ -59,30 +68,35 @@
       fields = Array.isArray(data.listing_fields) ? data.listing_fields : [];
     } catch (e) {}
     const enabled = (fields.length ? fields : Object.keys(FORM_MAP).map((k) => ({ key: k, form: true })))
-      .filter((f) => f && f.key && f.form !== false && f.key !== "地点" && f.key !== "链接")
+      .filter((f) => f && f.key && f.form !== false && f.key !== "地点" && f.key !== "链接" && f.key !== "聊天按钮")
       .map((f) => String(f.key));
     Object.keys(FORM_MAP).forEach((key) => toggleInput(FORM_MAP[key], enabled.includes(key)));
-    wrap.innerHTML = enabled.filter((k) => !FORM_MAP[k]).map((k) => {
-      const safe = k.replace(/"/g, "");
-      return `<label>${safe}</label><input data-extra="${safe}" maxlength="64" placeholder="${safe}" />`;
-    }).join("");
+    const extraKeys = enabled.filter((k) => !FORM_MAP[k]);
+    const prev = readExtras();
+    const same = extraKeys.length === wrap.querySelectorAll("[data-extra]").length
+      && extraKeys.every((k) => wrap.querySelector('[data-extra="' + k + '"]'));
+    if (!same) {
+      wrap.innerHTML = extraKeys.map((k) => {
+        const safe = k.replace(/"/g, "");
+        const val = (prev[safe] || "").replace(/"/g, "&quot;");
+        return `<label>${safe}</label><input data-extra="${safe}" maxlength="64" placeholder="${safe}" value="${val}" />`;
+      }).join("");
+    }
+  }
+  function attachExtras(opt) {
+    if (!opt || typeof opt.body !== "string") return opt;
+    const extras = readExtras();
+    const body = JSON.parse(opt.body);
+    body.extras = Object.assign({}, body.extras || {}, extras);
+    return Object.assign({}, opt, { body: JSON.stringify(body) });
   }
   const origFetch = window.fetch;
   window.fetch = function (url, opt) {
     try {
       const u = String(url || "");
-      if ((u.includes("/api/posts") || u.includes("/api/me/listings")) && opt && typeof opt.body === "string") {
-        const extras = {};
-        document.querySelectorAll("[data-extra]").forEach((inp) => {
-          const v = (inp.value || "").trim();
-          if (v) extras[inp.getAttribute("data-extra")] = v;
-        });
-        const body = JSON.parse(opt.body);
-        body.extras = extras;
-        opt = Object.assign({}, opt, { body: JSON.stringify(body) });
-      }
+      if (u.includes("/api/posts") || u.includes("/api/me/listings")) opt = attachExtras(opt);
     } catch (e) {}
-    return origFetch.apply(this, [url, opt]);
+    return origFetch.apply(this, arguments.length > 1 ? [url, opt] : [url]);
   };
   setTimeout(load, 500);
   document.addEventListener("click", (ev) => {
