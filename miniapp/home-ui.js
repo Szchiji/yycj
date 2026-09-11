@@ -90,7 +90,7 @@
       q = (($("#homeQ") && $("#homeQ").value.trim()) || q || "");
       const params = new URLSearchParams({ limit: "12", offset: String(offset) });
       if (q) params.set("q", q);
-      else if (city) params.set("city", city);
+      if (city) params.set("city", city);
       const data = await api("/api/home?" + params);
       fillCities(data.enabled_cities || cities, data.city || city);
       lastPins = q ? [] : (data.pins || []);
@@ -139,19 +139,12 @@
     if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
     else pins.scrollBy({ left: step, behavior: "smooth" });
   }, 4000);
-  if (!document.getElementById("yycj-home-fix-css")) {
-    const l = document.createElement("link");
-    l.id = "yycj-home-fix-css";
-    l.rel = "stylesheet";
-    l.href = "./home-fix.css?v=20260911aj";
-    document.head.appendChild(l);
-  }
   ["lazy.js", "share.js", "boot-extra.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911aj";
+    s.src = "./" + name + "?v=20260911al";
     document.head.appendChild(s);
   });
   async function boot() {
