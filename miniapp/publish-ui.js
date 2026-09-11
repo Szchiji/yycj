@@ -40,8 +40,6 @@
         file_id: it.file_id,
         preview_url: it.preview_url,
       }));
-      const ta = $("#pubMedia");
-      if (ta) ta.value = uploaded.map((m) => (m.type === "video" ? "video|" : "") + (m.url || "")).join("\n");
       previewBox();
       toast("媒体已上传 " + uploaded.length + " 个");
     } catch (e) {
@@ -56,6 +54,8 @@
     ev.stopImmediatePropagation();
     const title = ($("#pubTitle")?.value || "").trim();
     if (!title) return toast("请填称呼");
+    if (!uploaded.length && !($("#pubMedia")?.value || "").trim()) return toast("请先上传至少 1 张图");
+    const media = uploaded.length ? uploaded.map((m) => ({ type: m.type, url: m.url, file_id: m.file_id })) : [];
     const body = {
       city: $("#pubCity")?.value,
       title,
@@ -64,12 +64,14 @@
       approx_label: ($("#pubApprox")?.value || "").trim(),
       tags: ($("#pubTags")?.value || "").trim().split(/\s+/).filter(Boolean).slice(0, 5),
       description: ($("#pubDesc")?.value || "").trim(),
-      media: uploaded.map((m) => ({ type: m.type, url: m.url, file_id: m.file_id })),
+      media,
     };
     const digits = (body.price_text || "").replace(/\D/g, "");
     if (digits) body.price = parseInt(digits, 10);
+    const editId = ($("#editLampId")?.value || "").trim();
+    const url = editId ? `/api/me/listings/${editId}/edit` : "/api/posts";
     try {
-      const r = await fetch("/api/posts", {
+      const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
         body: JSON.stringify(body),
@@ -77,21 +79,19 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "提交失败");
       uploaded = [];
+      if ($("#editLampId")) $("#editLampId").value = "";
+      const t = $("#publishTitle");
+      if (t) t.textContent = "上架";
       form.reset();
       previewBox();
       const done = document.createElement("div");
       done.className = "card";
-      done.id = "pubDone";
-      done.innerHTML = `<h3>已提交审核</h3>
-        <p>编号 <code>${(data.post_id || "").slice(0,8)}</code></p>
-        <p class="muted">管理员通过后会出现在首页，机器人也会发你通知。请勿重复提交。</p>
-        <button class="btn primary block" type="button" id="pubAgain">再上架一条</button>`;
+      done.innerHTML = `<h3>${editId ? "改稿已交审" : "已提交审核"}</h3>
+        <p class="muted">管理员通过后才会替换首页内容，有效期不重算。</p>
+        <button class="btn primary block" type="button" id="pubAgain">返回上架</button>`;
       form.classList.add("hidden");
       form.parentNode.insertBefore(done, form.nextSibling);
-      $("#pubAgain")?.addEventListener("click", () => {
-        done.remove();
-        form.classList.remove("hidden");
-      });
+      $("#pubAgain")?.addEventListener("click", () => { done.remove(); form.classList.remove("hidden"); });
     } catch (e) {
       toast(e.message || String(e));
     }
