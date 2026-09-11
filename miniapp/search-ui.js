@@ -1,4 +1,5 @@
 (() => {
+  document.getElementById("filterBar")?.remove();
   const row = document.querySelector(".search-row");
   const pins = document.getElementById("pins");
   const announce = document.getElementById("announce");
@@ -16,8 +17,7 @@
     clr.className = "btn";
     clr.type = "button";
     clr.textContent = "清除";
-    const search = document.getElementById("btnSearch");
-    row.insertBefore(clr, search);
+    row.insertBefore(clr, document.getElementById("btnSearch"));
   }
   if (!document.getElementById("searchHint")) {
     const hint = document.createElement("p");
@@ -26,7 +26,6 @@
     hint.style.margin = "0 0 8px";
     row?.after(hint);
   }
-  const origSet = URLSearchParams.prototype.set;
   document.addEventListener("click", (ev) => {
     if (ev.target && ev.target.id === "btnSearchClear") {
       if (input) input.value = "";
@@ -36,8 +35,9 @@
   let timer = 0;
   function run() {
     const q = (input && input.value.trim()) || "";
+    const city = localStorage.getItem("yycj_city") || "";
     const hint = document.getElementById("searchHint");
-    if (hint) hint.textContent = q ? ("搜索「" + q + "」·全部城市·花名/标签/城区/价位") : "";
+    if (hint) hint.textContent = q ? (“搜索「" + q + "」 · 仅限" + (city || "当前城市")) : "";
     document.getElementById("btnSearch")?.click();
   }
   input?.addEventListener("input", () => {
