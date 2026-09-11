@@ -11,12 +11,12 @@
     s.src = "./scroll-perf.js?v=20260911ar";
     document.head.appendChild(s);
   }
-  ["admin-chats.js"].forEach((name) => {
+  ["admin-chats.js", "admin-cta.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260911ar";
+    s.src = "./" + name + "?v=20260912k";
     document.head.appendChild(s);
   });
 })();

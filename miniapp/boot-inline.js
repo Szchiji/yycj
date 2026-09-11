@@ -19,9 +19,10 @@
     document.querySelector("#bootRetry")?.classList.remove("hidden");
   }
   window.__yycjBoot = { showBoot, hideBoot, showBootError };
-  if (!document.querySelector('script[src*="publish-fields"]')) {
+  ["publish-fields.js", "cta-apply.js", "detail-extras.js"].forEach((name) => {
+    if (document.querySelector('script[src*="' + name + '"]')) return;
     const s = document.createElement("script");
-    s.src = "./publish-fields.js?v=20260912j";
+    s.src = "./" + name + "?v=20260912k";
     (document.body || document.documentElement).appendChild(s);
-  }
+  });
 })();
