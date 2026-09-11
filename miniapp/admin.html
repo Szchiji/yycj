@@ -10,8 +10,8 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260911aq" />
-  <link rel="stylesheet" href="./admin.css?v=20260911aq" />
+  <link rel="stylesheet" href="./styles.css?v=20260912f" />
+  <link rel="stylesheet" href="./admin.css?v=20260912f" />
   <style>html,body{height:auto!important;overflow:auto!important;overflow-y:scroll!important;-webkit-overflow-scrolling:touch!important;}</style>
 </head>
 <body class="admin-body">
@@ -21,7 +21,7 @@
       <div id="status" class="muted"></div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260911aq">← 首页</a>
+      <a class="btn" href="./index.html?v=20260912f">← 首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
@@ -104,6 +104,8 @@
         <input id="opsCta" value="想聊聊" maxlength="32" />
         <label>Bot /start 欢迎语</label>
         <textarea id="opsWelcome" rows="3"></textarea>
+        <label>媒体存储频道 ID（机器人须为管理员，如 -100123 或 @mychannel）</label>
+        <input id="opsMediaChannel" placeholder="-100xxxxxxxxxx" />
         <label>上架媒体上限</label>
         <input id="opsMediaMax" type="number" min="1" max="9" value="6" />
         <label>上架有效天数</label>
@@ -138,13 +140,13 @@
       </section>
     </div>
   </div>
-  <script src="./admin-boot.js?v=20260911aq"></script>
-  <script src="./admin.js?v=20260911aq"></script>
-  <script src="./admin-ops.js?v=20260911aq"></script>
-  <script src="./admin-promo.js?v=20260911aq"></script>
-  <script src="./admin-proxy.js?v=20260911aq"></script>
-  <script src="./admin-proxy-edit.js?v=20260911aq"></script>
-  <script src="./admin-picks.js?v=20260911aq"></script>
-  <script src="./admin-hydrate.js?v=20260911aq"></script>
+  <script src="./admin-boot.js?v=20260912f"></script>
+  <script src="./admin.js?v=20260912f"></script>
+  <script src="./admin-ops.js?v=20260912f"></script>
+  <script src="./admin-promo.js?v=20260912f"></script>
+  <script src="./admin-proxy.js?v=20260912f"></script>
+  <script src="./admin-proxy-edit.js?v=20260912f"></script>
+  <script src="./admin-picks.js?v=20260912f"></script>
+  <script src="./admin-hydrate.js?v=20260912f"></script>
 </body>
 </html>
