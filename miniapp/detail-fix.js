@@ -8,22 +8,19 @@
       #detail .media-grid { display:none !important; }
       #detail .gallery { margin:0 0 10px; }
       #detail .gallery-hero { position:relative; width:100%; border-radius:12px; overflow:hidden; background:#111; min-height:200px; }
-      #detail .gallery-hero img, #detail .gallery-hero video {
-        width:100%; max-height:320px; object-fit:cover; display:block;
-      }
-      #detail .gallery-hero .hero-poster { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:2; }
-      #detail .gallery-hero.playing .hero-poster { display:none; }
+      #detail .gallery-hero img, #detail .gallery-hero video { width:100%; max-height:320px; object-fit:cover; display:block; background:#111; }
       #detail .gallery-thumbs { display:flex; gap:6px; overflow-x:auto; margin-top:8px; }
       #detail .g-thumb {
         position:relative; flex:0 0 54px; width:54px; height:54px; padding:0;
         border:2px solid transparent; border-radius:8px; overflow:hidden; background:#111;
       }
       #detail .g-thumb.on { border-color:#7ea8ff; }
-      #detail .g-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+      #detail .g-thumb img, #detail .g-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
       #detail .g-thumb .play {
         position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-        color:#fff; background:rgba(0,0,0,.28); font-size:14px;
+        color:#fff; background:rgba(0,0,0,.28); font-size:14px; pointer-events:none;
       }
+      #detailShare { margin:8px 8px 0 0; }
     `;
     document.head.appendChild(st);
   }
@@ -43,40 +40,45 @@
     const out = [];
     (lamp.media || []).forEach((m) => {
       const raw = (m && (m.file_id || m.url)) || "";
-      const src = srcOf(m && (m.preview_url || m.file_id || m.url));
-      if (src) out.push({ type: isVideo(m, raw) ? "video" : "image", src });
+      const src = srcOf(m && (m.file_id || m.url || m.preview_url));
+      if (!src) return;
+      const vid = isVideo(m, raw);
+      const poster = srcOf(m && (m.thumb_file_id || m.thumbnail || (!vid ? m.preview_url : "")));
+      out.push({ type: vid ? "video" : "image", src, poster: poster || "" });
     });
     if (!out.length) (lamp.photos || []).forEach((p) => {
       const src = srcOf(p);
-      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src });
+      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: "" });
     });
-    const poster = (out.find((x) => x.type === "image") || {}).src || "";
-    out.forEach((x) => { if (x.type === "video") x.poster = poster; });
     return out;
   }
-  function hideNoise(box) {
-    box.querySelectorAll(".media-grid").forEach((n) => { n.style.display = "none"; });
-  }
-  function playVideo(v, wrap) {
+  function playVideo(v) {
     if (!v) return;
     v.muted = true;
     v.defaultMuted = true;
     v.loop = true;
     v.autoplay = true;
     v.playsInline = true;
-    v.setAttribute("playsinline", "");
     v.controls = false;
-    const go = () => {
-      v.play().then(() => wrap && wrap.classList.add("playing")).catch(() => {});
-    };
-    v.addEventListener("playing", () => wrap && wrap.classList.add("playing"));
-    v.addEventListener("error", () => wrap && wrap.classList.remove("playing"));
+    const go = () => v.play().catch(() => {});
     go();
-    setTimeout(go, 300);
-    setTimeout(go, 1200);
+    v.addEventListener("canplay", go, { once: true });
+    setTimeout(go, 400);
+  }
+  function ensureShare(box) {
+    if (box.querySelector("#detailShare")) return;
+    const btn = document.createElement("button");
+    btn.id = "detailShare";
+    btn.className = "btn";
+    btn.type = "button";
+    btn.setAttribute("data-share", box.getAttribute("data-lamp") || "1");
+    btn.textContent = "分享";
+    const row = box.querySelector(".row") || box.querySelector(".card") || box;
+    row.appendChild(btn);
   }
   function renderGallery(box, items, lampId) {
     if (!box || !items.length) return;
+    box.setAttribute("data-lamp", lampId || "");
     let wrap = box.querySelector(".gallery");
     if (!wrap) {
       wrap = document.createElement("div");
@@ -85,26 +87,20 @@
       card.insertBefore(wrap, card.firstChild);
     }
     let idx = Number(wrap.dataset.idx || -1);
-    if (idx < 0 || idx >= items.length) {
-      idx = items.findIndex((x) => x.type === "video" && x.poster);
-      if (idx < 0) idx = items.findIndex((x) => x.type === "image");
-      if (idx < 0) idx = 0;
-    }
+    if (idx < 0 || idx >= items.length) idx = 0;
     const cur = items[idx] || items[0];
-    const poster = cur.poster || (cur.type === "image" ? cur.src : "") || "";
     const hero = cur.type === "video"
-      ? `${poster ? `<img class="hero-poster" src="${poster}" alt="" />` : ""}<video src="${cur.src}" poster="${poster}" muted autoplay loop playsinline webkit-playsinline></video>`
+      ? `<video src="${cur.src}" ${cur.poster ? `poster="${cur.poster}"` : ""} muted autoplay loop playsinline webkit-playsinline></video>`
       : `<img src="${cur.src}" alt="" />`;
     wrap.innerHTML = `
       <div class="gallery-hero">${hero}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `
         <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
           ${m.type === "video"
-            ? `<img src="${m.poster || poster || ""}" alt="" /><span class="play">▶</span>`
+            ? (m.poster ? `<img src="${m.poster}" alt="" />` : `<video src="${m.src}" muted preload="metadata" playsinline></video>`) + `<span class="play">▶</span>`
             : `<img src="${m.src}" alt="" />`}
         </button>`).join("")}</div>`;
     wrap.dataset.idx = String(idx);
-    wrap.dataset.lamp = lampId || "";
     wrap.querySelectorAll("[data-g]").forEach((btn) => {
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
@@ -113,10 +109,9 @@
         renderGallery(box, items, lampId);
       });
     });
-    const heroWrap = wrap.querySelector(".gallery-hero");
-    const v = wrap.querySelector(".gallery-hero video");
-    if (v) playVideo(v, heroWrap);
-    hideNoise(box);
+    playVideo(wrap.querySelector(".gallery-hero video"));
+    box.querySelectorAll(".media-grid").forEach((n) => { n.style.display = "none"; });
+    ensureShare(box);
   }
   async function paint(id) {
     const box = document.getElementById("detail");
@@ -136,7 +131,7 @@
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
     const g = document.querySelector("#detail .gallery");
-    if (g) { g.dataset.idx = "-1"; }
+    if (g) g.dataset.idx = "-1";
     paint(id);
   };
   document.addEventListener("click", (ev) => {
@@ -147,4 +142,12 @@
     if (g) g.dataset.idx = "-1";
     paint(card.getAttribute("data-id"));
   });
+  const box = document.getElementById("detail");
+  if (box) {
+    new MutationObserver(() => {
+      const id = box.getAttribute("data-lamp");
+      if (id && !box.querySelector(".gallery-hero")) paint(id);
+      if (box.querySelector(".card") && !box.querySelector("#detailShare")) ensureShare(box);
+    }).observe(box, { childList: true, subtree: true });
+  }
 })();
