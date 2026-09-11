@@ -3,14 +3,19 @@
   function srcOf(u) {
     const s = String(u || "").trim();
     if (!s) return "";
-    if (s.startsWith("http") || s.startsWith("/")) return s;
+    if (s.startsWith("blob:") || s.startsWith("http") || s.startsWith("/")) return s;
     if (s.startsWith("file_id:")) return srcOf(s.slice(8).trim());
     return "/api/media/file/" + encodeURIComponent(s);
+  }
+  function isVideo(m, raw) {
+    const t = (m && m.type) || "";
+    const u = String(raw || (m && (m.file_id || m.url)) || "");
+    return t === "video" || u.startsWith("BAAC") || /\.(mp4|mov|webm|mkv)(\?|$)/i.test(u);
   }
   function stripIds(el) {
     el.querySelectorAll("p, li, span, pre, code").forEach((n) => {
       const t = (n.textContent || "").trim();
-      if (/^file_id\s*:/i.test(t) || /^AgACAg/.test(t)) n.remove();
+      if (/^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) n.remove();
     });
   }
   async function paint(id) {
@@ -24,12 +29,13 @@
       const lamp = data.lamp || data.item || data;
       const urls = [];
       (lamp.media || []).forEach((m) => {
-        const u = srcOf((m && (m.preview_url || m.file_id || m.url)) || "");
-        if (u) urls.push({ type: (m && m.type) || "image", src: u });
+        const raw = (m && (m.file_id || m.url || m.preview_url)) || "";
+        const u = srcOf(m && (m.preview_url || m.file_id || m.url));
+        if (u) urls.push({ type: isVideo(m, raw) ? "video" : "image", src: u });
       });
       if (!urls.length) (lamp.photos || []).forEach((p) => {
         const u = srcOf(p);
-        if (u) urls.push({ type: "image", src: u });
+        if (u) urls.push({ type: isVideo({}, p) ? "video" : "image", src: u });
       });
       stripIds(box);
       let grid = box.querySelector(".media-grid");
@@ -41,7 +47,7 @@
       }
       grid.innerHTML = urls.map((m) =>
         m.type === "video"
-          ? `<video src="${m.src}" controls playsinline></video>`
+          ? `<video src="${m.src}" controls playsinline preload="metadata"></video>`
           : `<img src="${m.src}" alt="" />`
       ).join("");
       box.dataset.painted = id;
