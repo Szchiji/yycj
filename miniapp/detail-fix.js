@@ -25,19 +25,32 @@
     });
     return out;
   }
+  function uniqJoin(t) {
+    const parts = String(t).split("·").map((s) => s.replace(/[\s📍📌]/g, "").trim()).filter(Boolean);
+    const out = [];
+    parts.forEach((p) => { if (!out.includes(p)) out.push(p); });
+    return out.join(" · ");
+  }
   function hideNoise(box) {
     box.querySelectorAll("p, li, span, pre, code, div").forEach((n) => {
       if (n.closest(".gallery")) return;
       const t = (n.textContent || "").replace(/\s+/g, " ").trim();
-      if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) n.style.display = "none";
+      if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) {
+        n.style.display = "none";
+        return;
+      }
+      if (t.includes("·")) {
+        const next = uniqJoin(t);
+        const rawParts = t.split("·").map((s) => s.trim()).filter(Boolean);
+        if (next && next.split("·").length < rawParts.length) n.textContent = next;
+      }
     });
   }
   function goFull(video) {
     if (!video) return;
     const req = video.requestFullscreen || video.webkitRequestFullscreen || video.webkitEnterFullscreen;
-    if (req) {
-      try { req.call(video); } catch (e) { video.play().catch(() => {}); }
-    } else video.play().catch(() => {});
+    if (req) { try { req.call(video); } catch (e) { video.play().catch(() => {}); } }
+    else video.play().catch(() => {});
   }
   function renderGallery(box, items) {
     if (!items.length) return;
@@ -73,9 +86,7 @@
       });
     });
     const heroVid = wrap.querySelector(".gallery-hero video");
-    if (heroVid) {
-      heroVid.addEventListener("click", () => goFull(heroVid));
-    }
+    if (heroVid) heroVid.addEventListener("click", () => goFull(heroVid));
   }
   async function paint(id) {
     const box = document.getElementById("detail");
@@ -87,6 +98,7 @@
       const data = await r.json();
       renderGallery(box, collect(data.lamp || data.item || data));
       hideNoise(box);
+      setTimeout(() => hideNoise(box), 300);
     } catch (e) { console.warn(e); }
   }
   window.openLamp = function (id) {
