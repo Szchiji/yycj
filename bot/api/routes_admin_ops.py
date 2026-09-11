@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete as sql_delete, select
 
 from bot.api.deps import get_admin_user_id
 from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
@@ -149,20 +149,17 @@ async def api_admin_renew(
 
 @router.post("/admin/homepage/pins/remove")
 async def api_pin_remove(body: PinRemoveBody, _: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
-    ok = False
-    if body.pin_id:
-        ok = await home_service.remove_pin(int(body.pin_id))
-    if not ok and body.lamp_id:
-        async with session_scope() as s:
-            res = await s.execute(select(HomepagePin).where(HomepagePin.lamp_id == str(body.lamp_id)))
-            rows = list(res.scalars().all())
-            if rows:
-                for pin in rows:
-                    s.delete(pin)
-                ok = True
-    if not ok:
+    removed = 0
+    async with session_scope() as s:
+        if body.pin_id:
+            res = await s.execute(sql_delete(HomepagePin).where(HomepagePin.id == int(body.pin_id)))
+            removed += int(res.rowcount or 0)
+        if removed == 0 and body.lamp_id:
+            res = await s.execute(sql_delete(HomepagePin).where(HomepagePin.lamp_id == str(body.lamp_id)))
+            removed += int(res.rowcount or 0)
+    if removed <= 0:
         raise HTTPException(status_code=404, detail="轮播不存在")
-    return {"ok": True}
+    return {"ok": True, "removed": removed}
 
 
 @router.post("/admin/bot-identity/refresh")
