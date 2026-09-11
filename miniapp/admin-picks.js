@@ -13,12 +13,6 @@
       if (raw.startsWith("http") || raw.startsWith("/")) return raw;
       return "/api/media/file/" + encodeURIComponent(raw);
     }
-    for (const p of lamp.photos || []) {
-      const raw = String(p || "").trim();
-      if (!raw || raw.startsWith("BAAC")) continue;
-      if (raw.startsWith("http") || raw.startsWith("/")) return raw;
-      return "/api/media/file/" + encodeURIComponent(raw);
-    }
     return "";
   }
   async function api(path, opt) {
@@ -84,21 +78,14 @@
     const pin = ev.target.closest("[data-pick-pin]");
     try {
       if (feed) {
-        await api("/api/admin/homepage/feed-pins", {
-          method: "POST",
-          body: JSON.stringify({ lamp_id: feed.getAttribute("data-pick-feed"), pinned: true }),
-        });
+        await api("/api/admin/homepage/feed-pins", { method: "POST", body: JSON.stringify({ lamp_id: feed.getAttribute("data-pick-feed"), pinned: true }) });
         await paintCurrent();
       }
       if (pin) {
         const hoursRaw = (document.getElementById("pinHours") || {}).value || "";
         await api("/api/admin/homepage/pins", {
           method: "POST",
-          body: JSON.stringify({
-            lamp_id: pin.getAttribute("data-pick-pin"),
-            sort_order: 0,
-            expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10),
-          }),
+          body: JSON.stringify({ lamp_id: pin.getAttribute("data-pick-pin"), sort_order: 0, expires_hours: hoursRaw === "" ? null : parseInt(hoursRaw, 10) }),
         });
         await paintCurrent();
       }
@@ -106,4 +93,10 @@
   });
   document.getElementById("btnRefresh")?.addEventListener("click", () => setTimeout(() => paintCurrent().catch(() => {}), 700));
   setTimeout(() => paintCurrent().catch(() => {}), 1800);
+  if (!document.getElementById("yycj-admin-side")) {
+    const s = document.createElement("script");
+    s.id = "yycj-admin-side";
+    s.src = "./admin-side.js?v=20260911aa";
+    document.head.appendChild(s);
+  }
 })();
