@@ -1,0 +1,4 @@
+.pick-item,.card.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.admin-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;background:#1a2030;flex:0 0 56px;}
+.admin-shell{display:flex !important;flex-direction:row !important;}
+.admin-side{position:sticky;top:0;flex:0 0 132px;width:132px;min-height:100vh;background:#0d1424;}
