@@ -62,7 +62,11 @@ async def api_home(
         lat=lat,
         lng=lng,
     )
-    items.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, -(x.get("authenticity_score") or 0)))
+    pinned = [x for x in items if x.get("feed_pinned")]
+    fresh = [x for x in items if not x.get("feed_pinned")]
+    pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
+    fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
+    items = pinned + fresh
     announcement = None
     if settings.get("announcement_enabled") and settings.get("announcement_text"):
         announcement = {"text": settings["announcement_text"], "enabled": True}
