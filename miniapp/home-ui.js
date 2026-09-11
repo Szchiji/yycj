@@ -55,7 +55,7 @@
     const pin = t.feed_pinned ? '<span class="badge">置顶</span>' : "";
     return `<div class="feed-card compact cover-card" data-id="${esc(t.lamp_id)}">
       <div class="cover-wrap">
-        ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
+        ${img ? `<img class="thumb" data-src="${esc(img)}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
         <button class="fav-btn" type="button" data-fav="${esc(t.lamp_id)}">♡</button>
         ${loc ? `<span class="badge-loc">${esc(loc)}</span>` : ""}
         ${tag ? `<span class="badge-tag">${esc(tag)}</span>` : ""}
@@ -67,7 +67,7 @@
   function pinHtml(p) {
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
-    const bg = img ? ` style="background-image:url('${esc(img)}')"` : "";
+    const bg = img ? ` data-bg="${esc(img)}"` : "";
     return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}"${bg}><div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
   }
   function paint() {
@@ -135,6 +135,12 @@
     if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
     else pins.scrollBy({ left: step, behavior: "smooth" });
   }, 4000);
+  if (!document.getElementById("yycj-lazy")) {
+    const s = document.createElement("script");
+    s.id = "yycj-lazy";
+    s.src = "./lazy.js?v=20260911z";
+    document.head.appendChild(s);
+  }
   async function boot() {
     for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
