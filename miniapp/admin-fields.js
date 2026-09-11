@@ -13,9 +13,17 @@
       const key = raw.replace(/仅模板|\*/g, "").trim().slice(0, 16);
       if (!key || seen.has(key)) return;
       seen.add(key);
-      out.push({ key, label: key, form: !only && key !== "地点" && key !== "链接" });
+      out.push({ key, label: key, form: !only && key !== "地点" && key !== "链接" && key !== "聊天按钮" });
     });
     return out;
+  }
+  function keysFromTpl() {
+    const tpl = document.getElementById("opsBroadcastTpl")?.value || "";
+    const found = [];
+    const re = /\{([^}]{1,16})\}/g;
+    let m;
+    while ((m = re.exec(tpl))) found.push(m[1].trim());
+    return found;
   }
   function toText(fields) {
     if (!fields || !fields.length) return DEFAULT_TEXT;
@@ -33,16 +41,28 @@
   }
   function sync() {
     const ta = document.getElementById("listingFieldsEditor");
-    const list = parse(ta ? ta.value : DEFAULT_TEXT);
+    let list = parse(ta ? ta.value : DEFAULT_TEXT);
+    const have = new Set(list.map((x) => x.key));
+    keysFromTpl().forEach((key) => {
+      if (!have.has(key)) {
+        list.push({ key, label: key, form: key !== "地点" && key !== "链接" && key !== "聊天按钮" });
+        have.add(key);
+      }
+    });
     window.__listingFields = list.length ? list : parse(DEFAULT_TEXT);
+    if (ta) {
+      const next = toText(window.__listingFields);
+      if (ta.value.trim() !== next.trim()) ta.value = next;
+    }
   }
   function paint(text) {
     const el = box();
     if (!el) return;
-    el.innerHTML = `<label>上架栏（一行一个，末尾加「仅模板」则只用于推送）</label><textarea id="listingFieldsEditor" rows="9"></textarea><p class="muted" style="margin:6px 0 0">推送模板里直接写 {称呼} {城市} 即可，改完点保存。</p><button class="btn" type="button" id="btnResetFields" style="margin-top:8px">恢复默认</button>`;
+    el.innerHTML = `<label>上架栏（一行一个，末尾加「仅模板」则只用于推送）</label><textarea id="listingFieldsEditor" rows="9"></textarea><p class="muted" style="margin:6px 0 0">模板里写 {微信} 会自动出现在上架栏。改完点保存。</p><button class="btn" type="button" id="btnResetFields" style="margin-top:8px">恢复默认</button>`;
     const editor = document.getElementById("listingFieldsEditor");
     if (editor) editor.value = text || DEFAULT_TEXT;
     editor?.addEventListener("input", sync);
+    document.getElementById("opsBroadcastTpl")?.addEventListener("input", sync);
     sync();
   }
   document.addEventListener("click", (ev) => {
