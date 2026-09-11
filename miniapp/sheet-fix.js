@@ -11,8 +11,17 @@
   st.id = "yycj-sheet-css";
   st.textContent = `.sheet{z-index:120!important;align-items:flex-end;}
 .sheet-panel{margin-bottom:78px!important;max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch;}
-#homeSearch,.search-row{display:flex;align-items:center;gap:8px;}
-#btnGuide{flex:none;margin:0;padding:8px 10px;white-space:nowrap;}`;
+#homeSearch,.search-row{display:flex;align-items:center;gap:6px;}
+#homeSearch input,.search-row input{flex:1;min-width:0;height:36px;margin:0;}
+#btnGuide{
+  flex:none;margin:0;height:36px;padding:0 10px;
+  border-radius:18px;border:1px solid #3a4668;
+  background:#1a2340;color:#c9d4ff;
+  font-size:.8rem;line-height:36px;white-space:nowrap;
+}
+#btnSearchClear,#btnSearch{
+  height:36px;padding:0 12px;font-size:.8rem;white-space:nowrap;
+}`;
   document.head.appendChild(st);
 
   function closeSheet(id) { document.getElementById(id)?.classList.add("hidden"); }
@@ -37,8 +46,8 @@
     btn = document.createElement("button");
     btn.id = "btnGuide";
     btn.type = "button";
-    btn.className = "btn";
   }
+  btn.className = "btn";
   btn.textContent = "教程";
   if (row) row.insertBefore(btn, row.firstChild);
 
