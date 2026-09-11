@@ -2,82 +2,77 @@
   display: grid !important;
   grid-template-columns: 76px 1fr auto !important;
   align-items: center !important;
-  gap: 8px;
 }
-.topbar .top-admin { justify-self: start; font-size: 13px; }
-.topbar .brand { justify-self: center; text-align: center; font-weight: 700; }
+.topbar .brand { justify-self: center; font-weight: 700; }
 .topbar .city-wrap { justify-self: end; position: relative; }
 .city-drop {
   position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
-  min-width: 132px; background: #151b2b; border: 1px solid #2a3348;
-  border-radius: 12px; padding: 6px;
+  min-width: 132px; background: #151b2b; border: 1px solid #2a3348; border-radius: 12px; padding: 6px;
 }
-.city-drop .city-opt {
-  display: block; width: 100%; text-align: left; border: 0;
-  background: transparent; color: #e8eefc; padding: 8px 10px; border-radius: 8px;
-}
-.city-drop .city-opt.on { background: #2a3348; }
+.city-drop .city-opt { display: block; width: 100%; border: 0; background: transparent; color: #e8eefc; padding: 8px 10px; text-align: left; }
 #citySheet { display: none !important; }
 .pins {
   display: flex !important;
   gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding-bottom: 4px;
 }
 .pin-card, .pin-card.short {
-  position: relative;
-  display: block !important;
-  writing-mode: horizontal-tb !important;
-  flex: 0 0 78%;
-  height: 148px !important;
-  min-height: 148px !important;
-  max-height: 148px !important;
-  border-radius: 14px;
-  overflow: hidden !important;
-  scroll-snap-align: start;
+  position: relative !important;
+  flex: 0 0 82%;
+  height: 150px !important;
+  min-height: 150px !important;
+  max-height: 150px !important;
   padding: 0 !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+  scroll-snap-align: start;
+  writing-mode: horizontal-tb !important;
 }
-.pin-card .thumb {
+.pin-card > *:not(img):not(.thumb):not(.pin-copy) { display: none !important; }
+.pin-card img, .pin-card .thumb {
+  position: absolute !important;
+  inset: 0 !important;
   width: 100% !important;
-  height: 148px !important;
+  height: 100% !important;
   object-fit: cover !important;
   display: block !important;
 }
 .pin-card .pin-copy {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  padding: 18px 10px 8px;
-  background: linear-gradient(transparent, rgba(0,0,0,.72));
+  position: absolute !important;
+  left: 0; right: 0; bottom: 0;
+  z-index: 2;
+  display: block !important;
+  padding: 24px 12px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,.75));
   color: #fff;
 }
 .pin-card .pin-copy b {
   display: block;
-  writing-mode: horizontal-tb !important;
+  font-size: 15px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 14px;
 }
 .pin-card .badge-pin { display: none !important; }
-#feed.has-cover, .feed.feed-3.has-cover {
+#feed.has-cover {
   display: grid !important;
   grid-template-columns: 1fr 1fr 1fr !important;
   gap: 8px !important;
 }
 #feed.has-cover .feed-card:not(.cover-card) { display: none !important; }
-.feed-card.cover-card { padding: 0; overflow: hidden; }
+.feed-card.cover-card { padding: 0 !important; overflow: hidden; }
 .cover-wrap { position: relative; }
 .cover-wrap .thumb, .cover-wrap .thumb.ph {
   width: 100% !important;
-  height: 132px !important;
+  height: 168px !important;
   object-fit: cover;
-  border-radius: 10px 10px 0 0;
   display: block;
   background: #1a2030;
 }
 .fav-btn {
   position: absolute; top: 6px; left: 6px; width: 26px; height: 26px;
-  border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font-size: 13px;
+  border: 0; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff;
 }
 .fav-btn.on { color: #ff6b8a; }
 body.role-host .fav-btn { display: none !important; }
@@ -87,15 +82,8 @@ body.role-host .fav-btn { display: none !important; }
 .badge-loc { top: 6px; right: 6px; background: rgba(20,40,90,.82); }
 .badge-tag { left: 6px; bottom: 6px; background: #6d4aff; }
 .badge-n { right: 6px; bottom: 6px; background: rgba(0,0,0,.5); }
-.cover-card .body { padding: 6px 7px 8px; }
-.cover-card .body h3 { margin: 0 0 2px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cover-card .price { color: #7ea8ff; font-weight: 600; font-size: 12px; }
-.gallery-hero img, .gallery-hero video { width: 100%; max-height: 360px; object-fit: cover; border-radius: 12px; }
-.gallery-thumbs { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; }
-.g-thumb { position: relative; flex: 0 0 56px; height: 56px; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: #111; }
-.g-thumb.on { border-color: #7ea8ff; }
-.g-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.g-thumb .play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.35); }
+.cover-card .body { padding: 6px 6px 8px; }
+.cover-card .body h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cover-card .price { color: #7ea8ff; font-size: 12px; font-weight: 600; }
 .nav-item.hidden { display: none !important; }
 #favList { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-#citySheet { display: none !important; }

@@ -54,34 +54,28 @@
     </div>`;
   }
   function pinHtml(p) {
-    const t = (p && p.lamp) || {};
+    const t = (p && p.lamp) || p || {};
     const img = cover(t);
     return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">
-      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : ""}
+      ${img ? `<img class="thumb" src="${esc(img)}" alt="" />` : `<div class="thumb ph"></div>`}
       <div class="pin-copy"><b>${esc(t.title || "")}</b></div>
-      <span class="badge-pin">精选</span>
     </div>`;
-  }
-  function renderCities(current) {
-    const drop = $("#cityDrop");
-    if (!drop) return;
-    drop.innerHTML = (cities || []).map((c) =>
-      `<button type="button" class="city-opt${c === current ? " on" : ""}" data-city="${esc(c)}">${esc(c)}</button>`
-    ).join("");
-    const btn = $("#btnCity");
-    if (btn) btn.textContent = (current || "城市") + " ▾";
   }
   function paint() {
     const feed = $("#feed");
-    if (feed) {
-      feed.classList.add("has-cover", "feed-3");
-      feed.innerHTML = lastItems.map(cardHtml).join("") || '<div class="empty card"><p class="muted">暂无内容</p></div>';
+    if (feed && lastItems.length) {
+      feed.classList.add("has-cover");
+      feed.innerHTML = lastItems.map(cardHtml).join("");
     }
     const pins = $("#pins");
-    if (pins) {
+    if (pins && lastPins.length) {
       pins.innerHTML = lastPins.map(pinHtml).join("");
-      pins.classList.toggle("hidden", !lastPins.length);
+      pins.classList.remove("hidden");
     }
+  }
+  function broken() {
+    const feed = $("#feed");
+    return !!(lastItems.length && feed && !feed.querySelector(".cover-card"));
   }
   async function loadFeed(reset) {
     if (!token() || painting) return;
@@ -95,35 +89,25 @@
       const data = await api("/api/home?" + params);
       cities = data.enabled_cities || cities;
       if (data.city) localStorage.setItem("yycj_city", data.city);
-      renderCities(data.city || city);
+      const btn = $("#btnCity");
+      if (btn) btn.textContent = (data.city || city || "城市") + " ▾";
+      const drop = $("#cityDrop");
+      if (drop) drop.innerHTML = (cities || []).map((c) => `<button type="button" class="city-opt" data-city="${esc(c)}">${esc(c)}</button>`).join("");
       lastPins = data.pins || [];
       const batch = data.items || [];
       lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
       offset += batch.length;
       paint();
       $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
-    } catch (e) {
-      console.warn(e);
-    } finally {
-      painting = false;
-    }
+    } catch (e) { console.warn(e); }
+    finally { painting = false; }
   }
-  window.yycjHomeReload = () => loadFeed(true);
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnSearch") {
-      q = ($("#homeQ") && $("#homeQ").value.trim()) || "";
-      loadFeed(true);
-    }
+    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
-    if (ev.target.closest("[data-nav='home']")) {
-      ev.stopPropagation();
-      document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
-      $("#view-home")?.classList.remove("hidden");
-      loadFeed(true);
-    }
+    if (ev.target.closest("[data-nav='home']")) loadFeed(true);
     if (ev.target.id === "btnCity" || ev.target.closest("#btnCity")) {
-      ev.preventDefault();
-      ev.stopPropagation();
+      ev.preventDefault(); ev.stopPropagation();
       $("#citySheet")?.classList.add("hidden");
       $("#cityDrop")?.classList.toggle("hidden");
     }
@@ -135,8 +119,20 @@
     }
   }, true);
   async function boot() {
-    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 120));
+    for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
+    const feed = $("#feed");
+    if (feed) {
+      new MutationObserver(() => { if (!painting && broken()) paint(); }).observe(feed, { childList: true });
+    }
+    const pins = $("#pins");
+    if (pins) {
+      new MutationObserver(() => {
+        if (!painting && lastPins.length && !pins.querySelector(".pin-copy")) paint();
+      }).observe(pins, { childList: true });
+    }
+    setTimeout(() => { if (broken()) paint(); }, 400);
+    setTimeout(() => { if (broken()) paint(); }, 1200);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
