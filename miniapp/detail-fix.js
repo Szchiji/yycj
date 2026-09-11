@@ -4,7 +4,7 @@
     const s = String(u || "").trim();
     if (!s) return "";
     if (s.toLowerCase().startsWith("file_id:")) return srcOf(s.slice(8).trim());
-    if (s.startsWith("http") || s.startsWith("/") || s.startsWith("blob:")) return s;
+    if (s.startsWith("http") || s.startsWith("/")) return s;
     return "/api/media/file/" + encodeURIComponent(s);
   }
   function isVideo(m, raw) {
@@ -31,15 +31,6 @@
       const t = (n.textContent || "").replace(/\s+/g, " ").trim();
       if (/^file_id:?$/i.test(t) || /^file_id\s*:/i.test(t) || /^(AgACAg|BAACAg)/.test(t)) n.style.display = "none";
     });
-    box.querySelectorAll("p, div, span, h3, h4").forEach((n) => {
-      if (n.closest(".gallery")) return;
-      const t = (n.textContent || "").trim();
-      if (!t.includes("·")) return;
-      const parts = t.split("·").map((s) => s.trim()).filter(Boolean);
-      const uniq = [];
-      parts.forEach((p) => { if (!uniq.includes(p)) uniq.push(p); });
-      if (uniq.length && uniq.length < parts.length && n.childElementCount === 0) n.textContent = uniq.join(" · ");
-    });
   }
   function renderGallery(box, items) {
     if (!items.length) return;
@@ -55,28 +46,22 @@
       idx = items.findIndex((x) => x.type !== "video");
       if (idx < 0) idx = 0;
     }
-    if (idx >= items.length) idx = 0;
-    const cur = items[idx];
+    const cur = items[idx] || items[0];
     wrap.innerHTML = `
-      <div class="gallery-hero">
-        ${cur.type === "video"
-          ? `<video src="${cur.src}" controls playsinline webkit-playsinline preload="metadata"></video>`
-          : `<img src="${cur.src}" alt="" />`}
-      </div>
-      <div class="gallery-thumbs">
-        ${items.map((m, i) => `
-          <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
-            ${m.type === "video" ? `<span class="play">▶</span>` : `<img src="${m.src}" alt="" loading="lazy" />`}
-          </button>`).join("")}
-      </div>`;
+      <div class="gallery-hero">${cur.type === "video"
+        ? `<video src="${cur.src}" controls playsinline webkit-playsinline></video>`
+        : `<img src="${cur.src}" alt="" />`}</div>
+      <div class="gallery-thumbs">${items.map((m, i) => `
+        <button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">
+          ${m.type === "video" ? `<span class="play">▶</span>` : `<img src="${m.src}" alt="" />`}
+        </button>`).join("")}</div>`;
     wrap.dataset.idx = String(idx);
     wrap.querySelectorAll("[data-g]").forEach((btn) => {
       btn.addEventListener("click", (ev) => {
         ev.stopPropagation();
         wrap.dataset.idx = btn.getAttribute("data-g") || "0";
         renderGallery(box, items);
-        const v = wrap.querySelector("video");
-        if (v) v.play().catch(() => {});
+        wrap.querySelector("video")?.play().catch(() => {});
       });
     });
   }
@@ -90,15 +75,18 @@
       const data = await r.json();
       renderGallery(box, collect(data.lamp || data.item || data));
       hideNoise(box);
-      setTimeout(() => hideNoise(box), 250);
     } catch (e) { console.warn(e); }
   }
+  window.openLamp = function (id) {
+    document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+    document.getElementById("view-detail")?.classList.remove("hidden");
+    const g = document.querySelector("#detail .gallery");
+    if (g) g.dataset.idx = "-1";
+    paint(id);
+  };
   document.addEventListener("click", (ev) => {
     const card = ev.target.closest("[data-id]");
-    if (!card || ev.target.closest("[data-fav]")) return;
-    const box = document.getElementById("detail");
-    const g = box && box.querySelector(".gallery");
-    if (g) g.dataset.idx = "-1";
-    setTimeout(() => paint(card.getAttribute("data-id")), 280);
+    if (!card || ev.target.closest("[data-fav],[data-unfav]")) return;
+    setTimeout(() => paint(card.getAttribute("data-id")), 200);
   });
 })();
