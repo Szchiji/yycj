@@ -168,10 +168,25 @@ async def broadcast_listing(lamp: Dict[str, Any]) -> bool:
     link = bot_info.bot_tme_url(ident.get("username") or "")
     title = lamp.get("title") or ""
     city = lamp.get("city") or ""
+    district = lamp.get("district") or ""
+    loc = " · ".join([x for x in (city, district) if x])
     price = lamp.get("price_text") or "面议"
-    caption = f"🌕 {title}\n📍 {city}\n💰 {price}"
+    tags = " ".join("#" + t for t in (lamp.get("tags") or [])[:4] if t)
+    desc = (lamp.get("description") or "").strip().replace("\n", " ")[:80]
+    caption = (
+        "🌙 <b>月影车姬 · 新上架</b>\n"
+        "────────────\n"
+        f"<b>{title}</b>\n"
+        f"📍 {loc or '城市面议'}\n"
+        f"💰 {price}\n"
+    )
+    if tags:
+        caption += f"🏷 {tags}\n"
+    if desc:
+        caption += f"\n{desc}\n"
+    caption += "────────────"
     if link:
-        caption += f"\n\n小程序：{link}"
+        caption += f"\n打开小程序查看相册\n{link}"
     media = enrich_media(lamp.get("media"), lamp.get("photos"))
     file_id = None
     for m in media:
@@ -181,9 +196,9 @@ async def broadcast_listing(lamp: Dict[str, Any]) -> bool:
             break
     try:
         if file_id:
-            await bot.send_photo(chat, file_id, caption=caption)
+            await bot.send_photo(chat, file_id, caption=caption, parse_mode="HTML")
         else:
-            await bot.send_message(chat, caption)
+            await bot.send_message(chat, caption, parse_mode="HTML", disable_web_page_preview=False)
         return True
     except Exception:
         logger.exception("broadcast to %s failed", chat)
