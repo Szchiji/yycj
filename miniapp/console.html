@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>管理后台 v20d</title>
+  <title>管理后台 v20z</title>
   <script src="./telegram-web-app.js"></script>
   <script>
   if (!(window.Telegram && window.Telegram.WebApp)) {
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260920d" />
-  <link rel="stylesheet" href="./admin.css?v=20260920d" />
-  <link rel="stylesheet" href="./admin-ux.css?v=20260920d" />
+  <link rel="stylesheet" href="./styles.css?v=20260920z" />
+  <link rel="stylesheet" href="./admin.css?v=20260920z" />
+  <link rel="stylesheet" href="./admin-ux.css?v=20260920z" />
 </head>
 <body class="admin-body">
   <header class="topbar">
@@ -25,7 +25,7 @@
       </div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260920d">首页</a>
+      <a class="btn" href="./index.html?v=20260920z">首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
@@ -178,68 +178,19 @@
       </section>
     </div>
   </div>
-  <script>
-  (function () {
-    function paint() {
-      if (document.getElementById("proxyDistrict")) return;
-      if (document.getElementById("proxyXtra")) return;
-      var after = document.getElementById("proxyDesc");
-      if (!after) return;
-      var wrap = document.createElement("div");
-      wrap.id = "proxyXtra";
-      wrap.innerHTML = '<label>区域</label><input id="proxyDistrict" /><label>大致位置</label><input id="proxyApprox" /><label>标签</label><input id="proxyTags" placeholder="空格分隔" /><label>联系</label><input data-extra="联系" /><label>频道</label><input data-extra="频道" /><label>微信</label><input data-extra="微信" />';
-      after.insertAdjacentElement("afterend", wrap);
-    }
-    function paintEdit() {
-      if (document.getElementById("editDistrict")) return;
-      if (document.getElementById("editXtra")) return;
-      var after = document.getElementById("editDesc");
-      if (!after) return;
-      var wrap = document.createElement("div");
-      wrap.id = "editXtra";
-      wrap.innerHTML = '<label>区域</label><input id="editDistrict" /><label>大致位置</label><input id="editApprox" /><label>标签</label><input id="editTags" placeholder="空格分隔" /><label>联系</label><input data-extra="联系" /><label>频道</label><input data-extra="频道" /><label>微信</label><input data-extra="微信" />';
-      after.insertAdjacentElement("afterend", wrap);
-    }
-    setInterval(function () { paint(); paintEdit(); }, 800);
-    var raw = window.fetch.bind(window);
-    window.fetch = function (url, opt) {
-      opt = opt || {};
-      var u = String(url || "");
-      var isProxy = u.indexOf("/listings/proxy") >= 0 || u.indexOf("/proxy-edit") >= 0;
-      if (isProxy && opt.body && typeof opt.body === "string") {
-        try {
-          var body = JSON.parse(opt.body);
-          var box = u.indexOf("proxy-edit") >= 0 ? "editBox" : "proxyBox";
-          body.district = (document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "District") || {}).value || body.district;
-          body.approx_label = (document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "Approx") || {}).value || body.approx_label;
-          var tagsEl = document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "Tags");
-          if (tagsEl && tagsEl.value) body.tags = tagsEl.value.split(/[,，\s]+/).filter(Boolean);
-          body.extras = body.extras || {};
-          document.querySelectorAll("#" + box + " [data-extra]").forEach(function (el) {
-            var k = el.getAttribute("data-extra");
-            var v = (el.value || "").trim();
-            if (k && v) body.extras[k] = v;
-          });
-          opt = Object.assign({}, opt, { body: JSON.stringify(body) });
-        } catch (e) {}
-      }
-      return raw(url, opt);
-    };
-  })();
-  </script>
-  <script src="./admin-boot.js?v=20260920d"></script>
-  <script src="./admin.js?v=20260920d"></script>
-  <script src="./admin-ops.js?v=20260920d"></script>
-  <script src="./admin-list.js?v=20260920d"></script>
-  <script src="./admin-fields.js?v=20260920d"></script>
-  <script src="./admin-promo.js?v=20260920d"></script>
-  <script src="./admin-proxy.js?v=20260920d"></script>
-  <script src="./admin-proxy-edit.js?v=20260920d"></script>
-  <script src="./admin-proxy-plus.js?v=20260920d"></script>
-  <script src="./admin-picks.js?v=20260920d"></script>
-  <script src="./admin-compact.js?v=20260920d"></script>
-  <script src="./admin-hydrate.js?v=20260920d"></script>
-  <script src="./admin-side.js?v=20260920d"></script>
-  <script src="./admin-ux.js?v=20260920d"></script>
+  <script src="./admin-boot.js?v=20260920z"></script>
+  <script src="./admin.js?v=20260920z"></script>
+  <script src="./admin-ops.js?v=20260920z"></script>
+  <script src="./admin-list.js?v=20260920z"></script>
+  <script src="./admin-fields.js?v=20260920z"></script>
+  <script src="./admin-promo.js?v=20260920z"></script>
+  <script src="./admin-proxy.js?v=20260920z"></script>
+  <script src="./admin-picks.js?v=20260920z"></script>
+  <script src="./admin-compact.js?v=20260920z"></script>
+  <script src="./admin-hydrate.js?v=20260920z"></script>
+  <script src="./admin-side.js?v=20260920z"></script>
+  <script src="./admin-ux.js?v=20260920z"></script>
+  <script src="./admin-refresh.js?v=20260920z"></script>
+  <script src="./live-refresh.js?v=20260920z"></script>
 </body>
 </html>
