@@ -59,7 +59,7 @@
       admin.style.cursor = "pointer";
       admin.onclick = (ev) => {
         ev.preventDefault();
-        if (home.is_admin) { location.href = "./admin.html"; return; }
+        if (home.is_admin) { location.href = "./console.html?v=20260920c"; return; }
         if (!openUrl(contacts.admin_url || "")) toast("后台还没填管理员联系");
       };
     }
