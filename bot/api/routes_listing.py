@@ -149,8 +149,16 @@ async def api_admin_proxy_edit(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    album = None
     try:
         await save_extras(lamp_id, body.extras)
+        from bot.services import search_service
+        full = await search_service.get_lamp(lamp_id) or lamp or {}
+        if isinstance(full, dict):
+            extras = dict(full.get("extras") or {})
+            extras.update(body.extras or {})
+            full["extras"] = extras
+            album = await listing_flow.broadcast_listing(full, extras)
     except Exception:
-        pass
-    return {"ok": True, "lamp": lamp, "by": admin_id}
+        album = None
+    return {"ok": True, "lamp": lamp, "album": album, "by": admin_id}
