@@ -1,6 +1,12 @@
 (() => {
   const pane = document.getElementById("pane-listings");
   if (!pane) return;
+  if (!document.getElementById("yycj-live")) {
+    const live = document.createElement("script");
+    live.id = "yycj-live";
+    live.src = "./live-refresh.js?v=20260920e";
+    document.head.appendChild(live);
+  }
   const CORE = new Set(["称呼", "城市", "价位", "简介", "地点", "链接", "聊天按钮"]);
   const ID_MAP = { "区域": "District", "大致位置": "Approx", "标签": "Tags" };
   function extraHtml(prefix, keys) {
@@ -55,6 +61,11 @@
   const token = () => localStorage.getItem("yycj_token") || "";
   const uploadedP = [];
   const uploadedE = [];
+  function dirty() {
+    localStorage.setItem("yycj_bust", String(Date.now()));
+    if (window.yycjRefreshViews) window.yycjRefreshViews();
+    document.getElementById("btnRefresh")?.click();
+  }
   function collectExtras(boxId) {
     const out = {};
     document.querySelectorAll("#" + boxId + " [data-extra]").forEach((el) => {
@@ -157,7 +168,7 @@
       if (!r.ok) throw new Error(data.detail || "失败");
       alert("已代上架并按模板推送：" + ((data.lamp || {}).title || ""));
       uploadedP.length = 0; preview("proxyPreview", uploadedP);
-      document.getElementById("btnRefresh")?.click();
+      dirty();
     } catch (e) { alert(e.message || String(e)); }
   });
   document.getElementById("btnEditSave")?.addEventListener("click", async () => {
@@ -181,9 +192,9 @@
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "失败");
-      alert(data.album ? "已保存并更新频道" : "已保存修改");
+      alert(data.edited_in_place ? "已保存并改了原频道帖" : "已保存修改");
       uploadedE.length = 0; preview("editPreview", uploadedE);
-      document.getElementById("btnRefresh")?.click();
+      dirty();
     } catch (e) { alert(e.message || String(e)); }
   });
   window.yycjFillProxy = function (item) {
