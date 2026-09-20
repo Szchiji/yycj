@@ -22,31 +22,20 @@ def _is_admin(user_id: int) -> bool:
 
 @router.message(Command("admin"))
 async def admin_help(message: Message) -> None:
-    if not message.from_user or not _is_admin(message.from_user.id):
+    if not message.from_user:
+        return
+    if not _is_admin(message.from_user.id):
+        await message.answer("这个命令只有管理员能用。")
         return
     kb = admin_webapp_kb()
-    await message.answer(
-        "管理员命令：\n"
-        "点下方「🛠 管理后台」打开 Mini App 控制台。\n"
-        "审核可通过 Bot 通知按钮，或 Mini App / HTTP API。\n"
-        "/admin — 本帮助 + 管理后台入口\n"
-        "/session_messages <session_id> — 查看会话落库消息（ADMIN_IDS）\n"
-        "HTTP：\n"
-        "· GET  /api/admin/posts/pending\n"
-        "· POST /api/admin/posts/{id}/approve|reject\n"
-        "· GET  /api/admin/reports/pending\n"
-        "· POST /api/admin/reports/{id}/accept|reject\n"
-        "· POST /api/admin/credit/adjust\n"
-        "· GET  /api/admin/shadow\n"
-        "· GET  /api/admin/sessions/{id}/messages\n"
-        "控制台：/app/admin.html（仅 ADMIN_IDS）",
-        reply_markup=kb,
-    )
+    if not kb:
+        await message.answer("还没配 WEBAPP_URL，无法打开后台。")
+        return
+    await message.answer("点下方打开管理后台。", reply_markup=kb)
 
 
 @router.message(Command("session_messages"))
 async def session_messages_cmd(message: Message) -> None:
-    """ADMIN_IDS only：列出某 session_id 的落库消息。"""
     if not message.from_user or not _is_admin(message.from_user.id):
         return
     parts = (message.text or "").split(maxsplit=1)
