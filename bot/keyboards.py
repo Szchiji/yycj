@@ -19,11 +19,11 @@ def remove_kb() -> ReplyKeyboardRemove:
 
 
 def admin_webapp_kb() -> InlineKeyboardMarkup | None:
-    """Inline WebApp button to admin.html (admins only)."""
+    """Inline WebApp button to console.html (admins only)."""
     webapp = get_settings().normalized_webapp_url
     if not webapp:
         return None
-    admin_url = f"{webapp}admin.html"
+    admin_url = f"{webapp}console.html?v=20260920c"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
