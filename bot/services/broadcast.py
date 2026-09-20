@@ -61,7 +61,7 @@ def fill_template(tpl: str, lamp: Dict[str, Any], extras: Optional[Dict[str, Any
         "link": link or "",
     }
     for key, val in extras.items():
-        if key:
+        if key and not str(key).startswith("_"):
             mapping[str(key)] = "" if val is None else str(val)
     if mapping.get("联系") and not mapping.get("微信"):
         mapping["微信"] = mapping["联系"]
@@ -103,12 +103,22 @@ async def resolve_media_chat() -> Optional[str]:
     return str(chat) if chat else None
 
 
-async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
+async def _remember(lamp_id: str, chat: str, mid: int) -> None:
+    if not lamp_id or not mid:
+        return
+    try:
+        from bot.services.extras_store import load_extras, save_extras
+        cur = await load_extras(lamp_id)
+        cur["_bc_chat"] = chat
+        cur["_bc_mid"] = str(mid)
+        await save_extras(lamp_id, cur)
+    except Exception:
+        logger.exception("remember broadcast ref failed")
+
+
+async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]]) -> tuple[str, str]:
     site = await home_service.get_or_create_settings()
     chat = normalize_chat(str(site.get("broadcast_channel") or ""))
-    if not chat:
-        return None
-    from bot.main import bot
     from bot.services import bot_info
     ident = await bot_info.get_bot_identity()
     link = bot_info.bot_tme_url(ident.get("username") or "")
@@ -118,6 +128,14 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
     merged.update(extras or {})
     merged.setdefault("聊天按钮", site.get("chat_cta_label") or "想聊聊")
     caption = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
+    return chat, caption
+
+
+async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    chat, caption = await _caption(lamp, extras)
+    if not chat:
+        return None
+    from bot.main import bot
     items = _media_items(lamp)
     try:
         msg = None
@@ -140,7 +158,33 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
         else:
             msg = await bot.send_message(chat, caption)
         mid = getattr(msg, "message_id", None)
-        return album_link(chat, int(mid)) if mid else None
+        if mid:
+            await _remember(str(lamp.get("lamp_id") or ""), chat, int(mid))
+            return album_link(chat, int(mid))
+        return None
     except Exception:
         logger.exception("broadcast to %s failed", chat)
         return None
+
+
+async def update_broadcast(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """只改原频道帖文案，不新发。"""
+    from bot.services.extras_store import load_extras
+    from bot.main import bot
+    lid = str(lamp.get("lamp_id") or "")
+    stored = await load_extras(lid)
+    chat = stored.get("_bc_chat") or ""
+    mid = stored.get("_bc_mid") or ""
+    if not chat or not str(mid).isdigit():
+        return None
+    _chat, caption = await _caption(lamp, extras)
+    try:
+        await bot.edit_message_caption(chat_id=chat, message_id=int(mid), caption=caption)
+        return album_link(chat, int(mid))
+    except Exception:
+        try:
+            await bot.edit_message_text(chat_id=chat, message_id=int(mid), text=caption)
+            return album_link(chat, int(mid))
+        except Exception:
+            logger.exception("edit original broadcast failed")
+            return None
