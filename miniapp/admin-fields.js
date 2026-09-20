@@ -2,7 +2,7 @@
   if (window.__yycjAdminFields) return;
   window.__yycjAdminFields = true;
   const token = () => localStorage.getItem("yycj_token") || "";
-  const DEFAULT_TEXT = "称呼\n城市\n简介\n价位\n区域\n大致位置\n标签\n地点 仅模板\n链接 仅模板";
+  const DEFAULT_TEXT = "称呼\n城市\n简介\n价位\n区域\n大致位置\n标签\n联系\n频道\n微信\n地点 仅模板\n链接 仅模板";
   function parse(text) {
     const out = [];
     const seen = new Set();
@@ -17,17 +17,14 @@
     });
     return out;
   }
-  function keysFromTpl() {
-    const tpl = document.getElementById("opsBroadcastTpl")?.value || "";
-    const found = [];
-    const re = /\{([^}]{1,16})\}/g;
-    let m;
-    while ((m = re.exec(tpl))) found.push(m[1].trim());
-    return found;
-  }
   function toText(fields) {
-    if (!fields || !fields.length) return DEFAULT_TEXT;
+    if (!fields || !fields.length) return "";
     return fields.map((x) => x.form === false ? (x.key + " 仅模板") : x.key).join("\n");
+  }
+  function readEditor() {
+    const ta = document.getElementById("listingFieldsEditor");
+    window.__listingFields = parse(ta ? ta.value : "");
+    return window.__listingFields;
   }
   function box() {
     let el = document.getElementById("listingFieldBox");
@@ -39,35 +36,18 @@
     tpl.parentNode.insertBefore(el, tpl.nextSibling);
     return el;
   }
-  function sync() {
-    const ta = document.getElementById("listingFieldsEditor");
-    let list = parse(ta ? ta.value : DEFAULT_TEXT);
-    const have = new Set(list.map((x) => x.key));
-    keysFromTpl().forEach((key) => {
-      if (!have.has(key)) {
-        list.push({ key, label: key, form: key !== "地点" && key !== "链接" && key !== "聊天按钮" });
-        have.add(key);
-      }
-    });
-    window.__listingFields = list.length ? list : parse(DEFAULT_TEXT);
-    if (ta) {
-      const next = toText(window.__listingFields);
-      if (ta.value.trim() !== next.trim()) ta.value = next;
-    }
-  }
   function paint(text) {
     const el = box();
     if (!el) return;
-    el.innerHTML = `<label>上架栏（一行一个，末尾加「仅模板」则只用于推送）</label><textarea id="listingFieldsEditor" rows="9"></textarea><p class="muted" style="margin:6px 0 0">模板里写 {微信} 会自动出现在上架栏。改完点保存。</p><button class="btn" type="button" id="btnResetFields" style="margin-top:8px">恢复默认</button>`;
+    el.innerHTML = `<label>上架栏（一行一个，删掉那一行即删栏）</label><textarea id="listingFieldsEditor" rows="10"></textarea><p class="muted" style="margin:6px 0 0">改完后必点「保存全部设置」。模板里的 {字} 不会再自动把栏加回来。</p><div class="row" style="margin-top:8px"><button class="btn" type="button" id="btnResetFields">恢复默认</button></div>`;
     const editor = document.getElementById("listingFieldsEditor");
-    if (editor) editor.value = text || DEFAULT_TEXT;
-    editor?.addEventListener("input", sync);
-    document.getElementById("opsBroadcastTpl")?.addEventListener("input", sync);
-    sync();
+    if (editor) editor.value = text || "";
+    editor?.addEventListener("input", readEditor);
+    readEditor();
   }
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnResetFields") paint(DEFAULT_TEXT);
-    sync();
+    if (ev.target && ev.target.id === "btnResetFields") paint(DEFAULT_TEXT);
+    readEditor();
   }, true);
   setTimeout(async () => {
     let text = DEFAULT_TEXT;
