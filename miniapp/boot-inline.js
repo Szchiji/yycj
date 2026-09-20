@@ -19,10 +19,10 @@
     document.querySelector("#bootRetry")?.classList.remove("hidden");
   }
   window.__yycjBoot = { showBoot, hideBoot, showBootError };
-  ["publish-fields.js", "cta-apply.js", "detail-extras.js", "publish-status.js"].forEach((name) => {
+  ["publish-fields.js", "cta-apply.js", "detail-extras.js", "publish-status.js", "role-gate.js"].forEach((name) => {
     if (document.querySelector('script[src*="' + name + '"]')) return;
     const s = document.createElement("script");
-    s.src = "./" + name + "?v=20260912m";
+    s.src = "./" + name + "?v=20260912w";
     (document.body || document.documentElement).appendChild(s);
   });
 })();
