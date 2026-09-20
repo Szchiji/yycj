@@ -1,9 +1,15 @@
 (() => {
   const pane = document.getElementById("pane-listings");
   if (!pane) return;
-  const EXTRA_DEFAULT = ["联系", "频道", "微信"];
-  function extraInputs(prefix) {
-    return EXTRA_DEFAULT.map((k) => `<label>${k}</label><input data-extra="${k}" id="${prefix}_${k}" maxlength="64" />`).join("");
+  const CORE = new Set(["称呼", "城市", "价位", "简介", "地点", "链接", "聊天按钮"]);
+  const ID_MAP = { "区域": "District", "大致位置": "Approx", "标签": "Tags" };
+  function extraHtml(prefix, keys) {
+    return keys.map((k) => {
+      const id = ID_MAP[k] ? (prefix + ID_MAP[k]) : "";
+      const extra = ID_MAP[k] ? "" : ` data-extra="${k}"`;
+      const ph = k === "标签" ? " placeholder=\"空格分隔\"" : "";
+      return `<label>${k}</label><input${id ? ` id="${id}"` : ""}${extra}${ph} maxlength="64" />`;
+    }).join("");
   }
   if (!document.getElementById("proxyBox")) {
     const box = document.createElement("div");
@@ -16,10 +22,7 @@
       <label>城市</label><input id="proxyCity" value="深圳" />
       <label>价位</label><input id="proxyPrice" />
       <label>简介</label><textarea id="proxyDesc" rows="3"></textarea>
-      <label>区域</label><input id="proxyDistrict" />
-      <label>大致位置</label><input id="proxyApprox" />
-      <label>标签</label><input id="proxyTags" placeholder="空格分隔" />
-      <div id="proxyExtras">${extraInputs("proxy")}</div>
+      <div id="proxyExtras"></div>
       <label>相册</label>
       <input id="proxyFiles" type="file" accept="image/*,video/*" multiple />
       <div id="proxyStatus" class="muted"></div>
@@ -32,17 +35,14 @@
     box.id = "editBox";
     box.className = "card";
     box.innerHTML = `<h3>代修改资料（免审）</h3>
-      <p class="muted">从下方资料列表点「代改」填入，保存后立刻覆盖，不走审核、不重复推频道。</p>
+      <p class="muted">从下方资料列表点「代改」填入，保存后覆盖资料并更新频道文案。</p>
       <input id="editLampId" type="hidden" />
       <label>资料</label><input id="editLampLabel" readonly placeholder="先在列表点代改" />
       <label>称呼</label><input id="editTitle" />
       <label>城市</label><input id="editCity" />
       <label>价位</label><input id="editPrice" />
       <label>简介</label><textarea id="editDesc" rows="3"></textarea>
-      <label>区域</label><input id="editDistrict" />
-      <label>大致位置</label><input id="editApprox" />
-      <label>标签</label><input id="editTags" placeholder="空格分隔" />
-      <div id="editExtras">${extraInputs("edit")}</div>
+      <div id="editExtras"></div>
       <label>相册（可选，选了就替换）</label>
       <input id="editFiles" type="file" accept="image/*,video/*" multiple />
       <div id="editStatus" class="muted"></div>
@@ -70,18 +70,13 @@
       const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token() } });
       fields = ((await r.json()).listing_fields) || [];
     } catch (e) {}
-    const keys = fields.filter((f) => f && f.key && f.form !== false)
+    const keys = (fields || []).filter((f) => f && f.key && f.form !== false)
       .map((f) => String(f.key))
-      .filter((k) => !["称呼","城市","价位","简介","区域","大致位置","标签","地点","链接","聊天按钮"].includes(k));
-    ["proxyExtras", "editExtras"].forEach((id) => {
-      const wrap = document.getElementById(id);
-      if (!wrap) return;
-      const have = new Set([...wrap.querySelectorAll("[data-extra]")].map((el) => el.getAttribute("data-extra")));
-      keys.forEach((k) => {
-        if (have.has(k)) return;
-        wrap.insertAdjacentHTML("beforeend", `<label>${k}</label><input data-extra="${k}" maxlength="64" />`);
-      });
-    });
+      .filter((k) => !CORE.has(k));
+    const proxyWrap = document.getElementById("proxyExtras");
+    const editWrap = document.getElementById("editExtras");
+    if (proxyWrap) proxyWrap.innerHTML = extraHtml("proxy", keys);
+    if (editWrap) editWrap.innerHTML = extraHtml("edit", keys);
   }
   function preview(elId, list) {
     const el = document.getElementById(elId);
@@ -128,6 +123,7 @@
       type: m.type, file_id: m.file_id, url: m.url || m.file_id, preview_url: m.preview_url || ""
     }));
   }
+  function val(id) { return (document.getElementById(id) || {}).value || ""; }
   document.getElementById("proxyFiles")?.addEventListener("change", (ev) => {
     uploadFiles([...(ev.target.files || [])], uploadedP, "proxyPreview", "proxyStatus");
     ev.target.value = "";
@@ -137,23 +133,22 @@
     ev.target.value = "";
   });
   document.getElementById("btnProxy")?.addEventListener("click", async () => {
-    const uid = parseInt(document.getElementById("proxyUid").value, 10);
+    const uid = parseInt(val("proxyUid"), 10);
     if (!uid) return alert("请填老师用户 ID");
-    const extras = collectExtras("proxyBox");
     try {
       const r = await fetch("/api/admin/listings/proxy", {
         method: "POST",
         headers: { Authorization: "Bearer " + token(), "Content-Type": "application/json" },
         body: JSON.stringify({
           target_user_id: uid,
-          title: document.getElementById("proxyTitle").value,
-          city: document.getElementById("proxyCity").value,
-          price_text: document.getElementById("proxyPrice").value,
-          description: document.getElementById("proxyDesc").value,
-          district: document.getElementById("proxyDistrict").value,
-          approx_label: document.getElementById("proxyApprox").value,
-          tags: (document.getElementById("proxyTags").value || "").split(/[,，\s]+/).filter(Boolean),
-          extras,
+          title: val("proxyTitle"),
+          city: val("proxyCity"),
+          price_text: val("proxyPrice"),
+          description: val("proxyDesc"),
+          district: val("proxyDistrict"),
+          approx_label: val("proxyApprox"),
+          tags: val("proxyTags").split(/[,，\s]+/).filter(Boolean),
+          extras: collectExtras("proxyBox"),
           media: mediaOf(uploadedP),
           publisher_role: "teacher",
         }),
@@ -166,28 +161,27 @@
     } catch (e) { alert(e.message || String(e)); }
   });
   document.getElementById("btnEditSave")?.addEventListener("click", async () => {
-    const id = document.getElementById("editLampId").value || "";
+    const id = val("editLampId");
     if (!id) return alert("请先在资料列表点「代改」");
-    const extras = collectExtras("editBox");
     try {
       const r = await fetch("/api/admin/listings/" + encodeURIComponent(id) + "/proxy-edit", {
         method: "POST",
         headers: { Authorization: "Bearer " + token(), "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: document.getElementById("editTitle").value,
-          city: document.getElementById("editCity").value,
-          price_text: document.getElementById("editPrice").value,
-          description: document.getElementById("editDesc").value,
-          district: document.getElementById("editDistrict").value,
-          approx_label: document.getElementById("editApprox").value,
-          tags: (document.getElementById("editTags").value || "").split(/[,，\s]+/).filter(Boolean),
-          extras,
+          title: val("editTitle"),
+          city: val("editCity"),
+          price_text: val("editPrice"),
+          description: val("editDesc"),
+          district: val("editDistrict"),
+          approx_label: val("editApprox"),
+          tags: val("editTags").split(/[,，\s]+/).filter(Boolean),
+          extras: collectExtras("editBox"),
           media: mediaOf(uploadedE),
         }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "失败");
-      alert("已保存修改");
+      alert(data.album ? "已保存并更新频道" : "已保存修改");
       uploadedE.length = 0; preview("editPreview", uploadedE);
       document.getElementById("btnRefresh")?.click();
     } catch (e) { alert(e.message || String(e)); }
