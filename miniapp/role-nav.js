@@ -26,4 +26,9 @@
   document.querySelectorAll("[data-switch]").forEach((b) => {
     b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); }, 400));
   });
+  if (!document.querySelector('script[src*="role-gate.js"]')) {
+    const s = document.createElement("script");
+    s.src = "./role-gate.js?v=20260912w";
+    document.body.appendChild(s);
+  }
 })();
