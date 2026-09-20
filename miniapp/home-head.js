@@ -34,6 +34,13 @@
       const tier = user.tier || "";
       box.innerHTML = `<div><div class="muted">兰花令</div><div class="score">${score}</div></div><div class="muted">${roleMap[user.role] || "客人"}${tier ? " · " + tier : ""}</div>`;
     }
+    const entry = document.getElementById("adminEntry");
+    const link = entry && entry.querySelector("a");
+    if (link) {
+      link.href = "./console.html?v=20260920e";
+      link.textContent = "管理后台";
+    }
+    if (entry) entry.classList.toggle("hidden", !(home && home.is_admin));
   }
   async function bind() {
     document.getElementById("topMeta")?.classList.add("hidden");
@@ -59,7 +66,7 @@
       admin.style.cursor = "pointer";
       admin.onclick = (ev) => {
         ev.preventDefault();
-        if (home.is_admin) { location.href = "./console.html?v=20260920c"; return; }
+        if (home.is_admin) { location.href = "./console.html?v=20260920e"; return; }
         if (!openUrl(contacts.admin_url || "")) toast("后台还没填管理员联系");
       };
     }
