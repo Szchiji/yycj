@@ -8,9 +8,10 @@ from pydantic import BaseModel, Field
 
 from bot.api.deps import get_admin_user_id, get_current_user_id
 from bot.api.routes_core import MediaItem, _normalize_media, _ser_dt, router
-from bot.models import UserRole
-from bot.services import credit_service, listing_flow, listing_notify
+from bot.models import LampStatus, UserRole
+from bot.services import credit_service, listing_flow, listing_notify, search_service
 from bot.services.admin_ops import notify_user_best_effort
+from bot.services.broadcast import update_broadcast
 from bot.services.extras_store import save_extras
 
 
@@ -53,12 +54,11 @@ async def api_me_edit(
     media = _normalize_media(body.media, body.photos)
     if not media:
         raise HTTPException(status_code=400, detail="请至少上传 1 张图或视频")
-    import uuid
-    from bot.db import session_scope
-    from bot.models import Post, PostStatus
-
-    lamp_data = {
-        "edit_lamp_id": lamp_id,
+    mine = await listing_flow.list_my_lamps(user_id)
+    current = next((x for x in mine if x.get("lamp_id") == lamp_id), None)
+    if not current:
+        raise HTTPException(status_code=404, detail="找不到你的这条资料")
+    payload = {
         "city": body.city.strip()[:32],
         "title": body.title.strip()[:64],
         "tags": [t.strip()[:24] for t in body.tags if t.strip()][:5],
@@ -69,12 +69,29 @@ async def api_me_edit(
         "media": media,
         "district": (body.district or "").strip()[:64] or None,
         "approx_label": (body.approx_label or "").strip()[:128] or None,
-        "publisher_role": u.get("role") or UserRole.TEACHER.value,
         "extras": dict(body.extras or {}),
     }
-    mine = await listing_flow.list_my_lamps(user_id)
-    if lamp_id not in {x["lamp_id"] for x in mine}:
-        raise HTTPException(status_code=404, detail="找不到你的这条资料")
+    if current.get("status") == LampStatus.ACTIVE.value:
+        lamp = await listing_flow.apply_edit(lamp_id, payload, owner_id=user_id)
+        album = None
+        try:
+            await save_extras(lamp_id, body.extras)
+            full = await search_service.get_lamp(lamp_id) or lamp or {}
+            extras = dict((full or {}).get("extras") or {})
+            extras.update(body.extras or {})
+            if isinstance(full, dict):
+                full["extras"] = extras
+            album = await update_broadcast(full if isinstance(full, dict) else {}, extras)
+        except Exception:
+            album = None
+        return {"ok": True, "instant": True, "lamp": lamp, "album": album, "edited_in_place": bool(album)}
+    import uuid
+    from bot.db import session_scope
+    from bot.models import Post, PostStatus
+
+    lamp_data = dict(payload)
+    lamp_data["edit_lamp_id"] = lamp_id
+    lamp_data["publisher_role"] = u.get("role") or UserRole.TEACHER.value
     post_id = str(uuid.uuid4())
     async with session_scope() as s:
         s.add(Post(post_id=post_id, user_id=user_id, lamp_data=lamp_data, status=PostStatus.PENDING.value))
@@ -82,7 +99,7 @@ async def api_me_edit(
         await listing_notify.notify_admins_new_post(post_id, user_id, lamp_data)
     except Exception:
         pass
-    return {"ok": True, "post_id": post_id, "status": "pending", "edit_lamp_id": lamp_id}
+    return {"ok": True, "post_id": post_id, "status": "pending", "edit_lamp_id": lamp_id, "instant": False}
 
 
 @router.post("/admin/listings/proxy")
@@ -152,8 +169,6 @@ async def api_admin_proxy_edit(
     album = None
     try:
         await save_extras(lamp_id, body.extras)
-        from bot.services import search_service
-        from bot.services.broadcast import update_broadcast
         full = await search_service.get_lamp(lamp_id) or lamp or {}
         if isinstance(full, dict):
             extras = dict(full.get("extras") or {})
