@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy import text
 
@@ -11,20 +11,6 @@ from bot.db import session_scope
 from bot.services import listing_flow, search_service
 
 logger = logging.getLogger(__name__)
-
-
-async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
-    data = {str(k): str(v) for k, v in (extras or {}).items() if k and v not in (None, "")}
-    if not lamp_id:
-        return
-    async with session_scope() as s:
-        try:
-            await s.execute(
-                text("UPDATE lamps SET extras = CAST(:j AS jsonb) WHERE lamp_id = :id"),
-                {"j": json.dumps(data, ensure_ascii=False), "id": lamp_id},
-            )
-        except Exception:
-            logger.exception("save extras failed")
 
 
 async def load_extras(lamp_id: str) -> Dict[str, Any]:
@@ -37,6 +23,38 @@ async def load_extras(lamp_id: str) -> Dict[str, Any]:
             return raw if isinstance(raw, dict) else {}
         except Exception:
             return {}
+
+
+async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
+    if not lamp_id:
+        return
+    incoming = {str(k): str(v) for k, v in (extras or {}).items() if k and v not in (None, "")}
+    current = await load_extras(lamp_id)
+    for key, val in current.items():
+        if str(key).startswith("_bc_") and key not in incoming:
+            incoming[key] = val
+    async with session_scope() as s:
+        try:
+            await s.execute(
+                text("UPDATE lamps SET extras = CAST(:j AS jsonb) WHERE lamp_id = :id"),
+                {"j": json.dumps(incoming, ensure_ascii=False), "id": lamp_id},
+            )
+        except Exception:
+            logger.exception("save extras failed")
+
+
+async def remember_broadcast(lamp_id: str, chat: str, mid: int) -> None:
+    if not lamp_id or not mid:
+        return
+    current = await load_extras(lamp_id)
+    current["_bc_chat"] = str(chat)
+    current["_bc_mid"] = str(int(mid))
+    await save_extras(lamp_id, current)
+
+
+async def load_broadcast(lamp_id: str) -> Tuple[str, str]:
+    extras = await load_extras(lamp_id)
+    return str(extras.get("_bc_chat") or ""), str(extras.get("_bc_mid") or "")
 
 
 _orig_get = search_service.get_lamp
