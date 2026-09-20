@@ -14,16 +14,14 @@ from bot.config import get_settings
 
 
 def remove_kb() -> ReplyKeyboardRemove:
-    """清除历史 ReplyKeyboard。"""
     return ReplyKeyboardRemove(remove_keyboard=True)
 
 
 def admin_webapp_kb() -> InlineKeyboardMarkup | None:
-    """Inline WebApp button to console.html (admins only)."""
     webapp = get_settings().normalized_webapp_url
     if not webapp:
         return None
-    admin_url = f"{webapp}console.html?v=20260920c"
+    admin_url = f"{webapp}console.html?v=20260920d"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
