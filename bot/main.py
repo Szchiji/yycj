@@ -223,9 +223,27 @@ async def miniapp_index():
     })
 
 
+def _admin_page() -> Path:
+    console = MINIAPP_DIR / "console.html"
+    if console.is_file():
+        return console
+    return MINIAPP_DIR / "admin.html"
+
+
 @app.get("/app/admin.html")
 async def miniapp_admin():
-    page = MINIAPP_DIR / "admin.html"
+    page = _admin_page()
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="admin missing")
+    return FileResponse(page, headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    })
+
+
+@app.get("/app/console.html")
+async def miniapp_console():
+    page = _admin_page()
     if not page.is_file():
         raise HTTPException(status_code=404, detail="admin missing")
     return FileResponse(page, headers={
