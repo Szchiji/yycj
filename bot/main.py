@@ -18,6 +18,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from bot.api import api_router
 from bot.config import get_settings
@@ -47,6 +48,17 @@ _ready = False
 _startup_error: str | None = None
 
 MINIAPP_DIR = Path(__file__).resolve().parent.parent / "miniapp"
+
+
+class NoCacheMiniapp(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        resp = await call_next(request)
+        path = request.url.path or ""
+        if path.startswith("/app") and path.endswith((".html", ".js", ".css", "/app", "/app/")):
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            resp.headers["Pragma"] = "no-cache"
+            resp.headers["Expires"] = "0"
+        return resp
 
 
 async def job_expire_sessions() -> None:
@@ -179,6 +191,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="月影车姬", lifespan=lifespan)
+app.add_middleware(NoCacheMiniapp)
 app.include_router(api_router)
 
 
@@ -204,7 +217,21 @@ async def miniapp_index():
     index = MINIAPP_DIR / "index.html"
     if not index.is_file():
         raise HTTPException(status_code=404, detail="miniapp missing")
-    return FileResponse(index)
+    return FileResponse(index, headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    })
+
+
+@app.get("/app/admin.html")
+async def miniapp_admin():
+    page = MINIAPP_DIR / "admin.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="admin missing")
+    return FileResponse(page, headers={
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    })
 
 
 @app.post(settings.webhook_path or "/webhook")
