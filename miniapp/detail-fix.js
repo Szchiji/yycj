@@ -1,7 +1,13 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
-  const cache = {};
+  window.__yycjLampCache = window.__yycjLampCache || {};
   const posters = {};
+  if (!document.getElementById("yycj-live")) {
+    const live = document.createElement("script");
+    live.id = "yycj-live";
+    live.src = "./live-refresh.js?v=20260920e";
+    document.head.appendChild(live);
+  }
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
@@ -49,7 +55,6 @@
     });
     return out;
   }
-  function grabFrame(src, done) { done(posters[src] || ""); }
   function playHero(v) {
     if (!v) return;
     v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.controls = false;
@@ -83,11 +88,13 @@
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
     try {
-      if (!cache[id]) {
-        const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
-        cache[id] = await r.json();
-      }
-      render(collect(cache[id].lamp || cache[id].item || cache[id]), id, 0);
+      const r = await fetch("/api/lamps/" + encodeURIComponent(id), {
+        headers: { Authorization: "Bearer " + token() },
+        cache: "no-store",
+      });
+      const data = await r.json();
+      window.__yycjLampCache[id] = data;
+      render(collect(data.lamp || data.item || data), id, 0);
     } catch (e) { console.warn(e); }
   }
   window.openLamp = function (id) {
