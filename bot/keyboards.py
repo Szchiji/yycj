@@ -21,7 +21,7 @@ def admin_webapp_kb() -> InlineKeyboardMarkup | None:
     webapp = get_settings().normalized_webapp_url
     if not webapp:
         return None
-    admin_url = f"{webapp}console.html?v=20260920d"
+    admin_url = f"{webapp}desk.html?v=20260920z"
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
