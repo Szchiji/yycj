@@ -13,7 +13,7 @@ from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import HomepagePin, Lamp
-from bot.services import home_service, listing_ops, user_admin
+from bot.services import home_service, listing_flow, listing_ops, search_service, user_admin
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,7 @@ async def api_admin_listings(_: int = Depends(get_admin_user_id)) -> Dict[str, A
     items = await listing_ops.list_listed()
     for it in items:
         it["expires_at"] = _ser_dt(it.get("expires_at"))
+        it["updated_at"] = _ser_dt(it.get("updated_at"))
     return {"ok": True, "items": items}
 
 
@@ -143,8 +144,15 @@ async def api_admin_renew(
         data = await listing_ops.set_listing_expiry(lamp_id, days=body.days)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    album = None
+    try:
+        full = await search_service.get_lamp(lamp_id) or {}
+        extras = dict((full or {}).get("extras") or {})
+        album = await listing_flow.broadcast_listing(full, extras)
+    except Exception:
+        logger.exception("renew broadcast failed")
     data["expires_at"] = _ser_dt(data.get("expires_at"))
-    return {"ok": True, **data}
+    return {"ok": True, **data, "album": album}
 
 
 @router.post("/admin/homepage/pins/remove")
