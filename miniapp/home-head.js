@@ -1,5 +1,6 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
+  const ADMIN = "./desk.html?v=20260920z";
   document.getElementById("topMeta")?.classList.add("hidden");
   function openUrl(url) {
     if (!url) return false;
@@ -37,8 +38,9 @@
     const entry = document.getElementById("adminEntry");
     const link = entry && entry.querySelector("a");
     if (link) {
-      link.href = "./console.html?v=20260920e";
+      link.setAttribute("href", ADMIN);
       link.textContent = "管理后台";
+      link.onclick = (ev) => { ev.preventDefault(); location.href = ADMIN; };
     }
     if (entry) entry.classList.toggle("hidden", !(home && home.is_admin));
   }
@@ -66,7 +68,7 @@
       admin.style.cursor = "pointer";
       admin.onclick = (ev) => {
         ev.preventDefault();
-        if (home.is_admin) { location.href = "./console.html?v=20260920e"; return; }
+        if (home.is_admin) { location.href = ADMIN; return; }
         if (!openUrl(contacts.admin_url || "")) toast("后台还没填管理员联系");
       };
     }
@@ -74,6 +76,8 @@
   }
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-nav='me']")) setTimeout(bind, 200);
-  });
+    const a = ev.target.closest("#adminEntry a");
+    if (a) { ev.preventDefault(); location.href = ADMIN; }
+  }, true);
   setTimeout(bind, 400);
 })();
