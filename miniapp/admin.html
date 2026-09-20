@@ -10,9 +10,9 @@
     document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
   }
   </script>
-  <link rel="stylesheet" href="./styles.css?v=20260912j" />
-  <link rel="stylesheet" href="./admin.css?v=20260912j" />
-  <link rel="stylesheet" href="./admin-ux.css?v=20260912j" />
+  <link rel="stylesheet" href="./styles.css?v=20260920b" />
+  <link rel="stylesheet" href="./admin.css?v=20260920b" />
+  <link rel="stylesheet" href="./admin-ux.css?v=20260920b" />
 </head>
 <body class="admin-body">
   <header class="topbar">
@@ -25,7 +25,7 @@
       </div>
     </div>
     <div class="row">
-      <a class="btn" href="./index.html?v=20260920a">首页</a>
+      <a class="btn" href="./index.html?v=20260920b">首页</a>
       <button class="btn" id="btnRefresh" type="button">刷新</button>
     </div>
   </header>
@@ -179,19 +179,67 @@
       </section>
     </div>
   </div>
-  <script src="./admin-boot.js?v=20260920a"></script>
-  <script src="./admin.js?v=20260912j"></script>
-  <script src="./admin-ops.js?v=20260912v"></script>
-  <script src="./admin-list.js?v=20260912j"></script>
-  <script src="./admin-fields.js?v=20260912j"></script>
-  <script src="./admin-promo.js?v=20260912j"></script>
-  <script src="./admin-proxy.js?v=20260920a"></script>
-  <script src="./admin-proxy-edit.js?v=20260920a"></script>
-  <script src="./admin-proxy-plus.js?v=20260920a"></script>
-  <script src="./admin-picks.js?v=20260912v"></script>
-  <script src="./admin-compact.js?v=20260912v"></script>
-  <script src="./admin-hydrate.js?v=20260912j"></script>
-  <script src="./admin-side.js?v=20260912j"></script>
-  <script src="./admin-ux.js?v=20260912j"></script>
+  <script>
+  (function () {
+    var BLOCK = '<label>区域</label><input id="__ID__District" />' +
+      '<label>大致位置</label><input id="__ID__Approx" />' +
+      '<label>标签</label><input id="__ID__Tags" placeholder="空格分隔" />' +
+      '<label>联系</label><input data-extra="联系" />' +
+      '<label>频道</label><input data-extra="频道" />' +
+      '<label>微信</label><input data-extra="微信" />';
+    function inject(afterId, prefix) {
+      var after = document.getElementById(afterId);
+      if (!after || document.getElementById(prefix + "Xtra")) return;
+      var wrap = document.createElement("div");
+      wrap.id = prefix + "Xtra";
+      wrap.innerHTML = BLOCK.replace(/__ID__/g, prefix);
+      after.insertAdjacentElement("afterend", wrap);
+    }
+    function paint() {
+      inject("proxyDesc", "proxy");
+      inject("editDesc", "edit");
+    }
+    paint();
+    setInterval(paint, 600);
+    var raw = window.fetch.bind(window);
+    window.fetch = function (url, opt) {
+      opt = opt || {};
+      var u = String(url || "");
+      var isProxy = u.indexOf("/listings/proxy") >= 0 || u.indexOf("/proxy-edit") >= 0;
+      if (isProxy && opt.body && typeof opt.body === "string") {
+        try {
+          var body = JSON.parse(opt.body);
+          var box = u.indexOf("proxy-edit") >= 0 ? "editBox" : "proxyBox";
+          body.district = (document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "District") || {}).value || body.district;
+          body.approx_label = (document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "Approx") || {}).value || body.approx_label;
+          var tagsEl = document.getElementById((u.indexOf("proxy-edit") >= 0 ? "edit" : "proxy") + "Tags");
+          if (tagsEl && tagsEl.value) body.tags = tagsEl.value.split(/[,，\s]+/).filter(Boolean);
+          body.extras = body.extras || {};
+          document.querySelectorAll("#" + box + " [data-extra]").forEach(function (el) {
+            var k = el.getAttribute("data-extra");
+            var v = (el.value || "").trim();
+            if (k && v) body.extras[k] = v;
+          });
+          opt = Object.assign({}, opt, { body: JSON.stringify(body) });
+        } catch (e) {}
+      }
+      return raw(url, opt);
+    };
+  })();
+  </script>
+  <script src="./admin-boot.js?v=20260920b"></script>
+  <script src="./admin.js?v=20260920b"></script>
+  <script src="./admin-ops.js?v=20260920b"></script>
+  <script src="./admin-list.js?v=20260920b"></script>
+  <script src="./admin-fields.js?v=20260920b"></script>
+  <script src="./admin-promo.js?v=20260920b"></script>
+  <script src="./admin-proxy.js?v=20260920b"></script>
+  <script src="./admin-proxy-edit.js?v=20260920b"></script>
+  <script src="./admin-proxy-plus.js?v=20260920b"></script>
+  <script src="./admin-picks.js?v=20260920b"></script>
+  <script src="./admin-compact.js?v=20260920b"></script>
+  <script src="./admin-hydrate.js?v=20260920b"></script>
+  <script src="./admin-side.js?v=20260920b"></script>
+  <script src="./admin-ux.js?v=20260920b"></script>
 </body>
 </html>
