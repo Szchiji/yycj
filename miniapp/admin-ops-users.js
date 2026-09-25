@@ -14,6 +14,17 @@
     pane.appendChild(el);
     return el;
   }
+  function lockVenue(on) {
+    const save = document.getElementById("btnOpsSave");
+    if (save) {
+      save.disabled = !on;
+      save.textContent = on ? "保存全部设置" : "仅超管可改站点设置";
+    }
+    ["listingFieldsEditor", "opsBroadcastTpl", "opsChannel", "opsMediaChannel"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.readOnly = !on;
+    });
+  }
   async function load() {
     const wrap = box();
     if (!wrap) return;
@@ -24,8 +35,9 @@
       if (ta) ta.value = (data.extra_admin_ids || []).join("\n");
       const hint = document.getElementById("opsAdminHint");
       const btn = document.getElementById("btnSaveOps");
+      lockVenue(!!data.is_super);
       if (!data.is_super) {
-        if (hint) hint.textContent = "当前是运营号，可以审核和改资料，不能改这份名单。超管 ID：" + (data.super_ids || []).join(", ");
+        if (hint) hint.textContent = "当前是运营号，可审核 / 代改 / 续期，不能改站点设置。";
         if (ta) ta.disabled = true;
         if (btn) btn.disabled = true;
       }
@@ -42,7 +54,7 @@
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "保存失败");
-      alert("已保存运营 " + (data.extra_admin_ids || []).length + " 人");
+      alert("已保存运营 " + (data.extra_admin_ids || []).length + " 人，新加的会收到机器人通知");
     } catch (e) { alert(e.message || String(e)); }
   });
   setTimeout(load, 1200);
