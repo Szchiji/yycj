@@ -33,43 +33,68 @@ async def api_home(
     if limit == 3 and page_size != 3:
         limit = page_size
     enabled = list(settings.get("enabled_cities") or [])
-    if city and enabled and city not in enabled:
-        raise HTTPException(status_code=400, detail="该城市暂未开放")
     use_city = city if city else (enabled[0] if enabled else None)
+    if use_city and enabled and use_city not in enabled:
+        use_city = enabled[0] if enabled else None
 
-    pins_raw = await home_service.list_active_pins()
     pins = []
-    for p in pins_raw:
-        lamp = p.get("lamp") or {}
-        if use_city and lamp.get("city") and lamp.get("city") != use_city:
-            continue
-        lamp = search_service.attach_fuzzy_distance(lamp, lat, lng)
-        lamp.pop("_distance_km", None)
-        pins.append(
-            {
-                "id": p["id"],
-                "sort_order": p["sort_order"],
-                "expires_at": _ser_dt(p.get("expires_at")),
-                "lamp": _ser_lamp(lamp),
-            }
-        )
+    try:
+        pins_raw = await home_service.list_active_pins()
+        for p in pins_raw:
+            try:
+                lamp = p.get("lamp") or {}
+                if use_city and lamp.get("city") and lamp.get("city") != use_city:
+                    continue
+                lamp = search_service.attach_fuzzy_distance(lamp, lat, lng)
+                lamp.pop("_distance_km", None)
+                pins.append(
+                    {
+                        "id": p["id"],
+                        "sort_order": p["sort_order"],
+                        "expires_at": _ser_dt(p.get("expires_at")),
+                        "lamp": _ser_lamp(lamp),
+                    }
+                )
+            except Exception:
+                logger.exception("serialize pin failed")
+    except Exception:
+        logger.exception("list pins failed")
 
-    items = await search_service.search_lamps(
-        keyword=q,
-        city=use_city,
-        limit=limit,
-        offset=offset,
-        lat=lat,
-        lng=lng,
-    )
-    pinned = [x for x in items if x.get("feed_pinned")]
-    fresh = [x for x in items if not x.get("feed_pinned")]
-    pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
-    fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
-    items = pinned + fresh
+    items = []
+    try:
+        items = await search_service.search_lamps(
+            keyword=q,
+            city=use_city,
+            limit=limit,
+            offset=offset,
+            lat=lat,
+            lng=lng,
+        )
+        pinned = [x for x in items if x.get("feed_pinned")]
+        fresh = [x for x in items if not x.get("feed_pinned")]
+        pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
+        fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
+        items = pinned + fresh
+    except Exception:
+        logger.exception("home search failed")
+        items = []
+
     announcement = None
     if settings.get("announcement_enabled") and settings.get("announcement_text"):
         announcement = {"text": settings["announcement_text"], "enabled": True}
+
+    safe_items = []
+    for x in items:
+        try:
+            safe_items.append(_ser_lamp(x))
+        except Exception:
+            logger.exception("serialize lamp failed")
+
+    contacts = {}
+    try:
+        contacts = await _home_contacts(settings)
+    except Exception:
+        logger.exception("home contacts failed")
 
     return {
         "ok": True,
@@ -77,18 +102,18 @@ async def api_home(
         "enabled_cities": enabled,
         "announcement": announcement,
         "pins": pins,
-        "items": [_ser_lamp(x) for x in items],
-        "count": len(items),
+        "items": safe_items,
+        "count": len(safe_items),
         "limit": limit,
         "offset": offset,
-        "has_more": len(items) >= limit,
+        "has_more": len(safe_items) >= limit,
         "scoring_rules": home_service.SCORING_RULES,
         "chat_cta_label": settings.get("chat_cta_label") or "想聊聊",
         "show_chat_cta": settings.get("show_chat_cta") is not False,
         "media_max_count": int(settings.get("media_max_count") or 6),
         "page_size": int(settings.get("home_feed_page_size") or 3),
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
-        "contacts": await _home_contacts(settings),
+        "contacts": contacts,
         "listing_fields": settings.get("listing_fields") or [],
     }
 
