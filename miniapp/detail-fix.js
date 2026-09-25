@@ -39,9 +39,8 @@
       const src = srcOf(raw);
       if (!src) return;
       const vid = isVideo(m, raw);
-      let poster = srcOf(m && (m.thumb_file_id || m.thumbnail || ""));
+      let poster = srcOf(m && (m.thumb_file_id || m.thumbnail || m.preview_url || ""));
       if (poster && isVideo({}, poster)) poster = "";
-      if (vid && !poster && raw && !raw.startsWith("http")) poster = "/api/media/poster/" + encodeURIComponent(raw);
       out.push({ type: vid ? "video" : "image", src, poster, raw });
     });
     if (!out.length) (lamp.photos || []).forEach((p) => {
@@ -59,7 +58,7 @@
     const poster = cur.poster || "";
     let hero;
     if (cur.type === "video" && play) {
-      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="auto"></video>`;
+      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="metadata"></video>`;
     } else if (cur.type === "video") {
       hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:220px;background:#111"></div>`}<span class="hero-play">▶</span>`;
     } else {
@@ -83,20 +82,18 @@
     if (heroBox && cur.type === "video" && !play) {
       heroBox.onclick = (ev) => { ev.preventDefault(); render(items, lampId, idx, true); };
     }
-    if (play && cur.type === "video") {
-      const v = el.querySelector(".gallery-hero video");
-      if (v) v.play().catch(() => {});
-    }
     document.querySelectorAll("#detail .media-grid").forEach((n) => { n.style.display = "none"; });
   }
   async function paint(id) {
     if (!id) return;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
+    if (window.__yycjLampCache[id] && window.__yycjLampCache[id].lamp) {
+      render(collect(window.__yycjLampCache[id].lamp), id, 0, false);
+    }
     try {
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), {
         headers: { Authorization: "Bearer " + token() },
-        cache: "no-store",
       });
       const data = await r.json();
       window.__yycjLampCache[id] = data;
