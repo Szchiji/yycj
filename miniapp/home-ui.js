@@ -1,6 +1,21 @@
 (() => {
   if (window.__yycjHomeUi) return;
   window.__yycjHomeUi = true;
+  const nativeFetch = window.fetch.bind(window);
+  let homeInflight = null;
+  window.fetch = function (input, init) {
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    const method = String((init && init.method) || "GET").toUpperCase();
+    if (method === "GET" && url.indexOf("/api/home") !== -1) {
+      if (homeInflight) return homeInflight.then((r) => r.clone());
+      homeInflight = nativeFetch(input, init).then((r) => {
+        homeInflight = null;
+        return r;
+      }, (e) => { homeInflight = null; throw e; });
+      return homeInflight.then((r) => r.clone());
+    }
+    return nativeFetch(input, init);
+  };
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
   let carouselMs = 4000, carouselTimer = 0;
@@ -22,19 +37,7 @@
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
   }
   function cover(item) {
-    if (window.yycjCoverOf) return window.yycjCoverOf(item);
-    const media = item.media || [];
-    for (let i = 0; i < media.length; i += 1) {
-      const m = media[i] || {};
-      const raw = m.preview_url || m.thumb_file_id || m.file_id || m.url || "";
-      if (m.type === "video") {
-        const t = String(m.thumb_file_id || m.preview_url || "");
-        if (t && !t.startsWith("BAAC")) return t.startsWith("http") || t.startsWith("/") ? t : "/api/media/file/" + encodeURIComponent(t);
-        continue;
-      }
-      if (raw) return String(raw).startsWith("http") || String(raw).startsWith("/") ? raw : "/api/media/file/" + encodeURIComponent(raw);
-    }
-    return "";
+    return window.yycjCoverOf ? window.yycjCoverOf(item) : "";
   }
   function fillCities(list, current) {
     cities = list && list.length ? list : cities;
@@ -54,7 +57,7 @@
     const n = (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
-      (img ? "<img class=\"thumb\" src=\"" + esc(img) + "\" alt=\"\" loading=\"lazy\" />" : "<div class=\"thumb ph\"></div>") +
+      (img ? "<img class=\"thumb\" src=\"" + esc(img) + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
       "<button class=\"fav-btn\" type=\"button\" data-fav=\"" + esc(t.lamp_id) + "\">♡</button>" +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
@@ -65,7 +68,7 @@
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
-      (img ? "<img class=\"pin-cover\" src=\"" + esc(img) + "\" alt=\"\" />" : "<div class=\"pin-cover ph\"></div>") +
+      (img ? "<img class=\"pin-cover\" src=\"" + esc(img) + "\" alt=\"\" decoding=\"async\" />" : "<div class=\"pin-cover ph\"></div>") +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
   function paint() {
@@ -79,6 +82,7 @@
       pins.innerHTML = lastPins.map(pinHtml).join("");
       pins.classList.toggle("hidden", !lastPins.length || !!q);
     }
+    if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
   async function loadFeed(reset) {
     if (!token()) return;
@@ -163,10 +167,6 @@
   async function boot() {
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
     if (token()) await loadFeed(true);
-    else {
-      const feed = $("#feed");
-      if (feed) feed.innerHTML = "<p class='muted'>请从机器人里打开</p>";
-    }
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
