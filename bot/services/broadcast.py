@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from bot.services import home_service
-from bot.services.media_urls import enrich_media, is_http
+from bot.services.media_urls import enrich_media
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def _media_items(lamp: Dict[str, Any]) -> List[Tuple[str, str]]:
     items: List[Tuple[str, str]] = []
     for m in enrich_media(lamp.get("media"), lamp.get("photos"))[:10]:
         raw = str(m.get("file_id") or m.get("url") or "").strip()
-        if not raw or is_http(raw):
+        if not raw:
             continue
         items.append(((m.get("type") or "image"), raw))
     return items
