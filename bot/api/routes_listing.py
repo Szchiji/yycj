@@ -52,12 +52,12 @@ async def api_me_edit(
     if u.get("is_shadowed"):
         raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法改稿")
     media = _normalize_media(body.media, body.photos)
-    if not media:
-        raise HTTPException(status_code=400, detail="请至少上传 1 张图或视频")
     mine = await listing_flow.list_my_lamps(user_id)
     current = next((x for x in mine if x.get("lamp_id") == lamp_id), None)
     if not current:
         raise HTTPException(status_code=404, detail="找不到你的这条资料")
+    if not media:
+        media = list(current.get("media") or [])
     payload = {
         "city": body.city.strip()[:32],
         "title": body.title.strip()[:64],
@@ -65,7 +65,7 @@ async def api_me_edit(
         "price": body.price,
         "price_text": (body.price_text or "")[:32],
         "description": (body.description or "")[:2000],
-        "photos": [m["url"] for m in media if m["type"] == "image"],
+        "photos": [m.get("url") or m.get("file_id") for m in media if (m.get("type") or "image") == "image"],
         "media": media,
         "district": (body.district or "").strip()[:64] or None,
         "approx_label": (body.approx_label or "").strip()[:128] or None,
@@ -147,23 +147,22 @@ async def api_admin_proxy_edit(
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
     media = _normalize_media(body.media, body.photos)
+    payload = {
+        "city": body.city,
+        "title": body.title,
+        "price": body.price,
+        "price_text": body.price_text,
+        "tags": body.tags,
+        "description": body.description,
+        "district": body.district,
+        "approx_label": body.approx_label,
+        "extras": dict(body.extras or {}),
+    }
+    if media:
+        payload["media"] = media
+        payload["photos"] = [m["url"] for m in media if m["type"] == "image"]
     try:
-        lamp = await listing_flow.apply_admin_edit(
-            lamp_id,
-            {
-                "city": body.city,
-                "title": body.title,
-                "price": body.price,
-                "price_text": body.price_text,
-                "tags": body.tags,
-                "description": body.description,
-                "media": media,
-                "photos": [m["url"] for m in media if m["type"] == "image"],
-                "district": body.district,
-                "approx_label": body.approx_label,
-                "extras": dict(body.extras or {}),
-            },
-        )
+        lamp = await listing_flow.apply_admin_edit(lamp_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     album = None
