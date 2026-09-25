@@ -25,41 +25,45 @@
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
   }
+  function paint(lamp) {
+    const box = document.getElementById("detail");
+    if (!box || !lamp) return;
+    box.setAttribute("data-lamp", lamp.lamp_id || "");
+    const loc = [lamp.city, lamp.district, lamp.approx_label].filter(Boolean).join(" · ");
+    box.innerHTML = `<div class="card">
+      <h3>${String(lamp.title || "").replace(/[<>]/g, "")}</h3>
+      <p class="muted">📍 ${String(loc || "").replace(/[<>]/g, "")}</p>
+      <p>${String(lamp.description || "").replace(/[<>]/g, "")}</p>
+      <div class="row">
+        <button class="btn primary" id="detailChat" data-lamp="${lamp.lamp_id || ""}" type="button">想聊聊</button>
+        <button class="btn" id="detailReview" type="button">写评价</button>
+        <button class="btn" id="detailShare" data-share="${lamp.lamp_id || ""}" type="button">分享</button>
+      </div>
+    </div>`;
+    window.__yycjOpenLamp = lamp.lamp_id || "";
+    showDetail();
+  }
   async function openLamp(id) {
     if (!id) return;
     localStorage.setItem("yycj_open_lamp", id);
-    const feed = document.getElementById("feed");
-    if (feed) {
-      const ghost = document.createElement("div");
-      ghost.setAttribute("data-id", id);
-      ghost.style.display = "none";
-      feed.appendChild(ghost);
-      ghost.click();
-      setTimeout(() => ghost.remove(), 800);
-    }
     showDetail();
     const token = localStorage.getItem("yycj_token") || "";
     if (!token) return;
     try {
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token } });
-      if (r.ok) showDetail();
+      if (!r.ok) return;
+      const data = await r.json();
+      paint(data.lamp || data);
     } catch (e) {}
   }
   async function boot() {
     const id = lampId();
     if (!id) return;
-    for (let i = 0; i < 40 && !localStorage.getItem("yycj_token"); i += 1) {
-      await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 50 && !localStorage.getItem("yycj_token"); i += 1) {
+      await new Promise((r) => setTimeout(r, 120));
     }
     await openLamp(id);
-    setTimeout(() => openLamp(id), 800);
-    setTimeout(() => {
-      if (!document.getElementById("view-detail") || document.getElementById("view-detail").classList.contains("hidden")) {
-        openLamp(id);
-      } else {
-        localStorage.removeItem("yycj_open_lamp");
-      }
-    }, 2000);
+    setTimeout(() => openLamp(id), 900);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
