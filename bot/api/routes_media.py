@@ -1,15 +1,17 @@
 """媒体上传与 Telegram file_id 预览代理。"""
 from __future__ import annotations
 
+import hashlib
 import logging
 import mimetypes
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import httpx
 from aiogram.types import BufferedInputFile
 from fastapi import Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 
 from bot.api.deps import get_current_user_id
 from bot.api.routes_core import router
@@ -19,9 +21,16 @@ logger = logging.getLogger(__name__)
 
 MAX_FILES = 9
 MAX_BYTES = 20 * 1024 * 1024
+_DISK_MAX = 2 * 1024 * 1024
+_DISK_DIR = Path("/tmp/yycj-media")
 _PATH_CACHE: Dict[str, Tuple[str, float]] = {}
 _PATH_TTL = 50 * 60
 _POSTER: Dict[str, str] = {}
+_CACHE_HDR = {
+    "Cache-Control": "public, max-age=604800, immutable",
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": "inline",
+}
 
 
 def _guess_type(filename: str, content_type: str | None) -> str:
@@ -41,6 +50,11 @@ def _mime_for(file_id: str, path: str) -> str:
     if fid.startswith("AgAC") or low.endswith((".jpg", ".jpeg", ".png", ".webp")):
         return mime or "image/jpeg"
     return mime or "application/octet-stream"
+
+
+def _disk_path(file_id: str) -> Path:
+    name = hashlib.sha256(file_id.encode("utf-8")).hexdigest()[:40]
+    return _DISK_DIR / name
 
 
 @router.post("/media/upload")
@@ -137,6 +151,10 @@ async def api_media_file(file_id: str, request: Request):
     settings = get_settings()
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
+    local = _disk_path(file_id)
+    if local.is_file() and local.stat().st_size > 0 and not request.headers.get("range"):
+        mime = _mime_for(file_id, str(local))
+        return FileResponse(local, media_type=mime, headers=_CACHE_HDR)
     now = time.time()
     cached = _PATH_CACHE.get(file_id)
     path = cached[0] if cached and cached[1] > now else ""
@@ -170,6 +188,33 @@ async def api_media_file(file_id: str, request: Request):
         _PATH_CACHE.pop(file_id, None)
         raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
 
+    length = 0
+    try:
+        length = int(resp.headers.get("content-length") or 0)
+    except ValueError:
+        length = 0
+    can_store = (
+        resp.status_code == 200
+        and not rng
+        and 0 < length <= _DISK_MAX
+        and not file_id.startswith(("BAAC", "BQAC"))
+    )
+    if can_store:
+        try:
+            _DISK_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = local.with_suffix(".part")
+            with tmp.open("wb") as fh:
+                async for chunk in resp.aiter_bytes(64 * 1024):
+                    fh.write(chunk)
+            tmp.replace(local)
+        except Exception:
+            logger.exception("disk cache write failed")
+        finally:
+            await resp.aclose()
+            await client.aclose()
+        if local.is_file():
+            return FileResponse(local, media_type=mime, headers=_CACHE_HDR)
+
     async def stream():
         try:
             async for chunk in resp.aiter_bytes(64 * 1024):
@@ -178,11 +223,7 @@ async def api_media_file(file_id: str, request: Request):
             await resp.aclose()
             await client.aclose()
 
-    out = {
-        "Cache-Control": "public, max-age=604800, immutable",
-        "Accept-Ranges": "bytes",
-        "Content-Disposition": "inline",
-    }
+    out = dict(_CACHE_HDR)
     if resp.headers.get("content-range"):
         out["Content-Range"] = resp.headers["content-range"]
     if resp.headers.get("content-length"):
