@@ -30,12 +30,11 @@
     });
   }
   function lockInfo(user) {
-    const raw = user && user.role_set_at;
+    const raw = user && (user.role_locked_until || user.role_set_at);
     if (!raw) return { locked: false, days: 0 };
-    const start = new Date(raw);
-    if (Number.isNaN(start.getTime())) return { locked: false, days: 0 };
-    const unlock = start.getTime() + 7 * 24 * 3600 * 1000;
-    const left = unlock - Date.now();
+    const end = user.role_locked_until ? new Date(user.role_locked_until) : new Date(new Date(user.role_set_at).getTime() + 7 * 86400000);
+    if (Number.isNaN(end.getTime())) return { locked: false, days: 0 };
+    const left = end.getTime() - Date.now();
     if (left <= 0) return { locked: false, days: 0 };
     return { locked: true, days: Math.max(1, Math.ceil(left / 86400000)) };
   }
@@ -78,7 +77,7 @@
         b.disabled = !!lock.locked && !data.is_admin;
         b.title = lock.locked ? ("还剩 " + lock.days + " 天可换") : "";
       });
-      if (needGate(user)) showGate(true);
+      if (needGate(user) && !data.is_admin) showGate(true);
     } catch (e) {}
   }
   document.addEventListener("click", async (ev) => {
@@ -111,6 +110,6 @@
       alert("角色一周内只能换一次，还剩 " + lock.days + " 天");
     }
   }, true);
-  setTimeout(refresh, 600);
-  setTimeout(refresh, 1800);
+  setTimeout(refresh, 400);
+  setTimeout(refresh, 1600);
 })();
