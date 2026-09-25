@@ -54,6 +54,11 @@ class UnlockRoleBody(BaseModel):
     user_id: int
 
 
+class PreviewBody(BaseModel):
+    lamp_id: Optional[str] = None
+    template: Optional[str] = None
+
+
 @router.post("/admin/settings/extra")
 async def api_admin_extra_ops(
     body: ExtraOpsBody,
@@ -189,3 +194,38 @@ async def api_admin_refresh_bot(_: int = Depends(get_admin_user_id)) -> Dict[str
     from bot.services import bot_info
     ident = await bot_info.refresh_bot_identity()
     return {"ok": True, "identity": ident}
+
+
+@router.post("/admin/broadcast/preview")
+async def api_broadcast_preview(
+    body: PreviewBody,
+    _: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    from bot.services import bot_info
+    from bot.services.broadcast import fill_template
+
+    site = await home_service.get_or_create_settings()
+    tpl = (body.template or site.get("broadcast_template") or "").strip()
+    lamp: Dict[str, Any] | None = None
+    if body.lamp_id:
+        lamp = await search_service.get_lamp(body.lamp_id)
+    if not lamp:
+        listed = await listing_ops.list_listed()
+        if listed:
+            lamp = await search_service.get_lamp(listed[0].get("lamp_id") or "") or listed[0]
+    if not lamp:
+        lamp = {
+            "title": "示例花名",
+            "city": "深圳",
+            "district": "南山",
+            "price_text": "面议",
+            "description": "这是预览用的简介",
+            "tags": ["预览"],
+            "approx_label": "后海",
+            "extras": {"微信": "demo_wx", "联系": "demo_wx"},
+        }
+    extras = dict((lamp.get("extras") if isinstance(lamp.get("extras"), dict) else {}) or {})
+    ident = await bot_info.get_bot_identity()
+    link = bot_info.bot_tme_url(ident.get("username") or "")
+    text = fill_template(tpl, lamp, extras, link)
+    return {"ok": True, "text": text, "title": lamp.get("title"), "lamp_id": lamp.get("lamp_id")}
