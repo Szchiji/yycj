@@ -22,10 +22,10 @@
     document.getElementById(id)?.classList.remove("hidden");
   }
   function cardHtml(x) {
-    const img = cover(x);
+    const img = cover(x) || x.cover_url || "";
     const loc = [x.city, x.district].filter(Boolean).join("·");
     const tag = (x.tags && x.tags[0]) || "";
-    const n = (x.media && x.media.length) || (x.photos && x.photos.length) || 0;
+    const n = x.media_count || (x.media && x.media.length) || (x.photos && x.photos.length) || 0;
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + x.lamp_id + "\"><div class=\"cover-wrap\">" +
       (img ? "<img class=\"thumb\" src=\"" + img + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
       (loc ? "<span class=\"badge-loc\">" + loc + "</span>" : "") +
@@ -106,5 +106,4 @@
       window.__yycjBack = "home";
     }
   }, true);
-  setTimeout(load, 600);
 })();
