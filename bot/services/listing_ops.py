@@ -133,31 +133,38 @@ async def purge_old_hidden(days: int = 30) -> int:
 
 
 async def list_listed(limit: int = 100) -> List[Dict[str, Any]]:
+    now = datetime.utcnow()
     async with session_scope() as s:
         res = await s.execute(
             select(Lamp)
             .where(or_(Lamp.status == LampStatus.ACTIVE.value, Lamp.status == LampStatus.HIDDEN.value))
-            .order_by(Lamp.updated_at.desc())
+            .order_by(Lamp.expires_at.asc().nullslast(), Lamp.updated_at.desc())
             .limit(max(1, min(limit, 300)))
         )
         rows = list(res.scalars().all())
-    return [
-        {
-            "lamp_id": x.lamp_id,
-            "title": x.title,
-            "city": x.city,
-            "status": x.status,
-            "expires_at": x.expires_at,
-            "unlist_reason": x.unlist_reason,
-            "feed_pinned": bool(x.feed_pinned),
-            "user_id": x.user_id,
-            "media": list(x.media or []),
-            "photos": list(x.photos or []),
-            "description": x.description or "",
-            "tags": list(x.tags or []),
-            "district": x.district,
-            "price_text": x.price_text,
-            "updated_at": x.updated_at,
-        }
-        for x in rows
-    ]
+    out = []
+    for x in rows:
+        days_left = None
+        if x.expires_at:
+            days_left = int((x.expires_at - now).total_seconds() // 86400)
+        out.append(
+            {
+                "lamp_id": x.lamp_id,
+                "title": x.title,
+                "city": x.city,
+                "status": x.status,
+                "expires_at": x.expires_at,
+                "days_left": days_left,
+                "unlist_reason": x.unlist_reason,
+                "feed_pinned": bool(x.feed_pinned),
+                "user_id": x.user_id,
+                "media": list(x.media or []),
+                "photos": list(x.photos or []),
+                "description": x.description or "",
+                "tags": list(x.tags or []),
+                "district": x.district,
+                "price_text": x.price_text,
+                "updated_at": x.updated_at,
+            }
+        )
+    return out
