@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjDetail) return;
+  window.__yycjDetail = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   window.__yycjLampCache = window.__yycjLampCache || {};
   if (!document.getElementById("yycj-gallery-css")) {
@@ -17,11 +19,23 @@
 #detailInfo h2{margin:0 0 8px;font-size:1.35rem;}
 #detailInfo .muted{margin:4px 0;}
 #detailInfo .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
-#detailInfo .row .btn{flex:1;min-width:88px;border-radius:18px;}`;
+#detailInfo .row .btn{flex:1;min-width:72px;border-radius:18px;}
+#yycjTags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+#yycjTags .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#6d4aff;color:#fff;font-size:11px;}
+#yycjExtras .ex-line{display:flex;gap:8px;margin:6px 0;}
+#yycjExtras .ex-k{opacity:.7;min-width:3em;}
+#yycjExtras a{color:#8ec8ff;}`;
     document.head.appendChild(st);
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    if (!el) return alert(msg);
+    el.textContent = msg;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 2800);
   }
   function host() {
     const view = document.getElementById("view-detail");
@@ -65,23 +79,56 @@
     });
     return out;
   }
-  function infoHtml(lamp) {
+  function tgHref(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    if (/^(https?:\/\/|tg:\/\/)/i.test(s)) return s;
+    if (s.startsWith("t.me/")) return "https://" + s;
+    if (s.startsWith("@")) return "https://t.me/" + s.slice(1);
+    if (/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(s)) return "https://t.me/" + s;
+    return "";
+  }
+  function extrasHtml(extras) {
+    const data = extras && typeof extras === "object" ? extras : {};
+    const keys = Object.keys(data).filter((k) => !String(k).startsWith("_") && String(data[k] || "").trim() && k !== "标签");
+    return keys.map((k) => {
+      const val = String(data[k]);
+      const href = tgHref(val);
+      const v = href ? `<a class="tg-link" href="${esc(href)}" data-tg="${esc(href)}">${esc(val)}</a>` : esc(val);
+      return `<div class="ex-line"><span class="ex-k">${esc(k)}</span><span class="ex-v">${v}</span></div>`;
+    }).join("");
+  }
+  function ctaOn() {
+    const v = (window.__yycjHomeData || {}).show_chat_cta;
+    return !(v === false || v === 0 || v === "0" || v === "false");
+  }
+  function ctaLabel() {
+    return String((window.__yycjHomeData || {}).chat_cta_label || "想聊聊").slice(0, 32);
+  }
+  function infoHtml(lamp, reviews) {
     const id = esc(lamp.lamp_id || "");
     const loc = [lamp.city, lamp.district, lamp.approx_label].filter(Boolean).join(" · ");
     const tags = (lamp.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("");
+    const chat = ctaOn() ? `<button class="btn primary" id="detailChat" type="button" data-lamp="${id}">${esc(ctaLabel())}</button>` : "";
+    const rev = (reviews || []).map((t) => {
+      const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${esc(t.text || "")}</p></div>`;
+    }).join("") || "<p class='muted'>暂无评价</p>";
     return `<div class="card" id="detailInfo">
       <h2>${esc(lamp.title || "")}</h2>
       <div class="muted">📍 ${esc(loc || "")}</div>
       <div class="muted">💰 ${esc(lamp.price_text || "面议")}</div>
       <div id="yycjTags">${tags}</div>
-      <div id="yycjExtras"></div>
+      <div id="yycjExtras">${extrasHtml(lamp.extras)}</div>
       <p>${esc(lamp.description || "")}</p>
       <div class="row">
         <button class="btn" id="detailReport" type="button" data-report="${id}">举报</button>
         <button class="btn" id="detailReview" type="button" data-review="${id}">写评价</button>
         <button class="btn" id="detailShare" type="button" data-share="${id}">分享</button>
-        <button class="btn primary" id="detailChat" type="button" data-lamp="${id}">想聊聊</button>
+        ${chat}
       </div>
+      <h3 style="font-size:1rem;margin:16px 0 6px">评价</h3>
+      ${rev}
     </div>`;
   }
   function render(items, lampId, idx, play) {
@@ -99,7 +146,7 @@
     } else {
       hero = `<img src="${cur.src}" alt="" />`;
     }
-    el.innerHTML = `<div class="gallery-hero" data-play="${cur.type === "video" ? "1" : "0"}">${hero}</div>
+    el.innerHTML = `<div class="gallery-hero">${hero}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
         m.type === "video"
           ? `${m.poster ? `<img src="${m.poster}" alt="" />` : ""}<span class="play">▶</span>`
@@ -109,26 +156,19 @@
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        const n = Number(btn.getAttribute("data-g") || 0);
-        render(items, lampId, n, items[n] && items[n].type === "video");
+        render(items, lampId, Number(btn.getAttribute("data-g") || 0), items[Number(btn.getAttribute("data-g") || 0)]?.type === "video");
       });
     });
     const heroBox = el.querySelector(".gallery-hero");
     if (heroBox && cur.type === "video" && !play) {
       heroBox.addEventListener("click", (ev) => { ev.preventDefault(); render(items, lampId, idx, true); });
     }
-    document.querySelectorAll("#detail .media-grid").forEach((n) => { n.style.display = "none"; });
   }
   async function paint(id) {
     if (!id) return;
     window.__yycjOpenLamp = id;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
-    const cached = window.__yycjLampCache[id];
-    if (cached && cached.lamp) {
-      render(collect(cached.lamp), id, 0, false);
-      if (box && !box.querySelector("#detailInfo")) box.insertAdjacentHTML("afterbegin", infoHtml(cached.lamp));
-    }
     try {
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), {
         headers: { Authorization: "Bearer " + token() },
@@ -137,13 +177,13 @@
       window.__yycjLampCache[id] = data;
       const lamp = data.lamp || data.item || data;
       render(collect(lamp), id, 0, false);
-      if (box) {
-        const old = box.querySelector("#detailInfo");
-        const html = infoHtml(lamp);
-        if (old) old.outerHTML = html;
-        else box.insertAdjacentHTML("afterbegin", html);
-      }
+      if (box) box.innerHTML = infoHtml(lamp, data.reviews || []);
     } catch (e) { console.warn(e); }
+  }
+  function shareUrl(id) {
+    const bot = ((window.__yycjHomeData || {}).contacts || {}).bot_username || "";
+    if (bot) return "https://t.me/" + String(bot).replace(/^@/, "") + "?startapp=" + encodeURIComponent(id);
+    return location.origin + "/app/go.html?lamp=" + encodeURIComponent(id);
   }
   window.openLamp = function (id) {
     window.__yycjBack = window.__yycjBack || "home";
@@ -152,11 +192,36 @@
     paint(id);
   };
   document.addEventListener("click", async (ev) => {
-    const report = ev.target.closest("#detailReport");
-    if (report) {
+    const a = ev.target.closest("a[data-tg], #yycjExtras a");
+    if (a) {
       ev.preventDefault();
-      ev.stopPropagation();
-      const id = report.getAttribute("data-report") || window.__yycjOpenLamp;
+      const href = a.getAttribute("data-tg") || a.getAttribute("href") || "";
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) tg.openTelegramLink(href);
+      else if (tg && tg.openLink) tg.openLink(href);
+      else location.href = href;
+      return;
+    }
+    if (ev.target.closest("#detailShare")) {
+      ev.preventDefault();
+      const id = ev.target.closest("#detailShare").getAttribute("data-share") || window.__yycjOpenLamp;
+      const url = shareUrl(id);
+      try { await navigator.clipboard.writeText(url); toast("链接已复制，发给好友"); }
+      catch (e) { toast(url); }
+      return;
+    }
+    if (ev.target.closest("#detailReview")) {
+      ev.preventDefault();
+      const id = ev.target.closest("#detailReview").getAttribute("data-review") || window.__yycjOpenLamp;
+      const hid = document.getElementById("revLampId");
+      if (hid) hid.value = id || "";
+      document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+      document.getElementById("view-review")?.classList.remove("hidden");
+      return;
+    }
+    if (ev.target.closest("#detailReport")) {
+      ev.preventDefault();
+      const id = ev.target.closest("#detailReport").getAttribute("data-report") || window.__yycjOpenLamp;
       const reason = window.prompt("举报原因", "不实信息") || "";
       if (!reason.trim() || !id) return;
       try {
@@ -166,15 +231,25 @@
           body: JSON.stringify({ lamp_id: id, reason: reason.trim() }),
         });
         const data = await r.json().catch(() => ({}));
-        alert(r.ok ? (data.message || "已提交举报") : (data.detail || "举报失败"));
-      } catch (e) { alert(String(e)); }
+        toast(r.ok ? (data.message || "已提交举报") : (data.detail || "举报失败"));
+      } catch (e) { toast(String(e)); }
       return;
     }
-    if (ev.target.closest("[data-share],[data-fav],[data-unfav],#detailShare,#detailChat,#detailReview,a,.g-thumb")) return;
+    if (ev.target.closest("#detailChat,.g-thumb,[data-fav],[data-unfav]")) return;
     const card = ev.target.closest("#feed [data-id], #pins [data-id], #favList [data-id]");
     if (!card) return;
     ev.preventDefault();
     ev.stopPropagation();
     window.openLamp(card.getAttribute("data-id"));
   }, true);
+  async function openShared() {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    const q = new URLSearchParams(location.search);
+    const id = (tg && tg.initDataUnsafe && (tg.initDataUnsafe.start_param || tg.initDataUnsafe.startParam)) || q.get("lamp") || "";
+    if (!id) return;
+    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
+    if (token()) window.openLamp(id);
+  }
+  if (document.readyState === "complete") openShared();
+  else window.addEventListener("load", openShared);
 })();

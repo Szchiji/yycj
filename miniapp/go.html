@@ -5,22 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=ui2" />
-  <link rel="stylesheet" href="./home-fix.css?v=ui2" />
+  <link rel="stylesheet" href="./styles.css?v=r1" />
+  <link rel="stylesheet" href="./home-fix.css?v=r1" />
   <style>
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
     #announce{position:relative!important;left:auto!important;right:auto!important;display:block;height:28px;overflow:hidden;margin:4px 8px 8px;white-space:nowrap;}
-    #announce span{display:inline-block;padding-right:24px;}
     .search-row{position:relative;z-index:3;}
-    #pins { margin-bottom:8px!important;display:flex !important; gap:10px; overflow-x:auto !important; max-height:168px; }
-    #pins .pin-card { flex:0 0 42%!important; aspect-ratio:3/4!important; max-height:168px; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
+    #pins { margin-bottom:10px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
+    #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
     #pins .pin-card img.pin-cover, #pins .pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
-    #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:20px 8px 8px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; font-size:12px; }
+    #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:24px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
     #feedSplit{height:1px;margin:10px 8px 12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
     #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
     #feed .cover-card, #favList .cover-card { position:relative !important; overflow:hidden !important; padding:0 !important; }
-    #feed .cover-wrap, #favList .cover-wrap { position:relative !important; display:block !important; overflow:hidden !important; }
+    #feed .cover-wrap, #favList .cover-wrap { position:relative !important; overflow:hidden !important; }
     #feed .cover-wrap .thumb, #favList .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; }
     .fav-btn { position:absolute !important; top:6px; left:6px; z-index:4; width:26px; height:26px; border:0; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; }
     .badge-loc { position:absolute !important; top:6px; right:6px; z-index:4; max-width:56%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -29,7 +28,6 @@
     #citySheet { display:none !important; }
     .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
     #view-detail{padding-bottom:96px;}
-    #yycjGallery{margin:8px 0 10px;}
     #detail .media-grid{display:none!important;}
   </style>
 </head>
@@ -119,15 +117,14 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
   <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
-  <script src="./cover.js?v=ui2"></script>
-  <script src="./app.js?v=ui2"></script>
-  <script src="./home-ui.js?v=ui2"></script>
-  <script src="./publish-ui.js?v=ui2"></script>
-  <script src="./detail-fix.js?v=ui2"></script>
-  <script src="./detail-kit.js?v=ui2"></script>
-  <script src="./role-nav.js?v=ui2"></script>
-  <script src="./fav.js?v=ui2"></script>
-  <script src="./admin-go.js?v=ui2"></script>
-  <script src="./role-gate.js?v=ui2"></script>
+  <script src="./cover.js?v=r1"></script>
+  <script src="./app.js?v=r1"></script>
+  <script src="./home-ui.js?v=r1"></script>
+  <script src="./publish-ui.js?v=r1"></script>
+  <script src="./detail-fix.js?v=r1"></script>
+  <script src="./role-nav.js?v=r1"></script>
+  <script src="./fav.js?v=r1"></script>
+  <script src="./admin-go.js?v=r1"></script>
+  <script src="./role-gate.js?v=r1"></script>
 </body>
 </html>
