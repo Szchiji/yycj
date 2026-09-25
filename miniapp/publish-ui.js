@@ -124,7 +124,8 @@
     const title = ($("#pubTitle")?.value || "").trim();
     if (!title) return toast("请填称呼");
     const media = uploaded.filter((m) => m.file_id || m.url).map((m) => ({ type: m.type, url: m.file_id || m.url, file_id: m.file_id, thumb_file_id: m.thumb_file_id, preview_url: m.preview_url }));
-    if (!media.length) return toast("请先上传至少 1 个媒体");
+    const editId = ($("#editLampId")?.value || "").trim();
+    if (!media.length && !editId) return toast("请先上传至少 1 个媒体");
     const extras = {};
     document.querySelectorAll("[data-extra]").forEach((inp) => {
       const k = (inp.getAttribute("data-extra") || "").trim();
@@ -141,7 +142,6 @@
     };
     const digits = (body.price_text || "").replace(/\D/g, "");
     if (digits) body.price = parseInt(digits, 10);
-    const editId = ($("#editLampId")?.value || "").trim();
     const url = editId ? `/api/me/listings/${editId}/edit` : "/api/posts";
     try {
       const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() }, body: JSON.stringify(body) });
@@ -159,17 +159,10 @@
       } catch (e) {}
       const done = document.createElement("div");
       done.className = "card";
-      done.innerHTML = `<h3>已提交审核</h3><p>资料已交给平台审核。</p><p class="muted">请联系${admin}开通/续期上架。通过后首页才会展示。</p><button class="btn primary block" type="button" id="pubContactAdmin">联系管理员</button><button class="btn block" type="button" id="pubAgain">继续上架</button>`;
+      done.innerHTML = `<h3>已提交</h3><p>${editId ? "资料已更新。" : "资料已交给平台审核。"}</p><p class="muted">${editId ? "已上架的会直接改原帖。" : "请联系"+admin+"开通/续期上架。"}</p><button class="btn block" type="button" id="pubAgain">返回上架</button>`;
       form.classList.add("hidden");
       form.parentNode.insertBefore(done, form.nextSibling);
       $("#pubAgain")?.addEventListener("click", () => { done.remove(); form.classList.remove("hidden"); loadFields(); });
-      $("#pubContactAdmin")?.addEventListener("click", () => {
-        const href = window.__yycjAdminUrl || "";
-        const tg = window.Telegram && window.Telegram.WebApp;
-        if (href && tg && tg.openTelegramLink) tg.openTelegramLink(href);
-        else if (href) location.href = href;
-        else toast("后台还没填管理员联系方式");
-      });
     } catch (e) { toast(e.message || String(e)); }
   }, true);
   document.addEventListener("click", (ev) => {
