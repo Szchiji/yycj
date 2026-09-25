@@ -1,4 +1,10 @@
 (() => {
+  if (!document.getElementById("yycj-admin-diff")) {
+    const s = document.createElement("script");
+    s.id = "yycj-admin-diff";
+    s.src = "./admin-diff.js?v=20260925d";
+    document.head.appendChild(s);
+  }
   if (window.__yycjAdminKit) return;
   window.__yycjAdminKit = true;
   const token = () => localStorage.getItem("yycj_token") || "";
