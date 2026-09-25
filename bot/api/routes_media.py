@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Tuple
 import httpx
 from aiogram.types import BufferedInputFile
 from fastapi import Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 
 from bot.api.deps import get_current_user_id
 from bot.api.routes_core import router
@@ -21,6 +21,7 @@ MAX_FILES = 9
 MAX_BYTES = 20 * 1024 * 1024
 _PATH_CACHE: Dict[str, Tuple[str, float]] = {}
 _PATH_TTL = 50 * 60
+_POSTER: Dict[str, str] = {}
 
 
 def _guess_type(filename: str, content_type: str | None) -> str:
@@ -94,10 +95,41 @@ async def api_media_upload(
         if thumb_id:
             item["thumb_file_id"] = thumb_id
             item["preview_url"] = f"/api/media/file/{thumb_id}"
+            _POSTER[file_id] = thumb_id
         results.append(item)
     if not results:
         raise HTTPException(status_code=400, detail="没有有效文件")
     return {"ok": True, "items": results, "count": len(results)}
+
+
+async def _resolve_poster(file_id: str) -> str:
+    if file_id in _POSTER:
+        return _POSTER[file_id]
+    from bot.main import bot
+    from bot.services.broadcast import resolve_media_chat
+    chat = await resolve_media_chat() or get_settings().media_storage_chat_id
+    if not chat:
+        raise HTTPException(status_code=404, detail="no media chat")
+    msg = await bot.send_video(chat, file_id, disable_notification=True)
+    thumb = None
+    if msg.video and getattr(msg.video, "thumbnail", None):
+        thumb = msg.video.thumbnail.file_id
+    if not thumb:
+        raise HTTPException(status_code=404, detail="no thumb")
+    _POSTER[file_id] = thumb
+    return thumb
+
+
+@router.get("/media/poster/{file_id:path}")
+async def api_media_poster(file_id: str):
+    try:
+        thumb = await _resolve_poster(file_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("poster failed %s", exc)
+        raise HTTPException(status_code=404, detail="no poster") from exc
+    return RedirectResponse(url=f"/api/media/file/{thumb}", status_code=307)
 
 
 @router.get("/media/file/{file_id:path}")
