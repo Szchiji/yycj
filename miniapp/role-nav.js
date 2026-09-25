@@ -10,25 +10,6 @@
     document.body.classList.toggle("role-guest", guest);
     document.body.classList.toggle("role-host", !guest);
   }
-  async function sniff() {
-    const token = localStorage.getItem("yycj_token");
-    if (!token) return;
-    try {
-      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + token } });
-      const data = await r.json();
-      if (data.user) localStorage.setItem("yycj_user", JSON.stringify(data.user));
-    } catch (e) {}
-    apply();
-  }
   apply();
-  sniff();
   setTimeout(apply, 800);
-  document.querySelectorAll("[data-switch]").forEach((b) => {
-    b.addEventListener("click", () => setTimeout(() => { sniff(); apply(); }, 400));
-  });
-  if (!document.querySelector('script[src*="role-gate.js"]')) {
-    const s = document.createElement("script");
-    s.src = "./role-gate.js?v=20260912w";
-    document.body.appendChild(s);
-  }
 })();
