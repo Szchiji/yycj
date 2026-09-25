@@ -2,22 +2,21 @@
   if (window.__yycjHomeUi) return;
   window.__yycjHomeUi = true;
   const $ = (s) => document.querySelector(s);
-  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [], cities = [];
+  let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
   let carouselMs = 4000, carouselTimer = 0;
-  const TUTORIAL = ["右上角选城市，首页只看当前城。","点轮播或卡片进详情，下方缩略图可切换。","客人可收藏、分享、想聊聊；老师/商家在上架提交资料。","分享链接发给好友后，先进机器人再点「打开资料」。","想聊聊是匿名会话，会显示代称。","兰花令是口碑分，说明在「我的」。"];
-  const st = document.createElement("style");
-  st.textContent = `#topMeta{display:none!important;}
-#feed,#pins{visibility:visible!important;}
-.search-row{display:flex;align-items:center;gap:6px;}
-#btnGuide{flex:none;height:36px;padding:0 10px;border-radius:18px;border:1px solid #3a4668;background:#1a2340;color:#c9d4ff;font-size:.8rem;}
-.bottom-nav{position:fixed!important;left:0;right:0;bottom:0;z-index:80!important;}`;
-  document.head.appendChild(st);
+  const TUTORIAL = ["右上角选城市。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
   function token() { return localStorage.getItem("yycj_token") || ""; }
   async function api(path) {
-    const r = await fetch(path, { headers: { Authorization: "Bearer " + token() } });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.detail || r.statusText);
-    return data;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch(path, { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || r.statusText || ("HTTP " + r.status));
+      return data;
+    } finally {
+      clearTimeout(timer);
+    }
   }
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
@@ -69,22 +68,10 @@
       (img ? "<img class=\"pin-cover\" src=\"" + esc(img) + "\" alt=\"\" />" : "<div class=\"pin-cover ph\"></div>") +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
-  function tickCarousel() {
-    clearTimeout(carouselTimer);
-    const pins = $("#pins");
-    if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card") && pins.dataset.userScroll !== "1") {
-      const card = pins.querySelector(".pin-card");
-      const step = card ? card.getBoundingClientRect().width + 10 : 160;
-      if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
-      else pins.scrollBy({ left: step, behavior: "smooth" });
-    }
-    if (pins) pins.dataset.userScroll = "0";
-    carouselTimer = setTimeout(tickCarousel, carouselMs);
-  }
   function paint() {
     const feed = $("#feed");
     if (feed) {
-      feed.classList.add("has-cover", "yycj-on");
+      feed.classList.add("has-cover");
       feed.innerHTML = lastItems.length ? lastItems.map(cardHtml).join("") : "<p class='muted'>暂无上架</p>";
     }
     const pins = $("#pins");
@@ -94,8 +81,7 @@
     }
   }
   async function loadFeed(reset) {
-    if (!token() || painting) return;
-    painting = true;
+    if (!token()) return;
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -106,8 +92,7 @@
       const data = await api("/api/home?" + params.toString());
       if (data.city) localStorage.setItem("yycj_city", data.city);
       fillCities(data.enabled_cities || cities, data.city || city);
-      const sec = Number(data.carousel_interval_sec || 4);
-      carouselMs = Math.max(2, Math.min(20, sec || 4)) * 1000;
+      carouselMs = Math.max(2000, Math.min(20000, Number(data.carousel_interval_sec || 4) * 1000));
       lastPins = q ? [] : (data.pins || []);
       const batch = data.items || [];
       lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -121,9 +106,7 @@
       }
     } catch (e) {
       const feed = $("#feed");
-      if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败</p>";
-    } finally {
-      painting = false;
+      if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
     }
   }
   function mountGuide() {
@@ -139,7 +122,7 @@
       const sheet = document.createElement("div");
       sheet.id = "guideSheet";
       sheet.className = "sheet hidden";
-      sheet.innerHTML = "<div class=\"sheet-panel\"><h3>操作教程</h3><ul>" + TUTORIAL.map((x) => "<li>" + x + "</li>").join("") + "</ul><button class=\"btn block primary\" id=\"guideClose\" type=\"button\">知道了</button></div>";
+      sheet.innerHTML = "<div class=\"sheet-panel\"><h3>教程</h3><ul>" + TUTORIAL.map((x) => "<li>" + x + "</li>").join("") + "</ul><button class=\"btn block\" id=\"guideClose\" type=\"button\">知道了</button></div>";
       document.body.appendChild(sheet);
     }
   }
@@ -166,10 +149,24 @@
     }
   }, true);
   mountGuide();
-  tickCarousel();
+  function tick() {
+    const pins = $("#pins");
+    if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card")) {
+      const card = pins.querySelector(".pin-card");
+      const step = card ? card.getBoundingClientRect().width + 10 : 160;
+      if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
+      else pins.scrollBy({ left: step, behavior: "smooth" });
+    }
+    carouselTimer = setTimeout(tick, carouselMs);
+  }
+  tick();
   async function boot() {
-    for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
     if (token()) await loadFeed(true);
+    else {
+      const feed = $("#feed");
+      if (feed) feed.innerHTML = "<p class='muted'>请从机器人里打开</p>";
+    }
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
