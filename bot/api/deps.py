@@ -1,4 +1,4 @@
-"""FastAPI 依赖：当前用户 / 管理员。"""
+"""FastAPI 依赖：当前用户 / 管理员 / 超管。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from fastapi import Depends, Header, HTTPException
 
 from bot.api.telegram_webapp import WebAppAuthError, verify_access_token
 from bot.config import get_settings
-from bot.services.admin_acl import is_admin, warm
+from bot.services.admin_acl import is_admin, is_super, warm
 
 
 async def get_current_user_id(
@@ -33,4 +33,10 @@ async def get_admin_user_id(user_id: Annotated[int, Depends(get_current_user_id)
     await warm()
     if not is_admin(user_id):
         raise HTTPException(status_code=403, detail="需要管理员权限（ADMIN_IDS）")
+    return user_id
+
+
+async def get_super_user_id(user_id: Annotated[int, Depends(get_admin_user_id)]) -> int:
+    if not is_super(user_id):
+        raise HTTPException(status_code=403, detail="只有超管能改站点设置")
     return user_id
