@@ -7,7 +7,9 @@ import bot.api.routes_media  # noqa: F401
 import bot.api.routes_listing  # noqa: F401
 import bot.api.routes_pins_extra  # noqa: F401
 import bot.api.routes_favorites  # noqa: F401
+import bot.api.routes_operators  # noqa: F401
 import bot.models_extra  # noqa: F401
 import bot.services.role_lock  # noqa: F401
+import bot.services.admin_acl  # noqa: F401
 
 __all__ = ["router"]
