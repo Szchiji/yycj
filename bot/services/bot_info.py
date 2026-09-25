@@ -22,6 +22,7 @@ except Exception:
 try:
     from bot.services import admin_ops_wire  # noqa: F401
     from bot.services import extras_store  # noqa: F401
+    from bot.services import admin_acl  # noqa: F401
 except Exception:
     logger.exception("admin_ops_wire skipped")
 
@@ -42,6 +43,11 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         logger.info("Bot identity @%s id=%s", _cache["username"], _cache["id"])
     except Exception:
         logger.exception("refresh_bot_identity failed")
+    try:
+        from bot.services.admin_acl import warm
+        await warm()
+    except Exception:
+        logger.exception("warm extra admins failed")
     return dict(_cache)
 
 
