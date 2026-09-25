@@ -8,10 +8,12 @@
   }
   function isVideo(u) {
     const s = String(u || "");
-    return s.startsWith("BAAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
+    return s.startsWith("BAAC") || s.startsWith("BQAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
   }
   function coverOf(item) {
-    const media = (item && item.media) || [];
+    if (!item) return "";
+    if (item.cover_url) return mediaSrc(item.cover_url);
+    const media = item.media || [];
     for (const m of media) {
       const raw = (m && (m.file_id || m.url)) || "";
       if ((m && m.type) === "video" || isVideo(raw)) {
@@ -19,10 +21,10 @@
         if (thumb && !isVideo(String(m.thumb_file_id || m.thumbnail || ""))) return thumb;
         continue;
       }
-      const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
+      const u = mediaSrc((m && (m.preview_url || m.thumb_file_id || m.file_id || m.url)) || "");
       if (u) return u;
     }
-    for (const p of (item && item.photos) || []) {
+    for (const p of item.photos || []) {
       if (isVideo(p)) continue;
       const u = mediaSrc(p);
       if (u) return u;
