@@ -5,21 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260925x" />
-  <link rel="stylesheet" href="./home-fix.css?v=20260925x" />
-  <style>
-    html,body,#app{pointer-events:auto!important;}
-    #boot.hidden,#gate.hidden,.sheet.hidden{display:none!important;pointer-events:none!important;}
-    #feed,#pins{visibility:visible!important;min-height:24px;}
-    #topMeta{display:none!important;}
-    #pins { margin-bottom:4px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
-    #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
-    #pins .pin-card img.pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
-    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
-    #feed .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; }
-    .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;pointer-events:auto!important;}
-    #detailDock{display:none!important;}
-  </style>
+  <link rel="stylesheet" href="./styles.css?v=20260925y" />
+  <link rel="stylesheet" href="./home-fix.css?v=20260925y" />
+  <link rel="stylesheet" href="./home-lock.css?v=20260925y" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -50,7 +38,7 @@
         </div>
         <div id="pins" class="pins"></div>
         <div id="feedSplit"></div>
-        <div id="feed" class="feed feed-3"><p class="muted">正在加载资料…</p></div>
+        <div id="feed" class="feed feed-3"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
       <section id="view-fav" class="view hidden">
@@ -100,7 +88,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./desk.html?v=20260925x">管理后台</a>
+            <a class="btn primary" href="./desk.html?v=20260925y">管理后台</a>
           </div>
         </div>
       </section>
@@ -125,33 +113,26 @@
       <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
     </nav>
   </div>
-  <div id="citySheet" class="sheet hidden">
-    <div class="sheet-panel">
-      <h3>选择城市</h3>
-      <div id="cityList"></div>
-      <button class="btn block" id="cityClose" type="button">关闭</button>
-    </div>
+  <div id="citySheet" class="sheet hidden" aria-hidden="true">
+    <div id="cityList"></div>
+    <button id="cityClose" type="button"></button>
   </div>
   <div id="rulesSheet" class="sheet hidden">
-    <div class="sheet-panel">
-      <h3 id="rulesTitle">口碑分说明</h3>
-      <ul id="rulesList"></ul>
-      <button class="btn block" id="rulesClose" type="button">知道了</button>
-    </div>
+    <h3 id="rulesTitle"></h3>
+    <ul id="rulesList"></ul>
+    <button id="rulesClose" type="button"></button>
   </div>
-  <script src="./boot-inline.js?v=20260925x"></script>
-  <script src="./app-safe.js?v=20260925x"></script>
-  <script src="./unlock.js?v=20260925x"></script>
-  <script src="./cover.js?v=20260925x"></script>
-  <script src="./app.js?v=20260925x"></script>
-  <script src="./home-paint.js?v=20260925x"></script>
-  <script src="./home-ui.js?v=20260925x"></script>
-  <script src="./publish-ui.js?v=20260925x"></script>
-  <script src="./role-nav.js?v=20260925x"></script>
-  <script src="./detail-fix.js?v=20260925x"></script>
-  <script src="./detail-kit.js?v=20260925x"></script>
-  <script src="./fav.js?v=20260925x"></script>
-  <script src="./admin-go.js?v=20260925x"></script>
-  <script src="./role-gate.js?v=20260925x"></script>
+  <script src="./app-safe.js?v=20260925y"></script>
+  <script src="./cover.js?v=20260925y"></script>
+  <script src="./app.js?v=20260925y"></script>
+  <script src="./home-paint.js?v=20260925y"></script>
+  <script src="./home-ui.js?v=20260925y"></script>
+  <script src="./publish-ui.js?v=20260925y"></script>
+  <script src="./role-nav.js?v=20260925y"></script>
+  <script src="./detail-fix.js?v=20260925y"></script>
+  <script src="./detail-kit.js?v=20260925y"></script>
+  <script src="./fav.js?v=20260925y"></script>
+  <script src="./admin-go.js?v=20260925y"></script>
+  <script src="./role-gate.js?v=20260925y"></script>
 </body>
 </html>
