@@ -6,15 +6,18 @@
     st.id = "yycj-gallery-css";
     st.textContent = `#detail .media-grid{display:none!important;}
 #yycjGallery{margin:8px 0 10px;position:relative;z-index:2;}
-#yycjGallery .gallery-hero{width:100%;border-radius:12px;overflow:hidden;background:#111;min-height:220px;position:relative;}
-#yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;height:280px;object-fit:cover;background:#111;display:block;}
+#yycjGallery .gallery-hero{width:100%;border-radius:14px;overflow:hidden;background:#0b0f18;min-height:240px;position:relative;}
+#yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:360px;object-fit:contain;background:#0b0f18;display:block;}
 #yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch;}
 #yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#1a2233;z-index:3;}
 #yycjGallery .g-thumb.on{border-color:#7ea8ff;}
 #yycjGallery .g-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
 #yycjGallery .g-thumb .play,#yycjGallery .hero-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.28);font-size:18px;pointer-events:none;}
-#detailInfo{margin:8px 0 80px;}
-#detailInfo .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}`;
+#detailInfo{margin:8px 0 96px;}
+#detailInfo h2{margin:0 0 8px;font-size:1.35rem;}
+#detailInfo .muted{margin:4px 0;}
+#detailInfo .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+#detailInfo .row .btn{flex:1;min-width:88px;border-radius:18px;}`;
     document.head.appendChild(st);
   }
   function esc(t) {
@@ -68,14 +71,16 @@
     const tags = (lamp.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("");
     return `<div class="card" id="detailInfo">
       <h2>${esc(lamp.title || "")}</h2>
-      <div class="muted">${esc(loc)}</div>
-      <div class="muted price">${esc(lamp.price_text || "面议")}</div>
+      <div class="muted">📍 ${esc(loc || "")}</div>
+      <div class="muted">💰 ${esc(lamp.price_text || "面议")}</div>
       <div id="yycjTags">${tags}</div>
+      <div id="yycjExtras"></div>
       <p>${esc(lamp.description || "")}</p>
       <div class="row">
-        <button class="btn primary" id="detailChat" type="button" data-lamp="${id}">想聊聊</button>
+        <button class="btn" id="detailReport" type="button" data-report="${id}">举报</button>
         <button class="btn" id="detailReview" type="button" data-review="${id}">写评价</button>
         <button class="btn" id="detailShare" type="button" data-share="${id}">分享</button>
+        <button class="btn primary" id="detailChat" type="button" data-lamp="${id}">想聊聊</button>
       </div>
     </div>`;
   }
@@ -90,7 +95,7 @@
     if (cur.type === "video" && play) {
       hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="metadata"></video>`;
     } else if (cur.type === "video") {
-      hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:220px;background:#111"></div>`}<span class="hero-play">▶</span>`;
+      hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:240px;background:#111"></div>`}<span class="hero-play">▶</span>`;
     } else {
       hero = `<img src="${cur.src}" alt="" />`;
     }
@@ -146,7 +151,24 @@
     document.getElementById("view-detail")?.classList.remove("hidden");
     paint(id);
   };
-  document.addEventListener("click", (ev) => {
+  document.addEventListener("click", async (ev) => {
+    const report = ev.target.closest("#detailReport,[data-report]");
+    if (report && report.id === "detailReport") {
+      ev.preventDefault();
+      const id = report.getAttribute("data-report") || window.__yycjOpenLamp;
+      const reason = window.prompt("举报原因", "不实信息") || "";
+      if (!reason.trim() || !id) return;
+      try {
+        const r = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
+          body: JSON.stringify({ lamp_id: id, reason: reason.trim() }),
+        });
+        const data = await r.json().catch(() => ({}));
+        alert(r.ok ? (数据.message || "已提交举报") : (data.detail || "举报失败"));
+      } catch (e) { alert(String(e)); }
+      return;
+    }
     if (ev.target.closest("[data-share],[data-fav],[data-unfav],#detailShare,#detailChat,#detailReview,a,.g-thumb")) return;
     const card = ev.target.closest("#feed [data-id], #pins [data-id], #favList [data-id]");
     if (!card) return;
