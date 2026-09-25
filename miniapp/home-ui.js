@@ -2,11 +2,12 @@
   if (window.__yycjHomeUi) return;
   window.__yycjHomeUi = true;
   const $ = (s) => document.querySelector(s);
-  let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
+  let offset = 0, q = "", painting = false, lastItems = [], lastPins = [], cities = [];
   let carouselMs = 4000, carouselTimer = 0;
   const TUTORIAL = ["右上角选城市，首页只看当前城。","点轮播或卡片进详情，下方缩略图可切换。","客人可收藏、分享、想聊聊；老师/商家在上架提交资料。","分享链接发给好友后，先进机器人再点「打开资料」。","想聊聊是匿名会话，会显示代称。","兰花令是口碑分，说明在「我的」。"];
   const st = document.createElement("style");
-  st.textContent = `#topMeta,.top-meta{display:none!important;}
+  st.textContent = `#topMeta{display:none!important;}
+#feed,#pins{visibility:visible!important;}
 .search-row{display:flex;align-items:center;gap:6px;}
 #btnGuide{flex:none;height:36px;padding:0 10px;border-radius:18px;border:1px solid #3a4668;background:#1a2340;color:#c9d4ff;font-size:.8rem;}
 .bottom-nav{position:fixed!important;left:0;right:0;bottom:0;z-index:80!important;}`;
@@ -15,7 +16,7 @@
   async function api(path) {
     const r = await fetch(path, { headers: { Authorization: "Bearer " + token() } });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.detail || r.statusText || ("HTTP " + r.status));
+    if (!r.ok) throw new Error(data.detail || r.statusText);
     return data;
   }
   function esc(t) {
@@ -46,12 +47,6 @@
     }
     const btn = $("#btnCity");
     if (btn) btn.textContent = (current || cities[0] || "城市") + " ▾";
-    const sheet = $("#cityList");
-    if (sheet) {
-      sheet.innerHTML = (cities || []).map((c) =>
-        "<button class=\"role-btn\" data-city=\"" + esc(c) + "\" type=\"button\">" + esc(c) + "</button>"
-      ).join("");
-    }
   }
   function cardHtml(t) {
     const img = cover(t);
@@ -90,8 +85,7 @@
     const feed = $("#feed");
     if (feed) {
       feed.classList.add("has-cover", "yycj-on");
-      if (lastItems.length) feed.innerHTML = lastItems.map(cardHtml).join("");
-      else feed.innerHTML = "<p class='muted' style='grid-column:1/-1;padding:20px 8px'>" + (q ? "没有匹配的资料" : "暂无上架") + "</p>";
+      feed.innerHTML = lastItems.length ? lastItems.map(cardHtml).join("") : "<p class='muted'>暂无上架</p>";
     }
     const pins = $("#pins");
     if (pins) {
@@ -99,18 +93,17 @@
       pins.classList.toggle("hidden", !lastPins.length || !!q);
     }
   }
-  async function loadFeed(reset, noCity) {
-    if (!token()) return;
+  async function loadFeed(reset) {
+    if (!token() || painting) return;
+    painting = true;
     try {
       if (reset) offset = 0;
-      const city = noCity ? "" : (localStorage.getItem("yycj_city") || "");
+      const city = localStorage.getItem("yycj_city") || "";
       q = (($("#homeQ") && $("#homeQ").value.trim()) || q || "");
       const params = new URLSearchParams({ limit: "12", offset: String(offset) });
       if (q) params.set("q", q);
       if (city) params.set("city", city);
       const data = await api("/api/home?" + params.toString());
-      window.__yycjHome = data;
-      window.__yycjHomeItems = data.items || [];
       if (data.city) localStorage.setItem("yycj_city", data.city);
       fillCities(data.enabled_cities || cities, data.city || city);
       const sec = Number(data.carousel_interval_sec || 4);
@@ -122,18 +115,15 @@
       paint();
       $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
       const ann = $("#announce");
-      if (ann) {
-        if (data.announcement && data.announcement.text) {
-          ann.classList.remove("hidden");
-          ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
-        }
+      if (ann && data.announcement && data.announcement.text) {
+        ann.classList.remove("hidden");
+        ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
       }
     } catch (e) {
-      if (!noCity) return loadFeed(reset, true);
       const feed = $("#feed");
-      if (feed && !feed.querySelector("[data-id]")) {
-        feed.innerHTML = "<p class='muted' style='grid-column:1/-1;padding:20px 8px'>加载失败，点底栏首页重试</p>";
-      }
+      if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败</p>";
+    } finally {
+      painting = false;
     }
   }
   function mountGuide() {
@@ -158,30 +148,23 @@
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest && ev.target.closest("[data-nav='home']")) loadFeed(true);
-    if (ev.target.id === "btnGuide") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); $("#guideSheet")?.classList.add("open"); }
-    if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") {
-      $("#guideSheet")?.classList.add("hidden");
-      $("#guideSheet")?.classList.remove("open");
-    }
+    if (ev.target.id === "btnGuide") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
+    if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
     if (ev.target.id === "btnCity" || (ev.target.closest && ev.target.closest("#btnCity"))) {
       ev.preventDefault();
       ev.stopPropagation();
       if (!$("#cityDrop")?.innerHTML) fillCities(cities, localStorage.getItem("yycj_city") || "");
       $("#cityDrop")?.classList.toggle("hidden");
     }
-    const opt = ev.target.closest && ev.target.closest("#cityDrop [data-city], #cityList [data-city]");
+    const opt = ev.target.closest && ev.target.closest("#cityDrop [data-city]");
     if (opt) {
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
-      if ($("#homeQ")) $("#homeQ").value = "";
       q = "";
+      if ($("#homeQ")) $("#homeQ").value = "";
       loadFeed(true);
     }
   }, true);
-  document.getElementById("pins")?.addEventListener("touchstart", () => {
-    const pins = document.getElementById("pins");
-    if (pins) pins.dataset.userScroll = "1";
-  }, { passive: true });
   mountGuide();
   tickCarousel();
   async function boot() {
