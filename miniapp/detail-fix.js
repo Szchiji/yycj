@@ -1,17 +1,10 @@
 (() => {
   const token = () => localStorage.getItem("yycj_token") || "";
   window.__yycjLampCache = window.__yycjLampCache || {};
-  const posters = {};
-  if (!document.getElementById("yycj-live")) {
-    const live = document.createElement("script");
-    live.id = "yycj-live";
-    live.src = "./live-refresh.js?v=20260920e";
-    document.head.appendChild(live);
-  }
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
-    st.textContent = `#detail .media-grid{display:none!important;}#yycjGallery{margin:8px 0 10px;}#yycjGallery .gallery-hero{width:100%;border-radius:12px;overflow:hidden;background:#111;min-height:180px;}#yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:320px;object-fit:contain;background:#111;display:block;}#yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;}#yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#111;}#yycjGallery .g-thumb.on{border-color:#7ea8ff;}#yycjGallery .g-thumb img{width:100%;height:100%;object-fit:cover;display:block;}#yycjGallery .g-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.28);font-size:13px;pointer-events:none;}#detailShare{margin-left:auto;}`;
+    st.textContent = `#detail .media-grid{display:none!important;}#yycjGallery{margin:8px 0 10px;}#yycjGallery .gallery-hero{width:100%;border-radius:12px;overflow:hidden;background:#111;min-height:180px;}#yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:320px;object-fit:contain;background:#111;display:block;}#yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;}#yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#1a2233;}#yycjGallery .g-thumb.on{border-color:#7ea8ff;}#yycjGallery .g-thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#1a2233;}#yycjGallery .g-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.28);font-size:13px;pointer-events:none;}`;
     document.head.appendChild(st);
   }
   function host() {
@@ -43,15 +36,19 @@
     const out = [];
     (lamp.media || []).forEach((m) => {
       const raw = (m && (m.file_id || m.url)) || "";
-      const src = srcOf(m && (m.file_id || m.url || m.preview_url));
+      const src = srcOf(m && (m.file_id || m.url));
       if (!src) return;
       const vid = isVideo(m, raw);
-      const poster = posters[src] || srcOf(m && (m.thumb_file_id || m.thumbnail || ""));
-      out.push({ type: vid ? "video" : "image", src, poster });
+      const poster = srcOf(m && (m.thumb_file_id || m.thumbnail || (!vid && m.preview_url) || ""));
+      out.push({ type: vid ? "video" : "image", src, poster: poster && !isVideo({}, poster) ? poster : "" });
     });
     if (!out.length) (lamp.photos || []).forEach((p) => {
       const src = srcOf(p);
-      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: posters[src] || "" });
+      if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: "" });
+    });
+    const firstImg = (out.find((x) => x.type === "image") || {}).src || "";
+    out.forEach((m) => {
+      if (m.type === "video" && !m.poster) m.poster = firstImg;
     });
     return out;
   }
@@ -68,8 +65,7 @@
     if (idx < 0 || idx >= items.length) idx = 0;
     const cur = items[idx];
     el.dataset.lamp = lampId || "";
-    el.dataset.idx = String(idx);
-    el.innerHTML = `<div class="row" style="justify-content:flex-end;margin:0 0 6px"><button class="btn" type="button" id="detailShare" data-share="${lampId || ""}">分享</button></div><div class="gallery-hero">${cur.type === "video"
+    el.innerHTML = `<div class="gallery-hero">${cur.type === "video"
       ? `<video src="${cur.src}" ${cur.poster ? `poster="${cur.poster}"` : ""} muted autoplay loop playsinline></video>`
       : `<img src="${cur.src}" alt="" />`}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
@@ -104,7 +100,7 @@
     paint(id);
   };
   document.addEventListener("click", (ev) => {
-    if (ev.target.closest("[data-share],[data-fav],[data-unfav],#detailShare")) return;
+    if (ev.target.closest("[data-share],[data-fav],[data-unfav],#detailShare,a")) return;
     const card = ev.target.closest("#feed [data-id], #pins [data-id], #favList [data-id]");
     if (!card) return;
     ev.preventDefault();
