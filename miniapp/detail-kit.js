@@ -17,7 +17,9 @@
 #yycjExtras .ex-line{display:flex;gap:8px;align-items:baseline;margin:4px 0;font-size:.92rem;}
 #yycjExtras .ex-k{opacity:.72;min-width:3em;}
 #yycjExtras .ex-v{word-break:break-all;}
-#yycjExtras a, #detail a.tg-link{color:#8ec8ff;text-decoration:underline;}`;
+#yycjExtras a, #detail a.tg-link{color:#8ec8ff;text-decoration:underline;}
+#yycjTags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px;}
+#yycjTags .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#6d4aff;color:#fff;font-size:11px;}`;
     document.head.appendChild(st);
   }
   function tgHref(raw) {
@@ -70,11 +72,26 @@
       loc.dataset.approx = "1";
     }
   }
+  function paintTags(lamp) {
+    const tags = ((lamp && lamp.tags) || []).map((t) => String(t || "").trim()).filter(Boolean);
+    const card = document.querySelector("#detail .card") || document.getElementById("detail");
+    if (!card) return;
+    let el = document.getElementById("yycjTags");
+    if (!tags.length) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "yycjTags";
+      const price = [...card.querySelectorAll(".muted")].find((x) => (x.textContent || "").includes("💰"));
+      if (price) price.insertAdjacentElement("afterend", el);
+      else card.insertBefore(el, card.querySelector("p") || card.querySelector(".row"));
+    }
+    el.innerHTML = tags.map((t) => `<span class="tag">#${t.replace(/[<>#]/g, "")}</span>`).join("");
+  }
   function paintExtras(extras) {
     const detail = document.getElementById("detail");
     if (!detail) return;
     const data = extras && typeof extras === "object" ? extras : {};
-    const keys = Object.keys(data).filter((k) => !String(k).startsWith("_") && String(data[k] || "").trim());
+    const keys = Object.keys(data).filter((k) => !String(k).startsWith("_") && String(data[k] || "").trim() && k !== "标签");
     let box = document.getElementById("yycjExtras");
     if (!keys.length) { if (box) box.remove(); return; }
     const card = detail.querySelector(".card") || detail;
@@ -131,6 +148,7 @@
       const data = await r.json();
       const lamp = data.lamp || data;
       paintApprox(lamp);
+      paintTags(lamp);
       paintExtras(lamp.extras || data.extras || {});
       paintReviews(data.reviews || data.approved_reviews || lamp.reviews || [], id);
       applyCta();
