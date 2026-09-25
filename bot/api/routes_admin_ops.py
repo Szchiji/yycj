@@ -14,6 +14,7 @@ from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import HomepagePin, Lamp
 from bot.services import home_service, listing_flow, listing_ops, search_service, user_admin
+from bot.services.role_lock import unlock_role
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,10 @@ class ShadowBody(BaseModel):
 class PinRemoveBody(BaseModel):
     pin_id: Optional[int] = None
     lamp_id: Optional[str] = None
+
+
+class UnlockRoleBody(BaseModel):
+    user_id: int
 
 
 @router.post("/admin/settings/extra")
@@ -103,6 +108,15 @@ async def api_admin_shadow(
         days=body.days,
         reason=body.reason or ("管理员设置" if body.shadowed else ""),
     )
+    return {"ok": True, "user": _ser_user(user), "by": admin_id}
+
+
+@router.post("/admin/users/unlock-role")
+async def api_admin_unlock_role(
+    body: UnlockRoleBody,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    user = await unlock_role(body.user_id)
     return {"ok": True, "user": _ser_user(user), "by": admin_id}
 
 
