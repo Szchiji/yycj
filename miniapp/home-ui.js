@@ -37,6 +37,11 @@
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
   }
   function cover(item) {
+    if (item && item.cover_url) {
+      const s = String(item.cover_url);
+      if (s.startsWith("http") || s.startsWith("/")) return s;
+      return "/api/media/file/" + encodeURIComponent(s);
+    }
     return window.yycjCoverOf ? window.yycjCoverOf(item) : "";
   }
   function fillCities(list, current) {
@@ -50,36 +55,41 @@
     const btn = $("#btnCity");
     if (btn) btn.textContent = (current || cities[0] || "城市") + " ▾";
   }
-  function cardHtml(t) {
+  function imgTag(src, cls, eager) {
+    if (!src) return "<div class=\"" + cls + " ph\"></div>";
+    const load = eager ? "eager" : "lazy";
+    const prio = eager ? "high" : "low";
+    return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" fetchpriority=\"" + prio + "\" decoding=\"async\" />";
+  }
+  function cardHtml(t, idx) {
     const img = cover(t);
     const loc = [t.city, t.district].filter(Boolean).join("·");
     const tag = (t.tags && t.tags[0]) || "";
-    const n = (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
+    const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
-      (img ? "<img class=\"thumb\" src=\"" + esc(img) + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
+      imgTag(img, "thumb", idx < 3) +
       "<button class=\"fav-btn\" type=\"button\" data-fav=\"" + esc(t.lamp_id) + "\">♡</button>" +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
       (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
       "</div><div class=\"body\"><h3>" + pin + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + "</div></div></div>";
   }
-  function pinHtml(p) {
+  function pinHtml(p, idx) {
     const t = (p && p.lamp) || p || {};
-    const img = cover(t);
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
-      (img ? "<img class=\"pin-cover\" src=\"" + esc(img) + "\" alt=\"\" decoding=\"async\" />" : "<div class=\"pin-cover ph\"></div>") +
+      imgTag(cover(t), "pin-cover", idx === 0) +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
   function paint() {
     const feed = $("#feed");
     if (feed) {
       feed.classList.add("has-cover");
-      feed.innerHTML = lastItems.length ? lastItems.map(cardHtml).join("") : "<p class='muted'>暂无上架</p>";
+      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>暂无上架</p>";
     }
     const pins = $("#pins");
     if (pins) {
-      pins.innerHTML = lastPins.map(pinHtml).join("");
+      pins.innerHTML = lastPins.map((p, i) => pinHtml(p, i)).join("");
       pins.classList.toggle("hidden", !lastPins.length || !!q);
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
@@ -163,9 +173,10 @@
     }
     carouselTimer = setTimeout(tick, carouselMs);
   }
-  tick();
+  setTimeout(tick, 2500);
   async function boot() {
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
+    if (document.querySelector("#feed [data-id]")) return;
     if (token()) await loadFeed(true);
   }
   if (document.readyState === "complete") boot();
