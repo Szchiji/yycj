@@ -14,30 +14,8 @@
     try { return (JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest") === "guest"; }
     catch (e) { return true; }
   }
-  function mediaSrc(u) {
-    const s = String(u || "").trim();
-    if (!s) return "";
-    if (s.toLowerCase().startsWith("file_id:")) return mediaSrc(s.slice(8));
-    if (s.startsWith("http") || s.startsWith("/")) return s;
-    return "/api/media/file/" + encodeURIComponent(s);
-  }
-  function isVideo(u) {
-    const s = String(u || "");
-    return s.startsWith("BAAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
-  }
   function cover(item) {
-    if (window.yycjCoverOf) return window.yycjCoverOf(item);
-    for (const m of item.media || []) {
-      const raw = (m && (m.file_id || m.url)) || "";
-      if ((m && m.type) === "video" || isVideo(raw)) {
-        const thumb = mediaSrc((m && (m.thumb_file_id || m.preview_url)) || "");
-        if (thumb && !isVideo(String(m.thumb_file_id || ""))) return thumb;
-        continue;
-      }
-      const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
-      if (u) return u;
-    }
-    return "";
+    return window.yycjCoverOf ? window.yycjCoverOf(item) : "";
   }
   function showView(id) {
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
@@ -48,19 +26,13 @@
     const loc = [x.city, x.district].filter(Boolean).join("·");
     const tag = (x.tags && x.tags[0]) || "";
     const n = (x.media && x.media.length) || (x.photos && x.photos.length) || 0;
-    return `<div class="feed-card compact cover-card" data-id="${x.lamp_id}">
-      <div class="cover-wrap">
-        ${img ? `<img class="thumb" src="${img}" alt="" loading="lazy" decoding="async" />` : `<div class="thumb ph"></div>`}
-        ${loc ? `<span class="badge-loc">${loc}</span>` : ""}
-        ${tag ? `<span class="badge-tag">${tag}</span>` : ""}
-        ${n ? `<span class="badge-n">${n}图</span>` : ""}
-      </div>
-      <div class="body">
-        <h3>${x.title || ""}</h3>
-        <div class="muted price">${x.price_text || ""}</div>
-        <button class="btn unfav" type="button" data-unfav="${x.lamp_id}">取消收藏</button>
-      </div>
-    </div>`;
+    return "<div class=\"feed-card compact cover-card\" data-id=\"" + x.lamp_id + "\"><div class=\"cover-wrap\">" +
+      (img ? "<img class=\"thumb\" src=\"" + img + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
+      (loc ? "<span class=\"badge-loc\">" + loc + "</span>" : "") +
+      (tag ? "<span class=\"badge-tag\">" + tag + "</span>" : "") +
+      (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
+      "</div><div class=\"body\"><h3>" + (x.title || "") + "</h3><div class=\"muted price\">" + (x.price_text || "") +
+      "</div><button class=\"btn unfav\" type=\"button\" data-unfav=\"" + x.lamp_id + "\">取消收藏</button></div></div>";
   }
   function paintHearts() {
     document.querySelectorAll("[data-fav]").forEach((b) => {
@@ -98,6 +70,7 @@
     paintHearts();
     paintList();
   }
+  window.__yycjPaintFav = paintHearts;
   document.addEventListener("click", async (ev) => {
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
@@ -121,9 +94,7 @@
       ev.stopPropagation();
       if (!isGuest()) return;
       try { await toggle(heart.getAttribute("data-fav")); } catch (e) {}
-      return;
     }
-    if (ev.target.closest("#favList [data-id]")) window.__yycjBack = "fav";
   }, true);
   document.getElementById("btnBackHome")?.addEventListener("click", (ev) => {
     if (window.__yycjBack === "fav") {
@@ -135,8 +106,5 @@
       window.__yycjBack = "home";
     }
   }, true);
-  const feed = document.getElementById("feed");
-  if (feed) new MutationObserver(() => paintHearts()).observe(feed, { childList: true, subtree: true });
-  setTimeout(load, 400);
-  setInterval(paintHearts, 1200);
+  setTimeout(load, 600);
 })();
