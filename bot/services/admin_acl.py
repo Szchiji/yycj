@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Iterable, List, Set
 
 from bot.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 _extra: Set[int] = set()
+_warm_at = 0.0
 
 
 def extra_ids() -> Set[int]:
@@ -38,19 +40,26 @@ def is_admin(user_id: int) -> bool:
 
 
 async def warm() -> List[int]:
+    global _warm_at
+    if _warm_at and time.time() - _warm_at < 20:
+        return sorted(_extra)
     try:
         from bot.services import home_service
         site = await home_service.get_or_create_settings()
-        return remember(site.get("extra_admin_ids") or [])
+        ids = remember(site.get("extra_admin_ids") or [])
+        _warm_at = time.time()
+        return ids
     except Exception:
         logger.exception("warm extra admins failed")
         return sorted(_extra)
 
 
 async def save(ids: Iterable[int]) -> List[int]:
+    global _warm_at
     cleaned = remember(ids)
     from bot.services import home_service
     await home_service.update_settings(ops_config={"extra_admin_ids": cleaned})
+    _warm_at = time.time()
     return cleaned
 
 
