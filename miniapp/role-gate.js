@@ -14,7 +14,7 @@
     try {
       const token = localStorage.getItem("yycj_token") || "";
       if (!token) return;
-      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + token } });
+      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + token() } });
       const data = await r.json().catch(() => ({}));
       const user = data.user || {};
       localStorage.setItem("yycj_user", JSON.stringify(user));
@@ -24,7 +24,9 @@
       });
     } catch (e) {}
   }
+  function token() { return localStorage.getItem("yycj_token") || ""; }
   document.addEventListener("click", (ev) => {
+    if (ev.target.closest && ev.target.closest("[data-nav='me']")) refresh();
     const btn = ev.target.closest && ev.target.closest("#view-me [data-switch]");
     if (!btn) return;
     const user = JSON.parse(localStorage.getItem("yycj_user") || "{}");
@@ -35,5 +37,4 @@
       alert("角色一周内只能换一次，还剩 " + lock.days + " 天");
     }
   }, true);
-  setTimeout(refresh, 600);
 })();
