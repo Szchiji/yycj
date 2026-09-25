@@ -1,9 +1,10 @@
-"""审核通过：改稿覆盖 + 推广通知 + 频道推送。"""
+"""审核通过：改稿覆盖原帖，新上架才发新帖。"""
 from bot.db import session_scope
 from bot.models import Post, PostStatus
 from bot.services import admin_ops, listing_flow, search_service
 from bot.services.listing_notify import notify_publisher_approved
 from bot.services.extras_store import save_extras
+from bot.services.broadcast import update_broadcast
 from sqlalchemy import select
 
 _orig = admin_ops.approve_post
@@ -40,10 +41,10 @@ async def approve_post(post_id: str, *, notify: bool = True):
         album = None
         if full:
             await save_extras((full or {}).get("lamp_id") or edit_id, extras)
-            album = await listing_flow.broadcast_listing(full, extras)
+            album = await update_broadcast(full, extras)
         if notify:
             await notify_publisher_approved(user_id, lamp.get("title") or "资料", album)
-        return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True}
+        return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True, "edited_in_place": bool(album)}
     result = await _orig(post_id, notify=False)
     if notify:
         lamp = await search_service.get_lamp(result.get("lamp_id") or "")
