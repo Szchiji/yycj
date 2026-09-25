@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus
@@ -37,9 +37,9 @@ def parse_hours(raw: Any) -> List[Tuple[str, str]]:
             if a and b:
                 out.append((a[:5], b[:5]))
         return out[:3]
-    text = str(raw or "").strip()
-    if "-" in text:
-        a, b = text.split("-", 1)
+    raw_text = str(raw or "").strip()
+    if "-" in raw_text:
+        a, b = raw_text.split("-", 1)
         a, b = a.strip()[:5], b.strip()[:5]
         if a and b:
             return [(a, b)]
@@ -184,29 +184,15 @@ async def send_daily() -> int:
         grouped.setdefault(int(lamp["user_id"]), []).append(lamp)
     for uid, items in grouped.items():
         try:
-            if len(items) == 1:
-                lamp = items[0]
+            batch = items if len(items) <= 3 else items[:8]
+            if len(items) > 3:
+                await bot.send_message(uid, f"你有 {len(items)} 条在架资料，请逐条确认今日是否开课。")
+            for lamp in batch:
                 await bot.send_message(
                     uid,
                     f"「{lamp['title']}」今日开课吗？",
                     reply_markup=_kb(lamp["lamp_id"], day),
                 )
-            elif len(items) <= 3:
-                for lamp in items:
-                    await bot.send_message(
-                        uid,
-                        f"「{lamp['title']}」今日开课吗？",
-                        reply_markup=_kb(lamp["lamp_id"], day),
-                    )
-            else:
-                lines = [f"你有 {len(items)} 条在架资料，请逐条确认今日是否开课。"]
-                await bot.send_message(uid, "\n".join(lines))
-                for lamp in items[:8]:
-                    await bot.send_message(
-                        uid,
-                        f"「{lamp['title']}」",
-                        reply_markup=_kb(lamp["lamp_id"], day),
-                    )
             sent += 1
         except Exception:
             logger.exception("shift remind failed %s", uid)
