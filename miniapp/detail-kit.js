@@ -16,8 +16,34 @@
     st.textContent = `#yycjExtras{margin:6px 0 2px;padding:0;background:none;border:none;}
 #yycjExtras .ex-line{display:flex;gap:8px;align-items:baseline;margin:4px 0;font-size:.92rem;}
 #yycjExtras .ex-k{opacity:.72;min-width:3em;}
-#yycjExtras .ex-v{word-break:break-all;}`;
+#yycjExtras .ex-v{word-break:break-all;}
+#yycjExtras a, #detail a.tg-link{color:#8ec8ff;text-decoration:underline;}`;
     document.head.appendChild(st);
+  }
+  function tgHref(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    if (/^(https?:\/\/|tg:\/\/)/i.test(s)) return s;
+    if (s.startsWith("t.me/")) return "https://" + s;
+    if (s.startsWith("@")) return "https://t.me/" + s.slice(1).replace(/^\+/, "+");
+    if (/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(s)) return "https://t.me/" + s;
+    return "";
+  }
+  function linkable(key) {
+    return /联系|频道|机器人|链接|用户名|telegram|bot/i.test(String(key || ""));
+  }
+  function valueHtml(key, val) {
+    const safe = String(val).replace(/[<>]/g, "");
+    const href = tgHref(val) || (linkable(key) ? tgHref(val.replace(/^@/, "@")) : "");
+    if (!href) return safe;
+    return `<a class="tg-link" href="${href.replace(/"/g, "")}" data-tg="${href.replace(/"/g, "")}">${safe}</a>`;
+  }
+  function openTg(href) {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (!href) return;
+    if (tg && /t\.me\/|tg:\/\//i.test(href) && tg.openTelegramLink) tg.openTelegramLink(href);
+    else if (tg && tg.openLink) tg.openLink(href);
+    else location.href = href;
   }
   function ctaOn() {
     const v = (window.__yycjHome || {}).show_chat_cta;
@@ -56,7 +82,7 @@
     if (!box) { box = document.createElement("div"); box.id = "yycjExtras"; }
     if (row && row.parentNode === card) card.insertBefore(box, row);
     else if (box.parentNode !== card) card.appendChild(box);
-    box.innerHTML = keys.map((k) => `<div class="ex-line"><span class="ex-k">${k}</span><span class="ex-v">${String(data[k]).replace(/[<>]/g, "")}</span></div>`).join("");
+    box.innerHTML = keys.map((k) => `<div class="ex-line"><span class="ex-k">${k}</span><span class="ex-v">${valueHtml(k, data[k])}</span></div>`).join("");
   }
   function placeShare(id) {
     document.querySelector("#yycjGallery #detailShare, #yycjGallery [data-share]")?.remove();
@@ -119,6 +145,13 @@
     } catch (e) {}
   }
   document.addEventListener("click", (ev) => {
+    const a = ev.target.closest("a[data-tg], #detail a.tg-link, #yycjExtras a");
+    if (a) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTg(a.getAttribute("data-tg") || a.getAttribute("href") || "");
+      return;
+    }
     const card = ev.target.closest("#feed [data-id], #pins [data-id], #favList [data-id]");
     if (!card) return;
     const id = card.getAttribute("data-id");
