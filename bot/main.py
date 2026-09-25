@@ -224,14 +224,16 @@ async def miniapp_index():
 
 
 def _admin_page() -> Path:
+    desk = MINIAPP_DIR / "desk.html"
+    if desk.is_file():
+        return desk
     console = MINIAPP_DIR / "console.html"
     if console.is_file():
         return console
     return MINIAPP_DIR / "admin.html"
 
 
-@app.get("/app/admin.html")
-async def miniapp_admin():
+def _admin_file():
     page = _admin_page()
     if not page.is_file():
         raise HTTPException(status_code=404, detail="admin missing")
@@ -239,17 +241,21 @@ async def miniapp_admin():
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         "Pragma": "no-cache",
     })
+
+
+@app.get("/app/admin.html")
+async def miniapp_admin():
+    return _admin_file()
 
 
 @app.get("/app/console.html")
 async def miniapp_console():
-    page = _admin_page()
-    if not page.is_file():
-        raise HTTPException(status_code=404, detail="admin missing")
-    return FileResponse(page, headers={
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-        "Pragma": "no-cache",
-    })
+    return _admin_file()
+
+
+@app.get("/app/desk.html")
+async def miniapp_desk():
+    return _admin_file()
 
 
 @app.post(settings.webhook_path or "/webhook")
