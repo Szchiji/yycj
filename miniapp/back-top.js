@@ -1,4 +1,10 @@
 (() => {
+  ["publish-hours.js", "shop-badge.js"].forEach((name) => {
+    if ([...document.scripts].some((s) => (s.src || "").indexOf(name) >= 0)) return;
+    const el = document.createElement("script");
+    el.src = "./" + name + "?v=20260925s";
+    document.body.appendChild(el);
+  });
   if (document.getElementById("yycjTop")) return;
   const btn = document.createElement("button");
   btn.id = "yycjTop";
