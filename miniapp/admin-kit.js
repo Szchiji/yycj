@@ -1,10 +1,10 @@
 (() => {
-  ["admin-diff.js", "admin-ops-users.js"].forEach((name) => {
+  ["admin-diff.js", "admin-ops-users.js", "back-top.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260925e";
+    s.src = "./" + name + "?v=20260925s";
     document.head.appendChild(s);
   });
   if (window.__yycjAdminKit) return;
@@ -114,7 +114,7 @@
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || "预览失败");
-        if (out) out.textContent = (data.title ? ("「" + data.title + "」\n") : "") + (data.text || "(空)");
+        if (out) out.textContent = (data.title ? (「" + data.title + "」\n") : "") + (data.text || "(空)");
       } catch (e) { if (out) out.textContent = e.message || String(e); }
     }
     const unlock = ev.target.closest("[data-unlock-role]");
