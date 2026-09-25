@@ -1,10 +1,12 @@
 (() => {
-  if (!document.getElementById("yycj-admin-diff")) {
+  ["admin-diff.js", "admin-ops-users.js"].forEach((name) => {
+    const id = "yycj-" + name.replace(".js", "");
+    if (document.getElementById(id)) return;
     const s = document.createElement("script");
-    s.id = "yycj-admin-diff";
-    s.src = "./admin-diff.js?v=20260925d";
+    s.id = id;
+    s.src = "./" + name + "?v=20260925e";
     document.head.appendChild(s);
-  }
+  });
   if (window.__yycjAdminKit) return;
   window.__yycjAdminKit = true;
   const token = () => localStorage.getItem("yycj_token") || "";
