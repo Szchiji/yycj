@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=ui1" />
-  <link rel="stylesheet" href="./home-fix.css?v=ui1" />
+  <link rel="stylesheet" href="./styles.css?v=ui2" />
+  <link rel="stylesheet" href="./home-fix.css?v=ui2" />
   <style>
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
+    #announce{position:relative!important;left:auto!important;right:auto!important;display:block;height:28px;overflow:hidden;margin:4px 8px 8px;white-space:nowrap;}
+    #announce span{display:inline-block;padding-right:24px;}
+    .search-row{position:relative;z-index:3;}
     #pins { margin-bottom:8px!important;display:flex !important; gap:10px; overflow-x:auto !important; max-height:168px; }
     #pins .pin-card { flex:0 0 42%!important; aspect-ratio:3/4!important; max-height:168px; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
     #pins .pin-card img.pin-cover, #pins .pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
@@ -25,11 +28,8 @@
     .badge-n { position:absolute !important; right:6px; bottom:6px; z-index:4; }
     #citySheet { display:none !important; }
     .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
+    #view-detail{padding-bottom:96px;}
     #yycjGallery{margin:8px 0 10px;}
-    #yycjGallery .gallery-hero{width:100%;border-radius:12px;overflow:hidden;background:#111;min-height:180px;}
-    #yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:320px;object-fit:contain;display:block;background:#111;}
-    #yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;}
-    #yycjTags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
     #detail .media-grid{display:none!important;}
   </style>
 </head>
@@ -119,15 +119,15 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
   <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
-  <script src="./cover.js?v=ui1"></script>
-  <script src="./app.js?v=ui1"></script>
-  <script src="./home-ui.js?v=ui1"></script>
-  <script src="./publish-ui.js?v=ui1"></script>
-  <script src="./detail-fix.js?v=ui1"></script>
-  <script src="./detail-kit.js?v=ui1"></script>
-  <script src="./role-nav.js?v=ui1"></script>
-  <script src="./fav.js?v=ui1"></script>
-  <script src="./admin-go.js?v=ui1"></script>
-  <script src="./role-gate.js?v=ui1"></script>
+  <script src="./cover.js?v=ui2"></script>
+  <script src="./app.js?v=ui2"></script>
+  <script src="./home-ui.js?v=ui2"></script>
+  <script src="./publish-ui.js?v=ui2"></script>
+  <script src="./detail-fix.js?v=ui2"></script>
+  <script src="./detail-kit.js?v=ui2"></script>
+  <script src="./role-nav.js?v=ui2"></script>
+  <script src="./fav.js?v=ui2"></script>
+  <script src="./admin-go.js?v=ui2"></script>
+  <script src="./role-gate.js?v=ui2"></script>
 </body>
 </html>
