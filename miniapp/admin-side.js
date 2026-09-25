@@ -1,4 +1,10 @@
 (() => {
+  if (!document.getElementById("yycj-back-top")) {
+    const s = document.createElement("script");
+    s.id = "yycj-back-top";
+    s.src = "./back-top.js?v=20260925t";
+    document.body.appendChild(s);
+  }
   if (window.__yycjAdminSide) return;
   window.__yycjAdminSide = true;
   const titles = { audit: "审核", listings: "上架资料", pin: "卡片置顶", carousel: "精选轮播", venue: "站点设置", users: "用户", more: "风控" };
