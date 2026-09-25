@@ -1,8 +1,7 @@
-"""审核通过后写入上架有效期；搜索结果补 preview_url 与营业状态。"""
+"""审核通过后写入上架有效期；搜索结果补 preview_url。"""
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 from bot.services import listing_ops, search_service
 from bot.services.media_urls import enrich_media
@@ -23,12 +22,6 @@ def _with_preview(d):
         media = enrich_media(out.get("media"), out.get("photos"))
         out["media"] = media
         out["photos"] = [m.get("preview_url") or m.get("url") for m in media if m.get("type") == "image"]
-        extras = out.get("extras") if isinstance(out.get("extras"), dict) else {}
-        try:
-            from bot.services.open_shift import shop_status
-            out["shop"] = shop_status(extras, out.get("status"), out.get("expires_at"))
-        except Exception:
-            out["shop"] = {"code": "unset", "text": "", "hours": ""}
         return out
     except Exception:
         logger.exception("preview attach failed")
@@ -52,15 +45,9 @@ async def search_lamps(**kwargs):
     out = []
     for x in items or []:
         try:
-            from bot.services.extras_store import load_extras
-            x["extras"] = await load_extras(x.get("lamp_id") or "")
+            out.append(_with_preview(x))
         except Exception:
-            x["extras"] = {}
-        try:
-            x = _with_preview(x)
-        except Exception:
-            pass
-        out.append(x)
+            out.append(x)
     return out
 
 
