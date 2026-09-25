@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any, Dict, Optional
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,32 @@ try:
     from bot.services import admin_acl  # noqa: F401
 except Exception:
     logger.exception("admin_ops_wire skipped")
+
+
+def _install_shift_jobs() -> None:
+    try:
+        from bot.main import scheduler
+        from bot.services.open_shift import expire_unanswered, send_daily
+    except Exception:
+        return
+    if not getattr(scheduler, "running", False):
+        return
+    async def job_open_shift() -> None:
+        try:
+            n = await send_daily()
+            if n:
+                logger.info("shift remind users=%s", n)
+        except Exception:
+            logger.exception("shift remind failed")
+    async def job_shift_timeout() -> None:
+        try:
+            n = await expire_unanswered()
+            if n:
+                logger.info("shift timeout closed=%s", n)
+        except Exception:
+            logger.exception("shift timeout failed")
+    scheduler.add_job(job_open_shift, "cron", hour=0, minute=5, timezone=ZoneInfo("Asia/Shanghai"), id="open_shift", replace_existing=True)
+    scheduler.add_job(job_shift_timeout, "interval", minutes=10, id="shift_timeout", replace_existing=True)
 
 
 async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
@@ -53,6 +80,10 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         await nudge_expiring(3)
     except Exception:
         logger.exception("expiry nudge failed")
+    try:
+        _install_shift_jobs()
+    except Exception:
+        logger.exception("shift jobs skipped")
     return dict(_cache)
 
 
