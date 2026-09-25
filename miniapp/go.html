@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>月影车姬</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="./styles.css?v=restore1" />
+  <link rel="stylesheet" href="./home-fix.css?v=restore1" />
+  <style>
+    #feed,#pins{visibility:visible!important;}
+    #topMeta{display:none!important;}
+    #pins { margin-bottom:4px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
+    #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
+    #pins .pin-card img.pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
+    #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:28px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
+    #feedSplit{height:1px;margin:12px 8px 14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
+    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
+    #feed .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; }
+    .fav-btn { position:absolute !important; top:6px; left:6px; z-index:3; }
+    .badge-loc { position:absolute; top:6px; right:6px; z-index:3; }
+    .badge-tag { position:absolute; left:6px; bottom:6px; z-index:3; }
+    .badge-n { position:absolute; right:6px; bottom:6px; z-index:3; }
+    #citySheet { display:none !important; }
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+  <section id="boot" class="boot">
+    <div class="boot-card">
+      <h1>月影车姬</h1>
+      <p id="bootMsg" class="muted">正在连接…</p>
+      <button id="bootRetry" class="btn primary block hidden" type="button">重试</button>
+    </div>
+  </section>
+  <section id="gate" class="gate hidden"></section>
+  <div id="app" class="hidden">
+    <header class="topbar topbar-3">
+      <a id="topAdmin" class="top-admin" href="#">管理员</a>
+      <a id="brandTitle" class="brand">月影车姬</a>
+      <div class="city-wrap">
+        <button id="btnCity" class="chip" type="button">城市 ▾</button>
+        <div id="cityDrop" class="city-drop hidden"></div>
+      </div>
+    </header>
+    <div id="topMeta" class="top-meta muted hidden"></div>
+    <main id="main">
+      <section id="view-home" class="view">
+        <div id="announce" class="announce hidden"></div>
+        <div class="search-row">
+          <input id="homeQ" maxlength="64" placeholder="搜花名 / 标签 / 城区 / 价位" />
+          <button class="btn" id="btnSearch" type="button">搜索</button>
+        </div>
+        <div id="pins" class="pins"></div>
+        <div id="feedSplit"></div>
+        <div id="feed" class="feed feed-3"></div>
+        <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
+      </section>
+      <section id="view-fav" class="view hidden"><div class="card"><h3>我的收藏</h3><div id="favList"></div></div></section>
+      <section id="view-publish" class="view hidden">
+        <form id="publishForm" class="card form">
+          <h3 id="publishTitle">上架</h3>
+          <label>相册</label><input id="pubFiles" type="file" accept="image/*,video/*" multiple />
+          <div id="pubPreview" class="media-preview"></div>
+          <label>称呼</label><input id="pubTitle" required maxlength="64" />
+          <label>城市</label><select id="pubCity" required></select>
+          <label>简介</label><textarea id="pubDesc" rows="3" maxlength="2000"></textarea>
+          <label>价位</label><input id="pubPrice" />
+          <label>区域</label><input id="pubDistrict" />
+          <label>大致位置</label><input id="pubApprox" />
+          <label>标签</label><input id="pubTags" />
+          <label>营业时段</label>
+          <div class="row"><input id="pubHourStart" type="time" value="13:00" /><input id="pubHourEnd" type="time" value="00:00" /></div>
+          <button class="btn primary block big" type="submit">提交审核</button>
+        </form>
+      </section>
+      <section id="view-me" class="view hidden">
+        <div id="meCard" class="card"></div>
+        <div class="card">
+          <h3>我的昵称</h3>
+          <div class="row"><input id="guestNick" maxlength="16" style="flex:1;margin:0" /><button class="btn" id="btnSaveNick" type="button">保存</button></div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" data-switch="guest" type="button">客人</button>
+            <button class="btn" data-switch="teacher" type="button">老师</button>
+            <button class="btn" data-switch="merchant" type="button">商家</button>
+          </div>
+        </div>
+        <div class="card hints"><div id="adminEntry" class="hidden"><a class="btn primary" href="./desk.html">管理后台</a></div></div>
+      </section>
+      <section id="view-detail" class="view hidden">
+        <button class="btn ghost" id="btnBackHome" type="button">← 返回</button>
+        <div id="detail"></div>
+      </section>
+      <section id="view-review" class="view hidden">
+        <form id="reviewForm" class="card form">
+          <h3>提交评价</h3>
+          <input type="hidden" id="revLampId" />
+          <input id="revStars" type="number" min="1" max="5" value="5" required />
+          <textarea id="revText" rows="3"></textarea>
+          <button class="btn primary block" type="submit">提交评价</button>
+        </form>
+      </section>
+    </main>
+    <nav class="bottom-nav nav-3">
+      <button data-nav="home" class="nav-item active" type="button"><span>首页</span></button>
+      <button data-nav="fav" class="nav-item hidden" type="button"><span>收藏</span></button>
+      <button data-nav="publish" class="nav-item" type="button"><span>上架</span></button>
+      <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
+    </nav>
+  </div>
+  <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
+  <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
+  <script src="./cover.js?v=restore1"></script>
+  <script src="./app.js?v=restore1"></script>
+  <script src="./home-ui.js?v=restore1"></script>
+  <script src="./publish-ui.js?v=restore1"></script>
+  <script src="./detail-fix.js?v=restore1"></script>
+  <script src="./detail-kit.js?v=restore1"></script>
+  <script src="./role-nav.js?v=restore1"></script>
+  <script src="./fav.js?v=restore1"></script>
+  <script src="./admin-go.js?v=restore1"></script>
+  <script src="./role-gate.js?v=restore1"></script>
+</body>
+</html>
