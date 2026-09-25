@@ -39,16 +39,13 @@
       const src = srcOf(m && (m.file_id || m.url));
       if (!src) return;
       const vid = isVideo(m, raw);
-      const poster = srcOf(m && (m.thumb_file_id || m.thumbnail || (!vid && m.preview_url) || ""));
-      out.push({ type: vid ? "video" : "image", src, poster: poster && !isVideo({}, poster) ? poster : "" });
+      const thumb = srcOf(m && (m.thumb_file_id || m.thumbnail || ""));
+      const poster = thumb && !isVideo({}, thumb) ? thumb : "";
+      out.push({ type: vid ? "video" : "image", src, poster });
     });
     if (!out.length) (lamp.photos || []).forEach((p) => {
       const src = srcOf(p);
       if (src) out.push({ type: isVideo({}, p) ? "video" : "image", src, poster: "" });
-    });
-    const firstImg = (out.find((x) => x.type === "image") || {}).src || "";
-    out.forEach((m) => {
-      if (m.type === "video" && !m.poster) m.poster = firstImg;
     });
     return out;
   }
@@ -70,7 +67,7 @@
       : `<img src="${cur.src}" alt="" />`}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
         m.type === "video"
-          ? `<img src="${m.poster || ""}" alt="" /><span class="play">▶</span>`
+          ? (m.poster ? `<img src="${m.poster}" alt="" /><span class="play">▶</span>` : `<span class="play">▶</span>`)
           : `<img src="${m.src}" alt="" />`
       }</button>`).join("")}</div>`;
     el.querySelectorAll("[data-g]").forEach((btn) => {
