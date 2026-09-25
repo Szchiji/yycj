@@ -16,6 +16,7 @@ from bot.config import get_settings
 from bot.models import UserRole
 from bot.services import credit_service, home_service
 from bot.services.admin_ops import AdminActionError
+from bot.services.media_urls import pick_cover
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +154,10 @@ def _ser_lamp(lamp: Dict[str, Any]) -> Dict[str, Any]:
     out.pop("_distance_km", None)
     out.pop("approx_lat", None)
     out.pop("approx_lng", None)
+    try:
+        out["cover_url"] = pick_cover(out)
+    except Exception:
+        out["cover_url"] = out.get("cover_url") or ""
     return out
 
 def _normalize_media(media: List[MediaItem] | None, photos: List[str] | None) -> List[Dict[str, str]]:
