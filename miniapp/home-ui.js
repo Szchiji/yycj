@@ -21,6 +21,19 @@
   let carouselMs = 4000, carouselTimer = 0;
   const TUTORIAL = ["右上角选城市。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
   function token() { return localStorage.getItem("yycj_token") || ""; }
+  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || ""); }
+  function readCache(city, qq) {
+    try {
+      const raw = sessionStorage.getItem(cacheKey(city, qq));
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o || Date.now() - Number(o.t || 0) > 60000) return null;
+      return o.d || null;
+    } catch (e) { return null; }
+  }
+  function writeCache(city, qq, data) {
+    try { sessionStorage.setItem(cacheKey(city, qq), JSON.stringify({ t: Date.now(), d: data })); } catch (e) {}
+  }
   async function api(path) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
@@ -94,30 +107,39 @@
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
+  function applyData(data, reset) {
+    window.__yycjHomeData = data;
+    if (data.city) localStorage.setItem("yycj_city", data.city);
+    fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
+    carouselMs = Math.max(2000, Math.min(20000, Number(data.carousel_interval_sec || 4) * 1000));
+    lastPins = q ? [] : (data.pins || []);
+    const batch = data.items || [];
+    lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
+    offset = lastItems.length;
+    paint();
+    $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
+    const ann = $("#announce");
+    if (ann && data.announcement && data.announcement.text) {
+      ann.classList.remove("hidden");
+      ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
+    }
+  }
   async function loadFeed(reset) {
     if (!token()) return;
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
       q = (($("#homeQ") && $("#homeQ").value.trim()) || q || "");
-      const params = new URLSearchParams({ limit: "12", offset: String(offset) });
+      if (reset) {
+        const cached = readCache(city, q);
+        if (cached && (cached.items || cached.pins)) applyData(cached, true);
+      }
+      const params = new URLSearchParams({ limit: "12", offset: String(offset && !reset ? offset : 0) });
       if (q) params.set("q", q);
       if (city) params.set("city", city);
       const data = await api("/api/home?" + params.toString());
-      if (data.city) localStorage.setItem("yycj_city", data.city);
-      fillCities(data.enabled_cities || cities, data.city || city);
-      carouselMs = Math.max(2000, Math.min(20000, Number(data.carousel_interval_sec || 4) * 1000));
-      lastPins = q ? [] : (data.pins || []);
-      const batch = data.items || [];
-      lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
-      offset += batch.length;
-      paint();
-      $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
-      const ann = $("#announce");
-      if (ann && data.announcement && data.announcement.text) {
-        ann.classList.remove("hidden");
-        ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
-      }
+      applyData(data, reset);
+      writeCache(data.city || city, q, data);
     } catch (e) {
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
@@ -176,7 +198,6 @@
   setTimeout(tick, 2500);
   async function boot() {
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
-    if (document.querySelector("#feed [data-id]")) return;
     if (token()) await loadFeed(true);
   }
   if (document.readyState === "complete") boot();
