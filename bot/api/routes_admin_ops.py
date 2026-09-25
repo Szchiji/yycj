@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import delete as sql_delete, select
 
-from bot.api.deps import get_admin_user_id
+from bot.api.deps import get_admin_user_id, get_super_user_id
 from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
 from bot.config import get_settings
 from bot.db import session_scope
@@ -62,7 +62,7 @@ class PreviewBody(BaseModel):
 @router.post("/admin/settings/extra")
 async def api_admin_extra_ops(
     body: ExtraOpsBody,
-    _: int = Depends(get_admin_user_id),
+    _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {k: v for k, v in body.model_dump().items() if v is not None}
     settings = await home_service.update_settings(ops_config=ops or None)
