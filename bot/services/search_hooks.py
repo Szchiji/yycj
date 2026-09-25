@@ -6,7 +6,6 @@ from datetime import datetime
 
 from bot.services import listing_ops, search_service
 from bot.services.media_urls import enrich_media
-from bot.services.video_thumbs import fill_video_thumbs
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +49,7 @@ async def search_lamps(**kwargs):
 
 
 async def get_lamp(lamp_id: str):
-    lamp = await _orig_get(lamp_id)
-    try:
-        lamp = await fill_video_thumbs(lamp)
-    except Exception:
-        logger.exception("fill video thumbs failed")
-    return _with_preview(lamp)
+    return _with_preview(await _orig_get(lamp_id))
 
 
 def _lamp_to_dict(lamp):
