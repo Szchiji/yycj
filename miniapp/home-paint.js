@@ -65,8 +65,6 @@
       pinBox.innerHTML = pins.map(pin).join("");
       pinBox.classList.toggle("hidden", !pins.length);
     }
-    const more = document.getElementById("btnLoadMore");
-    if (more) more.classList.toggle("hidden", !data.has_more);
     window.__yycjHomeItems = items;
     window.__yycjHome = Object.assign({}, window.__yycjHome || {}, data);
   }
@@ -78,20 +76,23 @@
     const params = new URLSearchParams({ limit: "12", offset: "0" });
     if (city) params.set("city", city);
     if (q) params.set("q", q);
-    const r = await fetch("/api/home?" + params, { headers: { Authorization: "Bearer " + tok } });
+    const r = await fetch("/api/home?" + params.toString(), { headers: { Authorization: "Bearer " + tok } });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.detail || "home failed");
+    if (!r.ok) return;
     paint(data);
   }
+  window.__yycjPaintHomeNow = load;
   window.__yycjReloadHome = function () { load().catch(() => {}); };
   document.addEventListener("click", (ev) => {
-    if (ev.target && ev.target.id === "btnSearch") load().catch(() => {});
-    if (ev.target && ev.target.closest && ev.target.closest("[data-nav='home']")) load().catch(() => {});
+    if (ev.target && (ev.target.id === "btnSearch" || (ev.target.closest && ev.target.closest("[data-nav='home']")))) {
+      load().catch(() => {});
+    }
   });
   async function boot() {
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 120));
     try { await load(); } catch (e) {}
-    setTimeout(() => load().catch(() => {}), 1200);
+    setTimeout(() => load().catch(() => {}), 800);
+    setTimeout(() => load().catch(() => {}), 2200);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);
