@@ -1,4 +1,10 @@
 (() => {
+  if (!document.getElementById("yycj-home-keep")) {
+    const s = document.createElement("script");
+    s.id = "yycj-home-keep";
+    s.src = "./home-keep.js?v=20260925v";
+    document.body.appendChild(s);
+  }
   if (document.getElementById("yycjTop")) return;
   const btn = document.createElement("button");
   btn.id = "yycjTop";
