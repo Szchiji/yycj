@@ -1,9 +1,9 @@
-"""把自定义上架栏写入资料，详情和推送都能读到。"""
+"""自定义上架栏 + 频道原帖引用。改 extras 不冲掉 bc_chat/bc_mid。"""
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 from sqlalchemy import text
 
@@ -46,15 +46,51 @@ async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
 async def remember_broadcast(lamp_id: str, chat: str, mid: int) -> None:
     if not lamp_id or not mid:
         return
+    payload = {"_bc_chat": str(chat), "_bc_mid": str(int(mid))}
     current = await load_extras(lamp_id)
-    current["_bc_chat"] = str(chat)
-    current["_bc_mid"] = str(int(mid))
-    await save_extras(lamp_id, current)
+    current.update(payload)
+    async with session_scope() as s:
+        try:
+            await s.execute(
+                text(
+                    "UPDATE lamps SET bc_chat = :c, bc_mid = :m, extras = CAST(:j AS jsonb) WHERE lamp_id = :id"
+                ),
+                {
+                    "c": str(chat),
+                    "m": str(int(mid)),
+                    "j": json.dumps(current, ensure_ascii=False),
+                    "id": lamp_id,
+                },
+            )
+        except Exception:
+            logger.exception("remember broadcast columns failed")
+            await save_extras(lamp_id, current)
 
 
 async def load_broadcast(lamp_id: str) -> Tuple[str, str]:
-    extras = await load_extras(lamp_id)
-    return str(extras.get("_bc_chat") or ""), str(extras.get("_bc_mid") or "")
+    if not lamp_id:
+        return "", ""
+    async with session_scope() as s:
+        try:
+            row = (
+                await s.execute(
+                    text("SELECT bc_chat, bc_mid, extras FROM lamps WHERE lamp_id = :id"),
+                    {"id": lamp_id},
+                )
+            ).first()
+        except Exception:
+            row = None
+    if not row:
+        extras = await load_extras(lamp_id)
+        return str(extras.get("_bc_chat") or ""), str(extras.get("_bc_mid") or "")
+    chat = str(row[0] or "")
+    mid = str(row[1] or "")
+    extras = row[2] if isinstance(row[2], dict) else {}
+    if not chat:
+        chat = str(extras.get("_bc_chat") or "")
+    if not mid:
+        mid = str(extras.get("_bc_mid") or "")
+    return chat, mid
 
 
 _orig_get = search_service.get_lamp
