@@ -9,13 +9,28 @@
     ev.stopPropagation();
     location.href = DESK;
   }
-  function paint() {
-    const a = document.querySelector("#adminEntry a");
+  function paint(isAdmin) {
+    const entry = document.getElementById("adminEntry");
+    const a = entry && entry.querySelector("a");
     if (a) {
       a.setAttribute("href", DESK);
       a.textContent = "管理后台";
     }
+    if (entry && isAdmin) entry.classList.remove("hidden");
+  }
+  async function check() {
+    try {
+      const token = localStorage.getItem("yycj_token") || "";
+      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + token } });
+      const data = await r.json();
+      paint(!!data.is_admin);
+    } catch (e) {
+      paint(false);
+    }
   }
   document.addEventListener("click", go, true);
-  paint();
+  document.addEventListener("click", (ev) => {
+    if (ev.target.closest("[data-nav='me']")) check();
+  });
+  setTimeout(check, 900);
 })();
