@@ -5,8 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20260925ab" />
-  <link rel="stylesheet" href="./home-lock.css?v=20260925ab" />
+  <link rel="stylesheet" href="./styles.css?v=restore1" />
+  <link rel="stylesheet" href="./home-fix.css?v=restore1" />
+  <style>
+    #feed,#pins{visibility:visible!important;}
+    #topMeta{display:none!important;}
+    #pins { margin-bottom:4px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
+    #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
+    #pins .pin-card img.pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
+    #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:28px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
+    #feedSplit{height:1px;margin:12px 8px 14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
+    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
+    #feed .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; }
+    .fav-btn { position:absolute !important; top:6px; left:6px; z-index:3; }
+    .badge-loc { position:absolute; top:6px; right:6px; z-index:3; }
+    .badge-tag { position:absolute; left:6px; bottom:6px; z-index:3; }
+    .badge-n { position:absolute; right:6px; bottom:6px; z-index:3; }
+    #citySheet { display:none !important; }
+    .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
+  </style>
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -37,7 +54,7 @@
         </div>
         <div id="pins" class="pins"></div>
         <div id="feedSplit"></div>
-        <div id="feed" class="feed feed-3"><p class="muted">正在加载…</p></div>
+        <div id="feed" class="feed feed-3"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
       <section id="view-fav" class="view hidden"><div class="card"><h3>我的收藏</h3><div id="favList"></div></div></section>
@@ -94,17 +111,15 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
   <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
-  <script src="./app-safe.js?v=20260925ab"></script>
-  <script src="./auth-boot.js?v=20260925ab"></script>
-  <script src="./cover.js?v=20260925ab"></script>
-  <script src="./app.js?v=20260925ab"></script>
-  <script src="./home-ui.js?v=20260925ab"></script>
-  <script src="./publish-ui.js?v=20260925ab"></script>
-  <script src="./role-nav.js?v=20260925ab"></script>
-  <script src="./detail-fix.js?v=20260925ab"></script>
-  <script src="./detail-kit.js?v=20260925ab"></script>
-  <script src="./fav.js?v=20260925ab"></script>
-  <script src="./admin-go.js?v=20260925ab"></script>
-  <script src="./role-gate.js?v=20260925ab"></script>
+  <script src="./cover.js?v=restore1"></script>
+  <script src="./app.js?v=restore1"></script>
+  <script src="./home-ui.js?v=restore1"></script>
+  <script src="./publish-ui.js?v=restore1"></script>
+  <script src="./detail-fix.js?v=restore1"></script>
+  <script src="./detail-kit.js?v=restore1"></script>
+  <script src="./role-nav.js?v=restore1"></script>
+  <script src="./fav.js?v=restore1"></script>
+  <script src="./admin-go.js?v=restore1"></script>
+  <script src="./role-gate.js?v=restore1"></script>
 </body>
 </html>
