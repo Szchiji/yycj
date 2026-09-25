@@ -5,9 +5,7 @@ import logging
 from datetime import datetime
 
 from bot.services import listing_ops, search_service
-from bot.services.extras_store import load_extras
 from bot.services.media_urls import enrich_media
-from bot.services.open_shift import shop_status
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +18,21 @@ _orig_to_dict = search_service._lamp_to_dict
 def _with_preview(d):
     if not d:
         return d
-    out = dict(d)
-    media = enrich_media(out.get("media"), out.get("photos"))
-    out["media"] = media
-    out["photos"] = [m.get("preview_url") or m.get("url") for m in media if m.get("type") == "image"]
-    extras = out.get("extras") if isinstance(out.get("extras"), dict) else {}
-    out["shop"] = shop_status(extras, out.get("status"), out.get("expires_at"))
-    return out
+    try:
+        out = dict(d)
+        media = enrich_media(out.get("media"), out.get("photos"))
+        out["media"] = media
+        out["photos"] = [m.get("preview_url") or m.get("url") for m in media if m.get("type") == "image"]
+        extras = out.get("extras") if isinstance(out.get("extras"), dict) else {}
+        try:
+            from bot.services.open_shift import shop_status
+            out["shop"] = shop_status(extras, out.get("status"), out.get("expires_at"))
+        except Exception:
+            out["shop"] = {"code": "unset", "text": "", "hours": ""}
+        return out
+    except Exception:
+        logger.exception("preview attach failed")
+        return d
 
 
 async def approve_lamp(lamp_id: str, *, days=None):
@@ -38,20 +44,22 @@ async def approve_lamp(lamp_id: str, *, days=None):
 
 
 async def search_lamps(**kwargs):
-    items = await _orig_search(**kwargs)
-    now = datetime.utcnow()
+    try:
+        items = await _orig_search(**kwargs)
+    except Exception:
+        logger.exception("search failed")
+        return []
     out = []
-    for x in items:
+    for x in items or []:
         try:
+            from bot.services.extras_store import load_extras
             x["extras"] = await load_extras(x.get("lamp_id") or "")
         except Exception:
             x["extras"] = {}
-        x = _with_preview(x)
-        exp = x.get("expires_at")
-        if exp is not None and hasattr(exp, "tzinfo"):
-            exp = exp.replace(tzinfo=None) if exp.tzinfo else exp
-        if exp is not None and exp <= now:
-            continue
+        try:
+            x = _with_preview(x)
+        except Exception:
+            pass
         out.append(x)
     return out
 
@@ -60,6 +68,7 @@ async def get_lamp(lamp_id: str):
     lamp = await _orig_get(lamp_id)
     if lamp and not lamp.get("extras"):
         try:
+            from bot.services.extras_store import load_extras
             lamp["extras"] = await load_extras(lamp_id)
         except Exception:
             lamp["extras"] = {}
@@ -67,7 +76,10 @@ async def get_lamp(lamp_id: str):
 
 
 def _lamp_to_dict(lamp):
-    return _with_preview(_orig_to_dict(lamp))
+    try:
+        return _with_preview(_orig_to_dict(lamp))
+    except Exception:
+        return _orig_to_dict(lamp)
 
 
 search_service.approve_lamp = approve_lamp  # type: ignore[assignment]
