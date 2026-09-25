@@ -48,6 +48,11 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         await warm()
     except Exception:
         logger.exception("warm extra admins failed")
+    try:
+        from bot.services.expiry_nudge import nudge_expiring
+        await nudge_expiring(3)
+    except Exception:
+        logger.exception("expiry nudge failed")
     return dict(_cache)
 
 
