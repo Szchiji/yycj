@@ -4,7 +4,7 @@
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260925s";
+    s.src = "./" + name + "?v=20260925u";
     document.head.appendChild(s);
   });
   if (window.__yycjAdminKit) return;
@@ -42,7 +42,7 @@
       tpl.parentNode.insertBefore(el, tpl.nextSibling);
     }
     if (!el) return;
-    el.innerHTML = `<label>上架栏（一行一个，删掉那一行即删栏）</label><textarea id="listingFieldsEditor" rows="10"></textarea><p class="muted" style="margin:6px 0 0">改完后必点「保存全部设置」。</p><div class="row" style="margin-top:8px"><button class="btn" type="button" id="btnResetFields">恢复默认</button><button class="btn" type="button" id="btnTplPreview">预览推送文案</button></div><pre id="tplPreview" class="muted" style="white-space:pre-wrap;background:rgba(0,0,0,.25);padding:10px;border-radius:10px;min-height:40px">点预览看频道成品</pre>`;
+    el.innerHTML = "<label>上架栏（一行一个，删掉那一行即删栏）</label><textarea id=\"listingFieldsEditor\" rows=\"10\"></textarea><p class=\"muted\" style=\"margin:6px 0 0\">改完后必点保存全部设置。</p><div class=\"row\" style=\"margin-top:8px\"><button class=\"btn\" type=\"button\" id=\"btnResetFields\">恢复默认</button><button class=\"btn\" type=\"button\" id=\"btnTplPreview\">预览推送文案</button></div><pre id=\"tplPreview\" class=\"muted\" style=\"white-space:pre-wrap;background:rgba(0,0,0,.25);padding:10px;border-radius:10px;min-height:40px\">点预览看频道成品</pre>";
     const editor = document.getElementById("listingFieldsEditor");
     if (editor) editor.value = text || "";
     window.__listingFields = parse(editor ? editor.value : "");
@@ -89,23 +89,14 @@
       const items = ((await r.json()).items) || [];
       window.__yycjListings = items;
       const ST = { active: "已上架", hidden: "已下架" };
-      box.innerHTML = items.map((x) => `
-        <div class="pick-item">
-          <div class="meta"><strong>${esc(x.title || "")}</strong><div class="muted">${esc(x.city || "")} · ${ST[x.status] || x.status} · ${dueText(x)}</div></div>
-          <div class="row">
-            <button class="btn" data-fill-proxy="${esc(x.lamp_id)}">代改</button>
-            <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期</button>
-            <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
-            <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
-          </div>
-        </div>`).join("") || "<p class='muted'>暂无资料</p>";
+      box.innerHTML = items.map((x) => "<div class=\"pick-item\"><div class=\"meta\"><strong>" + esc(x.title || "") + "</strong><div class=\"muted\">" + esc(x.city || "") + " · " + (ST[x.status] || x.status) + " · " + dueText(x) + "</div></div><div class=\"row\"><button class=\"btn\" data-fill-proxy=\"" + esc(x.lamp_id) + "\">代改</button><button class=\"btn\" data-list=\"renew\" data-id=\"" + esc(x.lamp_id) + "\">续期</button><button class=\"btn\" data-list=\"relist\" data-id=\"" + esc(x.lamp_id) + "\">重新上架</button><button class=\"btn danger\" data-list=\"unlist\" data-id=\"" + esc(x.lamp_id) + "\">下架</button></div></div>").join("") || "<p class='muted'>暂无资料</p>";
     } catch (e) {}
   }
   document.addEventListener("click", async (ev) => {
     if (ev.target && ev.target.id === "btnResetFields") paintFields(DEFAULT_TEXT);
     if (ev.target && ev.target.id === "btnTplPreview") {
       const out = document.getElementById("tplPreview");
-      if (out) out.textContent = "生成中…";
+      if (out) out.textContent = "生成中...";
       try {
         const r = await fetch("/api/admin/broadcast/preview", {
           method: "POST",
@@ -114,7 +105,8 @@
         });
         const data = await r.json();
         if (!r.ok) throw new Error(data.detail || "预览失败");
-        if (out) out.textContent = (data.title ? (「" + data.title + "」\n") : "") + (data.text || "(空)");
+        const title = data.title ? ("[" + data.title + "]\n") : "";
+        if (out) out.textContent = title + (data.text || "");
       } catch (e) { if (out) out.textContent = e.message || String(e); }
     }
     const unlock = ev.target.closest("[data-unlock-role]");
