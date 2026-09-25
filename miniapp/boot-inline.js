@@ -1,4 +1,13 @@
 (() => {
+  if (!document.getElementById("yycj-click-css")) {
+    const st = document.createElement("style");
+    st.id = "yycj-click-css";
+    st.textContent = `#boot.hidden,#gate.hidden,.sheet.hidden,#citySheet{display:none!important;pointer-events:none!important;}
+#app{pointer-events:auto!important;}
+#detailDock{display:none!important;}
+body,html{pointer-events:auto;}`;
+    document.head.appendChild(st);
+  }
   window.__yycjBoot = window.__yycjBoot || {
     showBoot(msg) {
       const boot = document.querySelector("#boot");
