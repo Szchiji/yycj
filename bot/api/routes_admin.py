@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from fastapi import Depends, HTTPException, Query
 
-from bot.api.deps import get_admin_user_id
+from bot.api.deps import get_admin_user_id, get_super_user_id
 from bot.models import ReviewStatus
 from bot.services import credit_service, home_service, session_service
 from bot.services import admin_ops
@@ -28,8 +28,6 @@ from bot.api.routes_core import (
 )
 
 logger = logging.getLogger(__name__)
-
-# ---------- admin ----------
 
 
 @router.get("/admin/posts/pending")
@@ -202,7 +200,7 @@ async def api_admin_homepage(_: int = Depends(get_admin_user_id)) -> Dict[str, A
 @router.post("/admin/homepage/announcement")
 async def api_admin_announcement(
     body: AnnounceBody,
-    _: int = Depends(get_admin_user_id),
+    _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     settings = await home_service.update_settings(
         announcement_text=body.text,
@@ -214,7 +212,7 @@ async def api_admin_announcement(
 @router.post("/admin/homepage/cities")
 async def api_admin_cities(
     body: CitiesBody,
-    _: int = Depends(get_admin_user_id),
+    _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     settings = await home_service.update_settings(enabled_cities=body.cities)
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
@@ -261,7 +259,7 @@ async def api_admin_reorder_pins(
     return {"ok": True, "pins": pins}
 
 @router.post("/admin/seed-demo")
-async def api_admin_seed_demo(_: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+async def api_admin_seed_demo(_: int = Depends(get_super_user_id)) -> Dict[str, Any]:
     result = await home_service.seed_demo_if_empty()
     return {"ok": True, **result}
 
@@ -325,7 +323,7 @@ async def api_admin_set_feed_pin(
 @router.post("/admin/homepage/ops")
 async def api_admin_ops_settings(
     body: OpsSettingsBody,
-    _: int = Depends(get_admin_user_id),
+    _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {}
     if body.home_feed_page_size is not None:
