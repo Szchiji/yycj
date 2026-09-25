@@ -4,6 +4,12 @@
   const token = () => localStorage.getItem("yycj_token") || "";
   let ids = new Set();
   let items = [];
+  if (!document.getElementById("yycj-fav-css")) {
+    const st = document.createElement("style");
+    st.id = "yycj-fav-css";
+    st.textContent = `.fav-btn.on,#detailFavTop.on{color:#ff6b8a!important;} .fav-btn{color:#fff;}`;
+    document.head.appendChild(st);
+  }
   function isGuest() {
     try { return (JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest") === "guest"; }
     catch (e) { return true; }
@@ -20,6 +26,7 @@
     return s.startsWith("BAAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
   }
   function cover(item) {
+    if (window.yycjCoverOf) return window.yycjCoverOf(item);
     for (const m of item.media || []) {
       const raw = (m && (m.file_id || m.url)) || "";
       if ((m && m.type) === "video" || isVideo(raw)) {
@@ -28,11 +35,6 @@
         continue;
       }
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
-      if (u) return u;
-    }
-    for (const p of item.photos || []) {
-      if (isVideo(p)) continue;
-      const u = mediaSrc(p);
       if (u) return u;
     }
     return "";
@@ -133,5 +135,8 @@
       window.__yycjBack = "home";
     }
   }, true);
-  setTimeout(load, 800);
+  const feed = document.getElementById("feed");
+  if (feed) new MutationObserver(() => paintHearts()).observe(feed, { childList: true, subtree: true });
+  setTimeout(load, 400);
+  setInterval(paintHearts, 1200);
 })();
