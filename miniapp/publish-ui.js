@@ -79,10 +79,14 @@
     const wrap = extraWrap();
     if (!wrap) return;
     let fields = [];
-    try {
-      const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token() } });
-      fields = ((await r.json()).listing_fields) || [];
-    } catch (e) {}
+    if (window.__yycjHomeData && window.__yycjHomeData.listing_fields) {
+      fields = window.__yycjHomeData.listing_fields;
+    } else {
+      try {
+        const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token() } });
+        fields = ((await r.json()).listing_fields) || [];
+      } catch (e) {}
+    }
     const enabled = (fields.length ? fields : Object.keys(FORM_MAP).map((k) => ({ key: k, form: true })))
       .filter((f) => f && f.key && f.form !== false && f.key !== "地点" && f.key !== "链接" && f.key !== "聊天按钮")
       .map((f) => String(f.key));
@@ -153,9 +157,8 @@
       previewBox();
       let admin = "管理员";
       try {
-        const hd = window.__yycjHome || {};
+        const hd = window.__yycjHomeData || {};
         admin = (hd.contacts && hd.contacts.admin_label) || admin;
-        window.__yycjAdminUrl = (hd.contacts && hd.contacts.admin_url) || window.__yycjAdminUrl || "";
       } catch (e) {}
       const done = document.createElement("div");
       done.className = "card";
@@ -168,5 +171,4 @@
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-nav='publish']")) setTimeout(loadFields, 80);
   });
-  setTimeout(loadFields, 600);
 })();
