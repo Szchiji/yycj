@@ -14,8 +14,27 @@ from bot.api.routes_core_base import (
     router,
 )
 from bot.services import anti_brush, credit_service, home_service, search_service, session_service
+from bot.services import pin_query
 
 logger = logging.getLogger(__name__)
+
+
+def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
+    full = _ser_lamp(lamp)
+    media = full.get("media") or []
+    photos = full.get("photos") or []
+    return {
+        "lamp_id": full.get("lamp_id"),
+        "title": full.get("title"),
+        "city": full.get("city"),
+        "district": full.get("district"),
+        "price_text": full.get("price_text"),
+        "tags": list(full.get("tags") or [])[:3],
+        "cover_url": full.get("cover_url") or "",
+        "feed_pinned": bool(full.get("feed_pinned")),
+        "feed_pin_order": int(full.get("feed_pin_order") or 0),
+        "media_count": len(media) or len(photos),
+    }
 
 
 @router.get("/home")
@@ -39,20 +58,18 @@ async def api_home(
 
     pins = []
     try:
-        pins_raw = await home_service.list_active_pins()
+        pins_raw = await pin_query.list_active_pins()
         for p in pins_raw:
             try:
                 lamp = p.get("lamp") or {}
                 if use_city and lamp.get("city") and lamp.get("city") != use_city:
                     continue
-                lamp = search_service.attach_fuzzy_distance(lamp, lat, lng)
-                lamp.pop("_distance_km", None)
                 pins.append(
                     {
                         "id": p["id"],
                         "sort_order": p["sort_order"],
                         "expires_at": _ser_dt(p.get("expires_at")),
-                        "lamp": _ser_lamp(lamp),
+                        "lamp": _ser_card(lamp),
                     }
                 )
             except Exception:
@@ -86,7 +103,7 @@ async def api_home(
     safe_items = []
     for x in items:
         try:
-            safe_items.append(_ser_lamp(x))
+            safe_items.append(_ser_card(x))
         except Exception:
             logger.exception("serialize lamp failed")
 
