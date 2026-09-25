@@ -1,11 +1,13 @@
-"""审核通过后写入上架有效期；搜索结果补 preview_url。"""
+"""审核通过后写入上架有效期；搜索结果补 preview_url 与营业状态。"""
 from __future__ import annotations
 
 import logging
 from datetime import datetime
 
 from bot.services import listing_ops, search_service
+from bot.services.extras_store import load_extras
 from bot.services.media_urls import enrich_media
+from bot.services.open_shift import shop_status
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,8 @@ def _with_preview(d):
     media = enrich_media(out.get("media"), out.get("photos"))
     out["media"] = media
     out["photos"] = [m.get("preview_url") or m.get("url") for m in media if m.get("type") == "image"]
+    extras = out.get("extras") if isinstance(out.get("extras"), dict) else {}
+    out["shop"] = shop_status(extras, out.get("status"), out.get("expires_at"))
     return out
 
 
@@ -38,6 +42,10 @@ async def search_lamps(**kwargs):
     now = datetime.utcnow()
     out = []
     for x in items:
+        try:
+            x["extras"] = await load_extras(x.get("lamp_id") or "")
+        except Exception:
+            x["extras"] = {}
         x = _with_preview(x)
         exp = x.get("expires_at")
         if exp is not None and hasattr(exp, "tzinfo"):
@@ -49,7 +57,13 @@ async def search_lamps(**kwargs):
 
 
 async def get_lamp(lamp_id: str):
-    return _with_preview(await _orig_get(lamp_id))
+    lamp = await _orig_get(lamp_id)
+    if lamp and not lamp.get("extras"):
+        try:
+            lamp["extras"] = await load_extras(lamp_id)
+        except Exception:
+            lamp["extras"] = {}
+    return _with_preview(lamp)
 
 
 def _lamp_to_dict(lamp):
