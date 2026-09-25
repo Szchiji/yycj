@@ -152,9 +152,10 @@
     paint(id);
   };
   document.addEventListener("click", async (ev) => {
-    const report = ev.target.closest("#detailReport,[data-report]");
-    if (report && report.id === "detailReport") {
+    const report = ev.target.closest("#detailReport");
+    if (report) {
       ev.preventDefault();
+      ev.stopPropagation();
       const id = report.getAttribute("data-report") || window.__yycjOpenLamp;
       const reason = window.prompt("举报原因", "不实信息") || "";
       if (!reason.trim() || !id) return;
@@ -165,7 +166,7 @@
           body: JSON.stringify({ lamp_id: id, reason: reason.trim() }),
         });
         const data = await r.json().catch(() => ({}));
-        alert(r.ok ? (数据.message || "已提交举报") : (data.detail || "举报失败"));
+        alert(r.ok ? (data.message || "已提交举报") : (data.detail || "举报失败"));
       } catch (e) { alert(String(e)); }
       return;
     }
