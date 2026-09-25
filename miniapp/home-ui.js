@@ -14,6 +14,7 @@
 #pins .pin-copy{position:absolute;left:0;right:0;bottom:0;padding:24px 8px 8px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;z-index:2;font-size:12px;}
 #feed.has-cover,#favList{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:8px!important;}
 #feed .cover-wrap .thumb,#favList .cover-wrap .thumb{width:100%!important;height:168px!important;object-fit:cover!important;display:block;border-radius:12px 12px 0 0;}
+.thumb.ph{background:linear-gradient(180deg,#2a3148,#1b2133);}
 .search-row{display:flex;align-items:center;gap:6px;}
 .search-row input{flex:1;min-width:0;height:36px;margin:0;}
 #btnGuide{flex:none;height:36px;padding:0 10px;border-radius:18px;border:1px solid #3a4668;background:#1a2340;color:#c9d4ff;font-size:.8rem;white-space:nowrap;}
@@ -29,9 +30,10 @@
     return data;
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
   }
   function mediaSrc(u) {
+    if (window.yycjMediaSrc) return window.yycjMediaSrc(u);
     const s = String(u || "").trim();
     if (!s) return "";
     if (s.toLowerCase().startsWith("file_id:")) return mediaSrc(s.slice(8));
@@ -39,13 +41,19 @@
     return "/api/media/file/" + encodeURIComponent(s);
   }
   function isVideo(u) {
+    if (window.yycjIsVideo) return window.yycjIsVideo(u);
     const s = String(u || "");
     return s.startsWith("BAAC") || /\.(mp4|mov|webm)(\?|$)/i.test(s);
   }
   function cover(item) {
+    if (window.yycjCoverOf) return window.yycjCoverOf(item);
     for (const m of item.media || []) {
       const raw = (m && (m.file_id || m.url)) || "";
-      if ((m && m.type) === "video" || isVideo(raw)) continue;
+      if ((m && m.type) === "video" || isVideo(raw)) {
+        const thumb = mediaSrc((m && (m.thumb_file_id || m.thumbnail || m.preview_url)) || "");
+        if (thumb && !isVideo(String(m.thumb_file_id || ""))) return thumb;
+        continue;
+      }
       const u = mediaSrc((m && (m.preview_url || m.file_id || m.url)) || "");
       if (u) return u;
     }
@@ -87,7 +95,7 @@
   function pinHtml(p) {
     const t = (p && p.lamp) || p || {};
     const img = cover(t);
-    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">${img ? `<img class="pin-cover" src="${esc(img)}" alt="" />` : ""}<div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
+    return `<div class="pin-card short" data-id="${esc(t.lamp_id || "")}">${img ? `<img class="pin-cover" src="${esc(img)}" alt="" />` : `<div class="pin-cover ph"></div>`}<div class="pin-copy"><b>${esc(t.title || "")}</b></div></div>`;
   }
   function tickCarousel() {
     clearTimeout(carouselTimer);
@@ -166,7 +174,7 @@
         admin.dataset.bound = "1";
         admin.addEventListener("click", (ev) => {
           ev.preventDefault();
-          if (home && home.is_admin) { location.href = "./admin.html?v=20260912b"; return; }
+          if (home && home.is_admin) { location.href = "./desk.html?v=20260925a"; return; }
           openUrl(contacts.admin_url || "");
         });
       }
@@ -223,14 +231,6 @@
   }, { passive: true });
   mountGuide();
   tickCarousel();
-  ["share.js", "keyboard-fix.js", "deep-open.js", "detail-polish.js", "me-polish.js", "home-head.js"].forEach((name) => {
-    const id = "yycj-" + name.replace(".js", "");
-    if (document.getElementById(id)) return;
-    const s = document.createElement("script");
-    s.id = id;
-    s.src = "./" + name + "?v=20260912b";
-    document.head.appendChild(s);
-  });
   async function boot() {
     for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100));
     if (token()) await loadFeed(true);
