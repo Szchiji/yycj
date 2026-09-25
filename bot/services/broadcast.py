@@ -104,14 +104,9 @@ async def resolve_media_chat() -> Optional[str]:
 
 
 async def _remember(lamp_id: str, chat: str, mid: int) -> None:
-    if not lamp_id or not mid:
-        return
     try:
-        from bot.services.extras_store import load_extras, save_extras
-        cur = await load_extras(lamp_id)
-        cur["_bc_chat"] = chat
-        cur["_bc_mid"] = str(mid)
-        await save_extras(lamp_id, cur)
+        from bot.services.extras_store import remember_broadcast
+        await remember_broadcast(lamp_id, chat, mid)
     except Exception:
         logger.exception("remember broadcast ref failed")
 
@@ -169,12 +164,10 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
 
 async def update_broadcast(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """只改原频道帖文案，不新发。"""
-    from bot.services.extras_store import load_extras
+    from bot.services.extras_store import load_broadcast
     from bot.main import bot
     lid = str(lamp.get("lamp_id") or "")
-    stored = await load_extras(lid)
-    chat = stored.get("_bc_chat") or ""
-    mid = stored.get("_bc_mid") or ""
+    chat, mid = await load_broadcast(lid)
     if not chat or not str(mid).isdigit():
         return None
     _chat, caption = await _caption(lamp, extras)
