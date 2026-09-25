@@ -37,16 +37,11 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
     user = message.from_user
     if not user:
         return
-    profile = await credit_service.ensure_user(
+    await credit_service.ensure_user(
         user.id,
         username=user.username,
         full_name=user.full_name,
     )
-    if not profile.get("role"):
-        try:
-            await credit_service.set_user_role(user.id, "guest")
-        except Exception:
-            pass
     arg = (command.args if command else "") or ""
     if not arg and message.text:
         parts = message.text.split(maxsplit=1)
