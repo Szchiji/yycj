@@ -1,4 +1,4 @@
-"""自定义上架栏 + 频道原帖引用。改 extras 不冲掉 bc_chat/bc_mid。"""
+"""自定义上架栏 + 频道原帖引用。改 extras 不冲掉 bc / 开课状态。"""
 from __future__ import annotations
 
 import json
@@ -11,6 +11,27 @@ from bot.db import session_scope
 from bot.services import listing_flow, search_service
 
 logger = logging.getLogger(__name__)
+
+_KEEP_PREFIX = ("_bc_", "_hours", "_open_", "_remind")
+
+
+def _keep_internal(key: str) -> bool:
+    k = str(key)
+    return k.startswith("_")
+
+
+def _clean_incoming(extras: Dict[str, Any] | None) -> Dict[str, Any]:
+    incoming: Dict[str, Any] = {}
+    for k, v in (extras or {}).items():
+        if not k:
+            continue
+        if _keep_internal(str(k)):
+            if v not in (None, ""):
+                incoming[str(k)] = v if not isinstance(v, (dict, list)) else v
+            continue
+        if v not in (None, ""):
+            incoming[str(k)] = str(v)
+    return incoming
 
 
 async def load_extras(lamp_id: str) -> Dict[str, Any]:
@@ -28,10 +49,10 @@ async def load_extras(lamp_id: str) -> Dict[str, Any]:
 async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
     if not lamp_id:
         return
-    incoming = {str(k): str(v) for k, v in (extras or {}).items() if k and v not in (None, "")}
+    incoming = _clean_incoming(extras)
     current = await load_extras(lamp_id)
     for key, val in current.items():
-        if str(key).startswith("_bc_") and key not in incoming:
+        if _keep_internal(str(key)) and key not in incoming:
             incoming[key] = val
     async with session_scope() as s:
         try:
@@ -110,13 +131,19 @@ async def get_lamp(lamp_id: str):
 
 async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin: bool = False):
     lamp = await _orig_apply(lamp_id, data, owner_id=owner_id, admin=admin)
-    await save_extras(lamp_id, (data or {}).get("extras"))
+    extras = dict((data or {}).get("extras") or {})
+    if data.get("_hours"):
+        extras["_hours"] = data.get("_hours")
+    await save_extras(lamp_id, extras)
     return lamp
 
 
 async def apply_admin_edit(lamp_id: str, data: Dict[str, Any]):
     lamp = await _orig_admin(lamp_id, data)
-    await save_extras(lamp_id, (data or {}).get("extras"))
+    extras = dict((data or {}).get("extras") or {})
+    if data.get("_hours"):
+        extras["_hours"] = data.get("_hours")
+    await save_extras(lamp_id, extras)
     return lamp
 
 
