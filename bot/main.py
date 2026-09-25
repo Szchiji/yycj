@@ -61,6 +61,11 @@ class NoCacheMiniapp(BaseHTTPMiddleware):
         return resp
 
 
+def _menu_webapp_url(webapp: str) -> str:
+    base = (webapp or "").rstrip("/")
+    return f"{base}/go.html" if base else ""
+
+
 async def job_expire_sessions() -> None:
     try:
         n = await session_service.expire_old_sessions()
@@ -144,12 +149,13 @@ async def _startup() -> None:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
         webapp = settings.normalized_webapp_url
         if webapp:
-            logger.info("WEBAPP_URL=%s (normalized=%s)", settings.webapp_url, webapp)
+            menu_url = _menu_webapp_url(webapp)
+            logger.info("WEBAPP_URL=%s (menu=%s)", settings.webapp_url, menu_url)
             try:
                 await bot.set_chat_menu_button(
-                    menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=webapp))
+                    menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=menu_url))
                 )
-                logger.info("Chat menu button set -> %s", webapp)
+                logger.info("Chat menu button set -> %s", menu_url)
             except Exception:
                 logger.exception("set_chat_menu_button failed")
         try:
@@ -214,7 +220,9 @@ async def healthz() -> PlainTextResponse:
 
 @app.get("/app")
 async def miniapp_index():
-    index = MINIAPP_DIR / "index.html"
+    index = MINIAPP_DIR / "go.html"
+    if not index.is_file():
+        index = MINIAPP_DIR / "index.html"
     if not index.is_file():
         raise HTTPException(status_code=404, detail="miniapp missing")
     return FileResponse(index, headers={
@@ -291,7 +299,7 @@ async def run_polling() -> None:
     if webapp:
         try:
             await bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=webapp))
+                menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=_menu_webapp_url(webapp)))
             )
         except Exception:
             logger.exception("set_chat_menu_button failed")
