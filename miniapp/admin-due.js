@@ -1,4 +1,10 @@
 (() => {
+  if (!document.getElementById("yycj-preview")) {
+    const s = document.createElement("script");
+    s.id = "yycj-preview";
+    s.src = "./admin-preview.js?v=20260925a";
+    document.head.appendChild(s);
+  }
   if (window.__yycjAdminDue) return;
   window.__yycjAdminDue = true;
   const token = () => localStorage.getItem("yycj_token") || "";
