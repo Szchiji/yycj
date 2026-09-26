@@ -15,8 +15,29 @@ from bot.api.routes_core_base import (
 )
 from bot.services import anti_brush, credit_service, home_service, search_service, session_service
 from bot.services import pin_query
+from bot.services.extras_store import load_extras
+from bot.services.open_shift import shop_status
 
 logger = logging.getLogger(__name__)
+
+
+async def _with_shop(lamp: Dict[str, Any]) -> Dict[str, Any]:
+    data = dict(lamp or {})
+    if not data.get("extras") and data.get("lamp_id"):
+        try:
+            data["extras"] = await load_extras(data["lamp_id"])
+        except Exception:
+            data["extras"] = {}
+    try:
+        st = shop_status(data.get("extras") or {}, data.get("status"), data.get("expires_at"))
+        data["open_code"] = st.get("code") or ""
+        data["open_text"] = st.get("text") or ""
+        data["hours_text"] = st.get("hours") or ""
+    except Exception:
+        data.setdefault("open_code", "")
+        data.setdefault("open_text", "")
+        data.setdefault("hours_text", "")
+    return data
 
 
 def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
@@ -34,6 +55,9 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
         "feed_pinned": bool(full.get("feed_pinned")),
         "feed_pin_order": int(full.get("feed_pin_order") or 0),
         "media_count": len(media) or len(photos),
+        "open_code": full.get("open_code") or lamp.get("open_code") or "",
+        "open_text": full.get("open_text") or lamp.get("open_text") or "",
+        "hours_text": full.get("hours_text") or lamp.get("hours_text") or "",
     }
 
 
@@ -61,7 +85,7 @@ async def api_home(
         pins_raw = await pin_query.list_active_pins()
         for p in pins_raw:
             try:
-                lamp = p.get("lamp") or {}
+                lamp = await _with_shop(p.get("lamp") or {})
                 if use_city and lamp.get("city") and lamp.get("city") != use_city:
                     continue
                 pins.append(
@@ -103,7 +127,7 @@ async def api_home(
     safe_items = []
     for x in items:
         try:
-            safe_items.append(_ser_card(x))
+            safe_items.append(_ser_card(await _with_shop(x)))
         except Exception:
             logger.exception("serialize lamp failed")
 
@@ -173,7 +197,10 @@ async def api_lamps(
     items = await search_service.search_lamps(
         keyword=q, city=city, price_min=price_min, price_max=price_max, limit=limit, lat=lat, lng=lng
     )
-    return {"ok": True, "items": [_ser_lamp(x) for x in items], "count": len(items)}
+    out = []
+    for x in items:
+        out.append(_ser_lamp(await _with_shop(x)))
+    return {"ok": True, "items": out, "count": len(out)}
 
 
 @router.get("/lamps/{lamp_id}")
@@ -188,6 +215,7 @@ async def api_lamp_detail(
         raise HTTPException(status_code=404, detail="资料不存在或未上架")
     lamp = search_service.attach_fuzzy_distance(lamp, lat, lng)
     lamp.pop("_distance_km", None)
+    lamp = await _with_shop(lamp)
     rep = await home_service.reputation_for_lamp(lamp_id)
     reviews = await home_service.list_reviews_for_lamp(lamp_id, approved_only=True)
     for r in reviews:
