@@ -11,6 +11,9 @@
 #yycjGallery{margin:8px 0 10px;position:relative;z-index:2;}
 #yycjGallery .gallery-hero{width:100%;border-radius:14px;overflow:hidden;background:#0b0f18;min-height:240px;position:relative;}
 #yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:360px;object-fit:contain;background:#0b0f18;display:block;}
+#yycjGallery .gallery-hero.playing .hero-play{display:none!important;}
+#yycjGallery .gallery-hero video::-webkit-media-controls-overlay-play-button,
+#yycjGallery .gallery-hero video::-webkit-media-controls-start-playback-button{display:none!important;opacity:0!important;width:0!important;height:0!important;}
 #yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch;}
 #yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#1a2233;z-index:3;}
 #yycjGallery .g-thumb.on{border-color:#7ea8ff;}
@@ -29,7 +32,7 @@
     document.head.appendChild(st);
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
   }
   function toast(msg) {
     const el = document.getElementById("toast");
@@ -109,7 +112,10 @@
   function infoHtml(lamp, reviews) {
     const id = esc(lamp.lamp_id || "");
     const loc = [lamp.city, lamp.district, lamp.approx_label].filter(Boolean).join(" · ");
-    const tags = (lamp.tags || []).map((t) => `<span class="tag">#${esc(t)}</span>`).join("");
+    const tags = (lamp.tags || []).map((t) => {
+      const label = String(t || "").replace(/^#+/, "");
+      return label ? `<span class="tag">#${esc(label)}</span>` : "";
+    }).join("");
     const chat = ctaOn() ? `<button class="btn primary" id="detailChat" type="button" data-lamp="${id}">${esc(ctaLabel())}</button>` : "";
     const rev = (reviews || []).map((t) => {
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
@@ -141,13 +147,13 @@
     const poster = cur.poster || "";
     let hero;
     if (cur.type === "video" && play) {
-      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="metadata"></video>`;
+      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="auto"></video>`;
     } else if (cur.type === "video") {
       hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:240px;background:#111"></div>`}<span class="hero-play">▶</span>`;
     } else {
       hero = `<img src="${cur.src}" alt="" />`;
     }
-    el.innerHTML = `<div class="gallery-hero">${hero}</div>
+    el.innerHTML = `<div class="gallery-hero${play && cur.type === "video" ? " playing" : ""}">${hero}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
         m.type === "video"
           ? `${m.poster ? `<img src="${m.poster}" alt="" />` : ""}<span class="play">▶</span>`
@@ -158,12 +164,17 @@
         ev.preventDefault();
         ev.stopPropagation();
         const n = Number(btn.getAttribute("data-g") || 0);
-        render(items, lampId, n, items[n] && items[n].type === "video");
+        render(items, lampId, n, false);
       });
     });
     const heroBox = el.querySelector(".gallery-hero");
     if (heroBox && cur.type === "video" && !play) {
       heroBox.addEventListener("click", (ev) => { ev.preventDefault(); render(items, lampId, idx, true); });
+    }
+    const video = el.querySelector(".gallery-hero video");
+    if (video && play) {
+      video.addEventListener("play", () => heroBox && heroBox.classList.add("playing"));
+      video.play().catch(() => {});
     }
   }
   async function paint(id) {
