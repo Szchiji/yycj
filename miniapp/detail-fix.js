@@ -222,19 +222,8 @@
   }
   function openTgChat(href) {
     if (!href) return;
-    if (typeof window.__yycjKillMedia === "function") window.__yycjKillMedia();
-    else if (typeof window.__yycjPauseUi === "function") window.__yycjPauseUi();
-    const tg = window.Telegram && window.Telegram.WebApp;
-    setTimeout(() => {
-      try {
-        if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) {
-          tg.openTelegramLink(href);
-          return;
-        }
-      } catch (e) {}
-      toast("已复制联系方式，去电报粘贴");
-      try { navigator.clipboard.writeText(href); } catch (e) {}
-    }, 40);
+    toast("已复制联系方式，小程序仍打开");
+    try { navigator.clipboard.writeText(href); } catch (e) {}
   }
   window.openLamp = function (id) {
     const nid = normLampId(id);
