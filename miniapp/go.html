@@ -5,15 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="./life.js?v=r8"></script>
-  <link rel="stylesheet" href="./styles.css?v=r8" />
-  <link rel="stylesheet" href="./home-fix.css?v=r8" />
+  <script src="./life.js?v=r9"></script>
+  <link rel="stylesheet" href="./styles.css?v=r9" />
+  <link rel="stylesheet" href="./home-fix.css?v=r9" />
   <style>
     html,body{background:#0b0f18;min-height:100%;}
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
-    #announce{position:relative!important;left:auto!important;right:auto!important;display:block;height:22px;overflow:hidden;margin:4px 8px 6px;white-space:nowrap;}
-    .search-row{position:relative;z-index:3;margin:0 8px 8px;}
+    #topAdmin{position:relative;z-index:30;pointer-events:auto;padding:8px 10px;}
+    #announce{position:relative!important;left:auto!important;right:auto!important;display:flex!important;align-items:center;justify-content:center;height:22px;overflow:hidden;margin:4px 8px 6px;text-align:center;}
+    #announce span{display:block;width:100%;text-align:center;font-size:12px;color:#f5d56a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .search-row{position:relative;z-index:3;margin:0 8px 8px;display:flex;align-items:center;gap:6px;}
+    #btnGuide,.guide-chip{background:transparent!important;border:1px solid rgba(255,255,255,.18)!important;color:#8b93a7!important;padding:6px 8px!important;border-radius:14px!important;font-size:12px!important;box-shadow:none!important;}
     #pins { margin:0 8px 10px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
     #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
     #pins .pin-card img.pin-cover, #pins .pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
@@ -47,7 +50,7 @@
   <section id="gate" class="gate hidden"></section>
   <div id="app" class="hidden">
     <header class="topbar topbar-3">
-      <a id="topAdmin" class="top-admin" href="#">管理员</a>
+      <button id="topAdmin" class="top-admin" type="button">管理员</button>
       <a id="brandTitle" class="brand">月影车姬</a>
       <div class="city-wrap">
         <button id="btnCity" class="chip" type="button">城市 ▾</button>
@@ -103,6 +106,7 @@
         <div id="detail"></div>
       </section>
       <section id="view-review" class="view hidden">
+        <button class="btn ghost" id="btnBackReview" type="button">← 返回详情</button>
         <form id="reviewForm" class="card form">
           <h3>提交评价</h3>
           <input type="hidden" id="revLampId" />
@@ -121,15 +125,16 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
   <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
-  <script src="./cover.js?v=r8"></script>
-  <script src="./app.js?v=r8"></script>
-  <script src="./home-ui.js?v=r8"></script>
-  <script src="./publish-ui.js?v=r8"></script>
-  <script src="./publish-hours.js?v=r8"></script>
-  <script src="./detail-fix.js?v=r8"></script>
-  <script src="./role-nav.js?v=r8"></script>
-  <script src="./fav.js?v=r8"></script>
-  <script src="./admin-go.js?v=r8"></script>
-  <script src="./role-gate.js?v=r8"></script>
+  <script src="./cover.js?v=r9"></script>
+  <script src="./app.js?v=r9"></script>
+  <script src="./home-ui.js?v=r9"></script>
+  <script src="./publish-ui.js?v=r9"></script>
+  <script src="./publish-hours.js?v=r9"></script>
+  <script src="./detail-fix.js?v=r9"></script>
+  <script src="./role-nav.js?v=r9"></script>
+  <script src="./fav.js?v=r9"></script>
+  <script src="./admin-go.js?v=r9"></script>
+  <script src="./role-gate.js?v=r9"></script>
+  <script src="./ui-nits.js?v=r9"></script>
 </body>
 </html>
