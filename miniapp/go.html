@@ -5,26 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=r3" />
-  <link rel="stylesheet" href="./home-fix.css?v=r3" />
+  <link rel="stylesheet" href="./styles.css?v=r4" />
+  <link rel="stylesheet" href="./home-fix.css?v=r4" />
   <style>
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
-    #announce{position:relative!important;left:auto!important;right:auto!important;display:block;height:28px;overflow:hidden;margin:4px 8px 8px;white-space:nowrap;}
-    .search-row{position:relative;z-index:3;}
-    #pins { margin-bottom:10px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
+    #announce{position:relative!important;left:auto!important;right:auto!important;display:block;height:22px;overflow:hidden;margin:4px 8px 6px;white-space:nowrap;}
+    .search-row{position:relative;z-index:3;margin:0 8px 8px;}
+    #pins { margin:0 8px 10px!important;display:flex !important; gap:10px; overflow-x:auto !important; }
     #pins .pin-card { flex:0 0 46%!important; aspect-ratio:3/4!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; }
     #pins .pin-card img.pin-cover, #pins .pin-cover { position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
     #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:24px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
-    #feedSplit{height:1px;margin:10px 8px 12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
-    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
+    #feedSplit{height:1px;margin:8px 8px 10px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
+    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; padding-bottom:88px; }
     #feed .cover-card, #favList .cover-card { position:relative !important; overflow:hidden !important; padding:0 !important; }
     #feed .cover-wrap, #favList .cover-wrap { position:relative !important; overflow:hidden !important; }
     #feed .cover-wrap .thumb, #favList .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; }
     .fav-btn { position:absolute !important; top:6px; left:6px; z-index:4; width:26px; height:26px; border:0; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; }
-    .badge-loc { position:absolute !important; top:6px; right:6px; z-index:4; max-width:56%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .badge-tag { position:absolute !important; left:6px; bottom:6px; z-index:4; max-width:62%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .badge-n { position:absolute !important; right:6px; bottom:6px; z-index:4; }
+    .badge-open { position:absolute !important; top:6px; left:36px; z-index:4; font-size:10px; line-height:1; padding:4px 6px; border-radius:999px; background:#16a34a; color:#fff; }
+    .badge-open.rest, .badge-open.wait, .badge-open.off { background:#6b7280; }
+    .badge-loc { position:absolute !important; top:6px; right:6px; z-index:4; max-width:58%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; padding:3px 6px; border-radius:999px; background:rgba(0,0,0,.55); color:#fff; }
+    .badge-tag { position:absolute !important; left:6px; bottom:6px; z-index:4; max-width:58%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; padding:3px 6px; border-radius:999px; background:#6d4aff; color:#fff; }
+    .badge-n { position:absolute !important; right:6px; bottom:6px; z-index:4; font-size:10px; padding:3px 6px; border-radius:999px; background:rgba(0,0,0,.55); color:#fff; }
     #citySheet { display:none !important; }
     .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:80;}
     #view-detail{padding-bottom:96px;}
@@ -117,14 +119,15 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div id="cityList"></div><button id="cityClose" type="button"></button></div>
   <div id="rulesSheet" class="sheet hidden"><h3 id="rulesTitle"></h3><ul id="rulesList"></ul><button id="rulesClose" type="button"></button></div>
-  <script src="./cover.js?v=r3"></script>
-  <script src="./app.js?v=r3"></script>
-  <script src="./home-ui.js?v=r3"></script>
-  <script src="./publish-ui.js?v=r3"></script>
-  <script src="./detail-fix.js?v=r3"></script>
-  <script src="./role-nav.js?v=r3"></script>
-  <script src="./fav.js?v=r3"></script>
-  <script src="./admin-go.js?v=r3"></script>
-  <script src="./role-gate.js?v=r3"></script>
+  <script src="./cover.js?v=r4"></script>
+  <script src="./app.js?v=r4"></script>
+  <script src="./home-ui.js?v=r4"></script>
+  <script src="./publish-ui.js?v=r4"></script>
+  <script src="./publish-hours.js?v=r4"></script>
+  <script src="./detail-fix.js?v=r4"></script>
+  <script src="./role-nav.js?v=r4"></script>
+  <script src="./fav.js?v=r4"></script>
+  <script src="./admin-go.js?v=r4"></script>
+  <script src="./role-gate.js?v=r4"></script>
 </body>
 </html>
