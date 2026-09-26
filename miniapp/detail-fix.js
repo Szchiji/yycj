@@ -13,7 +13,7 @@
 #yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:360px;object-fit:contain;background:#0b0f18;display:block;}
 #yycjGallery .gallery-hero.playing .hero-play{display:none!important;}
 #yycjGallery .gallery-hero video::-webkit-media-controls-overlay-play-button,
-#yycjGallery .gallery-hero video::-webkit-media-controls-start-playback-button{display:none!important;opacity:0!important;width:0!important;height:0!important;}
+#yycjGallery .gallery-hero video::-webkit-media-controls-start-playback-button{display:none!important;opacity:0!important;}
 #yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch;}
 #yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#1a2233;z-index:3;}
 #yycjGallery .g-thumb.on{border-color:#7ea8ff;}
@@ -26,9 +26,9 @@
 #detailInfo .row .btn{flex:1;min-width:72px;border-radius:18px;}
 #yycjTags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
 #yycjTags .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#6d4aff;color:#fff;font-size:11px;}
-#yycjExtras .ex-line{display:flex;gap:8px;margin:6px 0;}
+#yycjExtras .ex-line{display:flex;gap:8px;margin:6px 0;align-items:center;}
 #yycjExtras .ex-k{opacity:.7;min-width:3em;}
-#yycjExtras a{color:#8ec8ff;}`;
+#yycjExtras .tg-link{color:#8ec8ff;background:none;border:0;padding:0;font:inherit;text-decoration:underline;}`;
     document.head.appendChild(st);
   }
   function esc(t) {
@@ -98,7 +98,9 @@
     return keys.map((k) => {
       const val = String(data[k]);
       const href = tgHref(val);
-      const v = href ? `<a class="tg-link" href="${esc(href)}" data-tg="${esc(href)}">${esc(val)}</a>` : esc(val);
+      const v = href
+        ? `<button type="button" class="tg-link" data-tg="${esc(href)}">${esc(val)}</button>`
+        : esc(val);
       return `<div class="ex-line"><span class="ex-k">${esc(k)}</span><span class="ex-v">${v}</span></div>`;
     }).join("");
   }
@@ -121,8 +123,10 @@
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
       return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${esc(t.text || "")}</p></div>`;
     }).join("") || "<p class='muted'>暂无评价</p>";
+    const open = lamp.open_text ? `<div class="muted">${esc(lamp.open_text)}${lamp.hours_text ? " · " + esc(lamp.hours_text) : ""}</div>` : "";
     return `<div class="card" id="detailInfo">
       <h2>${esc(lamp.title || "")}</h2>
+      ${open}
       <div class="muted">📍 ${esc(loc || "")}</div>
       <div class="muted">💰 ${esc(lamp.price_text || "面议")}</div>
       <div id="yycjTags">${tags}</div>
@@ -147,7 +151,7 @@
     const poster = cur.poster || "";
     let hero;
     if (cur.type === "video" && play) {
-      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="auto"></video>`;
+      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="metadata"></video>`;
     } else if (cur.type === "video") {
       hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:240px;background:#111"></div>`}<span class="hero-play">▶</span>`;
     } else {
@@ -163,8 +167,7 @@
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        const n = Number(btn.getAttribute("data-g") || 0);
-        render(items, lampId, n, false);
+        render(items, lampId, Number(btn.getAttribute("data-g") || 0), false);
       });
     });
     const heroBox = el.querySelector(".gallery-hero");
@@ -207,17 +210,19 @@
   }
   function openTgChat(href) {
     if (!href) return;
-    if (typeof window.__yycjPauseUi === "function") window.__yycjPauseUi();
-    document.querySelectorAll("video").forEach((v) => { try { v.pause(); } catch (e) {} });
+    if (typeof window.__yycjKillMedia === "function") window.__yycjKillMedia();
+    else if (typeof window.__yycjPauseUi === "function") window.__yycjPauseUi();
     const tg = window.Telegram && window.Telegram.WebApp;
-    try {
-      if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) {
-        tg.openTelegramLink(href);
-        return;
-      }
-    } catch (e) {}
-    toast("链接已准备：" + href);
-    try { navigator.clipboard.writeText(href); } catch (e) {}
+    setTimeout(() => {
+      try {
+        if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) {
+          tg.openTelegramLink(href);
+          return;
+        }
+      } catch (e) {}
+      toast("已复制联系方式，去电报粘贴");
+      try { navigator.clipboard.writeText(href); } catch (e) {}
+    }, 40);
   }
   window.openLamp = function (id) {
     window.__yycjBack = window.__yycjBack || "home";
@@ -226,11 +231,11 @@
     paint(id);
   };
   document.addEventListener("click", async (ev) => {
-    const a = ev.target.closest("a[data-tg], #yycjExtras a");
-    if (a) {
+    const a = ev.target.closest("[data-tg]");
+    if (a && a.closest("#yycjExtras, #detailInfo")) {
       ev.preventDefault();
       ev.stopPropagation();
-      openTgChat(a.getAttribute("data-tg") || a.getAttribute("href") || "");
+      openTgChat(a.getAttribute("data-tg") || "");
       return;
     }
     if (ev.target.closest("#detailShare")) {
