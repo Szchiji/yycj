@@ -6,6 +6,12 @@
   window.__yycjLife = life;
   let hideTimer = 0;
 
+  try {
+    const q = new URLSearchParams(location.search);
+    const raw = (tg && tg.initDataUnsafe && (tg.initDataUnsafe.start_param || tg.initDataUnsafe.startParam)) || q.get("lamp") || "";
+    if (raw) sessionStorage.setItem("yycj_open_lamp", raw);
+  } catch (e) {}
+
   function killMedia() {
     document.querySelectorAll("video").forEach((v) => {
       try {
@@ -35,6 +41,11 @@
         const home = document.getElementById("view-home");
         if (home) home.classList.remove("hidden");
       }
+    }
+    const pending = sessionStorage.getItem("yycj_open_lamp") || "";
+    const detailOpen = document.getElementById("view-detail") && !document.getElementById("view-detail").classList.contains("hidden");
+    if (pending && !detailOpen && typeof window.openLamp === "function") {
+      try { window.openLamp(pending); } catch (e) {}
     }
     const feed = document.getElementById("feed");
     if (feed && !feed.querySelector("[data-id]") && typeof window.__yycjLoadHome === "function") {
