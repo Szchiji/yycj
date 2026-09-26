@@ -203,9 +203,21 @@
       if (box) box.innerHTML = infoHtml(lamp, data.reviews || []);
     } catch (e) { console.warn(e); }
   }
+  function normLampId(raw) {
+    let s = String(raw || "").trim();
+    if (!s) return "";
+    if (s.startsWith("s_")) s = s.slice(2);
+    const c = s.replace(/-/g, "");
+    if (/^[0-9a-fA-F]{32}$/.test(c)) {
+      const x = c.toLowerCase();
+      return x.slice(0, 8) + "-" + x.slice(8, 12) + "-" + x.slice(12, 16) + "-" + x.slice(16, 20) + "-" + x.slice(20);
+    }
+    return s;
+  }
   function shareUrl(id) {
     const bot = ((window.__yycjHomeData || {}).contacts || {}).bot_username || "";
-    if (bot) return "https://t.me/" + String(bot).replace(/^@/, "") + "?startapp=" + encodeURIComponent(id);
+    const compact = String(id || "").replace(/-/g, "");
+    if (bot) return "https://t.me/" + String(bot).replace(/^@/, "") + "?start=s_" + compact;
     return location.origin + "/app/go.html?lamp=" + encodeURIComponent(id);
   }
   function openTgChat(href) {
@@ -225,10 +237,12 @@
     }, 40);
   }
   window.openLamp = function (id) {
+    const nid = normLampId(id);
+    if (!nid) return;
     window.__yycjBack = window.__yycjBack || "home";
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
-    paint(id);
+    paint(nid);
   };
   document.addEventListener("click", async (ev) => {
     const a = ev.target.closest("[data-tg]");
@@ -282,10 +296,12 @@
     if (sharedOpened) return;
     const tg = window.Telegram && window.Telegram.WebApp;
     const q = new URLSearchParams(location.search);
-    const id = (tg && tg.initDataUnsafe && (tg.initDataUnsafe.start_param || tg.initDataUnsafe.startParam)) || q.get("lamp") || "";
+    const raw = (tg && tg.initDataUnsafe && (tg.initDataUnsafe.start_param || tg.initDataUnsafe.startParam)) || q.get("lamp") || sessionStorage.getItem("yycj_open_lamp") || "";
+    const id = normLampId(raw);
     if (!id) return;
+    try { sessionStorage.setItem("yycj_open_lamp", id); } catch (e) {}
     sharedOpened = true;
-    for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
+    for (let i = 0; i < 50 && !token(); i += 1) await new Promise((r) => setTimeout(r, 120));
     if (token()) window.openLamp(id);
   }
   if (document.readyState === "complete") openShared();
