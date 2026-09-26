@@ -1,21 +1,6 @@
 (() => {
   if (window.__yycjHomeUi) return;
   window.__yycjHomeUi = true;
-  const nativeFetch = window.fetch.bind(window);
-  let homeInflight = null;
-  window.fetch = function (input, init) {
-    const url = typeof input === "string" ? input : (input && input.url) || "";
-    const method = String((init && init.method) || "GET").toUpperCase();
-    if (method === "GET" && url.indexOf("/api/home") !== -1) {
-      if (homeInflight) return homeInflight.then((r) => r.clone());
-      homeInflight = nativeFetch(input, init).then((r) => {
-        homeInflight = null;
-        return r;
-      }, (e) => { homeInflight = null; throw e; });
-      return homeInflight.then((r) => r.clone());
-    }
-    return nativeFetch(input, init);
-  };
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
   let carouselMs = 4000, carouselTimer = 0, paused = false;
@@ -142,7 +127,8 @@
     }
   }
   async function loadFeed(reset) {
-    if (!token() || paused || document.hidden) return;
+    if (!token() || document.hidden) return;
+    paused = false;
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -179,13 +165,14 @@
       document.body.appendChild(sheet);
     }
   }
-  window.__yycjReloadHome = function () { if (!document.hidden) loadFeed(true); };
+  window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
+  window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest && ev.target.closest("[data-nav='home']")) {
-      if (lastItems.length) return;
-      loadFeed(true);
+      if (lastItems.length) paint();
+      else loadFeed(true);
     }
     if (ev.target.id === "btnGuide") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
@@ -220,11 +207,6 @@
     }
     carouselTimer = setTimeout(tick, carouselMs);
   }
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseMedia();
-    else resumeWork();
-  });
-  window.addEventListener("pagehide", pauseMedia);
   setTimeout(tick, 4000);
   async function boot() {
     if (window.__yycjHomeBooted) return;
