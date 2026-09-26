@@ -3,6 +3,7 @@
   window.__yycjDetail = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   window.__yycjLampCache = window.__yycjLampCache || {};
+  let sharedOpened = false;
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
@@ -156,7 +157,8 @@
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        render(items, lampId, Number(btn.getAttribute("data-g") || 0), items[Number(btn.getAttribute("data-g") || 0)]?.type === "video");
+        const n = Number(btn.getAttribute("data-g") || 0);
+        render(items, lampId, n, items[n] && items[n].type === "video");
       });
     });
     const heroBox = el.querySelector(".gallery-hero");
@@ -166,9 +168,16 @@
   }
   async function paint(id) {
     if (!id) return;
+    if (window.__yycjOpenLamp === id && document.getElementById("detailInfo")) return;
     window.__yycjOpenLamp = id;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
+    const cached = window.__yycjLampCache[id];
+    if (cached && (cached.lamp || cached.item)) {
+      const lamp = cached.lamp || cached.item || cached;
+      render(collect(lamp), id, 0, false);
+      if (box) box.innerHTML = infoHtml(lamp, cached.reviews || []);
+    }
     try {
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), {
         headers: { Authorization: "Bearer " + token() },
@@ -185,6 +194,20 @@
     if (bot) return "https://t.me/" + String(bot).replace(/^@/, "") + "?startapp=" + encodeURIComponent(id);
     return location.origin + "/app/go.html?lamp=" + encodeURIComponent(id);
   }
+  function openTgChat(href) {
+    if (!href) return;
+    if (typeof window.__yycjPauseUi === "function") window.__yycjPauseUi();
+    document.querySelectorAll("video").forEach((v) => { try { v.pause(); } catch (e) {} });
+    const tg = window.Telegram && window.Telegram.WebApp;
+    try {
+      if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) {
+        tg.openTelegramLink(href);
+        return;
+      }
+    } catch (e) {}
+    toast("链接已准备：" + href);
+    try { navigator.clipboard.writeText(href); } catch (e) {}
+  }
   window.openLamp = function (id) {
     window.__yycjBack = window.__yycjBack || "home";
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
@@ -195,11 +218,8 @@
     const a = ev.target.closest("a[data-tg], #yycjExtras a");
     if (a) {
       ev.preventDefault();
-      const href = a.getAttribute("data-tg") || a.getAttribute("href") || "";
-      const tg = window.Telegram && window.Telegram.WebApp;
-      if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) tg.openTelegramLink(href);
-      else if (tg && tg.openLink) tg.openLink(href);
-      else location.href = href;
+      ev.stopPropagation();
+      openTgChat(a.getAttribute("data-tg") || a.getAttribute("href") || "");
       return;
     }
     if (ev.target.closest("#detailShare")) {
@@ -243,10 +263,12 @@
     window.openLamp(card.getAttribute("data-id"));
   }, true);
   async function openShared() {
+    if (sharedOpened) return;
     const tg = window.Telegram && window.Telegram.WebApp;
     const q = new URLSearchParams(location.search);
     const id = (tg && tg.initDataUnsafe && (tg.initDataUnsafe.start_param || tg.initDataUnsafe.startParam)) || q.get("lamp") || "";
     if (!id) return;
+    sharedOpened = true;
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
     if (token()) window.openLamp(id);
   }

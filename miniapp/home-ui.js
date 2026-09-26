@@ -18,7 +18,7 @@
   };
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
-  let carouselMs = 4000, carouselTimer = 0;
+  let carouselMs = 4000, carouselTimer = 0, paused = false;
   const TUTORIAL = ["右上角选城市。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
   function token() { return localStorage.getItem("yycj_token") || ""; }
   function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || ""); }
@@ -34,6 +34,21 @@
   function writeCache(city, qq, data) {
     try { sessionStorage.setItem(cacheKey(city, qq), JSON.stringify({ t: Date.now(), d: data })); } catch (e) {}
   }
+  function homeVisible() {
+    const view = $("#view-home");
+    return view && !view.classList.contains("hidden") && !document.hidden;
+  }
+  function pauseMedia() {
+    document.querySelectorAll("video").forEach((v) => { try { v.pause(); } catch (e) {} });
+    paused = true;
+    if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; }
+  }
+  function resumeWork() {
+    paused = false;
+    if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
+  }
+  window.__yycjPauseUi = pauseMedia;
+  window.__yycjResumeUi = resumeWork;
   async function api(path) {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
@@ -47,7 +62,7 @@
     }
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
   function cover(item) {
     if (item && item.cover_url) {
@@ -71,8 +86,7 @@
   function imgTag(src, cls, eager) {
     if (!src) return "<div class=\"" + cls + " ph\"></div>";
     const load = eager ? "eager" : "lazy";
-    const prio = eager ? "high" : "low";
-    return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" fetchpriority=\"" + prio + "\" decoding=\"async\" />";
+    return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\" />";
   }
   function cardHtml(t, idx) {
     const img = cover(t);
@@ -111,7 +125,7 @@
     window.__yycjHomeData = data;
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
-    carouselMs = Math.max(2000, Math.min(20000, Number(data.carousel_interval_sec || 4) * 1000));
+    carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
     lastPins = q ? [] : (data.pins || []);
     const batch = data.items || [];
     lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -125,7 +139,7 @@
     }
   }
   async function loadFeed(reset) {
-    if (!token()) return;
+    if (!token() || paused || document.hidden) return;
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -162,11 +176,14 @@
       document.body.appendChild(sheet);
     }
   }
-  window.__yycjReloadHome = function () { loadFeed(true); };
+  window.__yycjReloadHome = function () { if (!document.hidden) loadFeed(true); };
   document.addEventListener("click", (ev) => {
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
-    if (ev.target.closest && ev.target.closest("[data-nav='home']")) loadFeed(true);
+    if (ev.target.closest && ev.target.closest("[data-nav='home']")) {
+      if (lastItems.length) return;
+      loadFeed(true);
+    }
     if (ev.target.id === "btnGuide") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
     if (ev.target.id === "btnCity" || (ev.target.closest && ev.target.closest("#btnCity"))) {
@@ -186,17 +203,29 @@
   }, true);
   mountGuide();
   function tick() {
+    carouselTimer = 0;
+    if (paused || !homeVisible()) {
+      carouselTimer = setTimeout(tick, carouselMs);
+      return;
+    }
     const pins = $("#pins");
     if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card")) {
       const card = pins.querySelector(".pin-card");
-      const step = card ? card.getBoundingClientRect().width + 10 : 160;
-      if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollTo({ left: 0, behavior: "smooth" });
-      else pins.scrollBy({ left: step, behavior: "smooth" });
+      const step = card ? card.offsetWidth + 10 : 160;
+      if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollLeft = 0;
+      else pins.scrollLeft += step;
     }
     carouselTimer = setTimeout(tick, carouselMs);
   }
-  setTimeout(tick, 2500);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseMedia();
+    else resumeWork();
+  });
+  window.addEventListener("pagehide", pauseMedia);
+  setTimeout(tick, 4000);
   async function boot() {
+    if (window.__yycjHomeBooted) return;
+    window.__yycjHomeBooted = true;
     for (let i = 0; i < 40 && !token(); i += 1) await new Promise((r) => setTimeout(r, 150));
     if (token()) await loadFeed(true);
   }
