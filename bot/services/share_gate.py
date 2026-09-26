@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -11,15 +12,31 @@ from bot.services import home_service
 
 logger = logging.getLogger(__name__)
 
+_UUID_DASH = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
 
 def parse_share_payload(arg: str) -> Optional[str]:
     raw = (arg or "").strip()
     if raw.startswith("s_"):
         raw = raw[2:]
-    raw = raw.replace("-", "")
-    if len(raw) == 32:
-        return f"{raw[0:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:32]}"
+    if _UUID_DASH.match(raw):
+        return raw.lower()
+    compact = raw.replace("-", "")
+    if len(compact) == 32 and re.fullmatch(r"[0-9a-fA-F]{32}", compact):
+        compact = compact.lower()
+        return f"{compact[0:8]}-{compact[8:12]}-{compact[12:16]}-{compact[16:20]}-{compact[20:32]}"
     return None
+
+
+def card_page_url(lamp_id: str) -> str:
+    webapp = (get_settings().normalized_webapp_url or "").rstrip("/")
+    if not webapp:
+        return ""
+    if webapp.endswith(".html"):
+        webapp = webapp.rsplit("/", 1)[0]
+    return f"{webapp}/go.html?lamp={lamp_id}"
 
 
 def _norm_chat(raw: Any) -> Dict[str, Any]:
@@ -98,11 +115,9 @@ def join_kb(chats: List[Dict[str, Any]], lamp_id: str) -> InlineKeyboardMarkup:
 
 
 def open_card_kb(lamp_id: str) -> Optional[InlineKeyboardMarkup]:
-    webapp = get_settings().normalized_webapp_url
-    if not webapp:
+    url = card_page_url(lamp_id)
+    if not url:
         return None
-    sep = "&" if "?" in webapp else "?"
-    url = f"{webapp}{sep}lamp={lamp_id}"
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="打开资料", web_app=WebAppInfo(url=url))]]
     )
