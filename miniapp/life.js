@@ -1,37 +1,53 @@
 (() => {
-  if (window.__yycjLife) return;
+  if (window.__yycjLifeJs) return;
+  window.__yycjLifeJs = true;
   const tg = window.Telegram && window.Telegram.WebApp;
-  const life = {
-    state: "boot",
-    view: "home",
-    awayAt: 0,
-  };
+  const life = { state: "boot", view: "home", awayAt: 0 };
   window.__yycjLife = life;
+  let hideTimer = 0;
 
   function killMedia() {
     document.querySelectorAll("video").forEach((v) => {
       try {
         v.pause();
         v.removeAttribute("src");
-        while (v.firstChild) v.removeChild(v.firstChild);
         v.load();
       } catch (e) {}
     });
-    if (typeof window.__yycjPauseUi === "function") window.__yycjPauseUi();
+    if (typeof window.__yycjPauseUi === "function") {
+      try { window.__yycjPauseUi(); } catch (e) {}
+    }
+  }
+
+  function recover() {
+    life.state = "ready";
+    try {
+      if (tg && tg.expand) tg.expand();
+    } catch (e) {}
+    const app = document.getElementById("app");
+    const boot = document.getElementById("boot");
+    const token = localStorage.getItem("yycj_token") || "";
+    if (token && app) {
+      app.classList.remove("hidden");
+      if (boot) boot.classList.add("hidden");
+      const open = document.querySelector("#app .view:not(.hidden)");
+      if (!open) {
+        const home = document.getElementById("view-home");
+        if (home) home.classList.remove("hidden");
+      }
+    }
+    const feed = document.getElementById("feed");
+    if (feed && !feed.querySelector("[data-id]") && typeof window.__yycjLoadHome === "function") {
+      try { window.__yycjLoadHome(); } catch (e) {}
+    }
+    document.body.style.opacity = "0.99";
+    requestAnimationFrame(() => { document.body.style.opacity = "1"; });
   }
 
   function pause(reason) {
     life.state = reason === "away" ? "away" : "hidden";
     if (reason === "away") life.awayAt = Date.now();
     killMedia();
-  }
-
-  function resume() {
-    if (life.state === "boot") return;
-    life.state = "ready";
-    if (typeof window.__yycjResumeUi === "function") {
-      try { window.__yycjResumeUi(); } catch (e) {}
-    }
   }
 
   function openChat(href) {
@@ -41,7 +57,7 @@
       if (tg && tg.openTelegramLink && /t\.me\/|tg:\/\//i.test(href)) {
         setTimeout(() => {
           try { tg.openTelegramLink(href); } catch (e) {}
-        }, 30);
+        }, 40);
         return true;
       }
     } catch (e) {}
@@ -50,26 +66,30 @@
 
   window.__yycjKillMedia = killMedia;
   window.__yycjOpenChat = openChat;
+  window.__yycjRecover = recover;
 
   if (tg) {
     try {
       tg.ready();
       if (tg.expand) tg.expand();
-      if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
     } catch (e) {}
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pause(life.state === "away" ? "away" : "hidden");
-    else resume();
+    if (document.hidden) {
+      hideTimer = window.setTimeout(() => pause(life.state === "away" ? "away" : "hidden"), 280);
+      return;
+    }
+    window.clearTimeout(hideTimer);
+    recover();
   });
-  window.addEventListener("pagehide", () => pause(life.state === "away" ? "away" : "hidden"));
-  window.addEventListener("pageshow", (ev) => {
-    if (ev.persisted) pause("hidden");
-    resume();
+  window.addEventListener("pageshow", () => {
+    window.clearTimeout(hideTimer);
+    recover();
   });
-  window.addEventListener("freeze", () => pause("hidden"));
-  window.addEventListener("resume", resume);
+  window.addEventListener("focus", recover);
 
-  life.state = "ready";
+  document.addEventListener("DOMContentLoaded", () => {
+    if (localStorage.getItem("yycj_token")) recover();
+  });
 })();
