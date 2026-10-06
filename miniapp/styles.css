@@ -151,10 +151,10 @@ label { font-size: .85rem; color: var(--muted); }
   background: var(--warn); color: #1a1200; font-size: .62rem; font-weight: 700;
   padding: 1px 6px; border-radius: 999px;
 }
-.feed.feed-3, #feed.has-cover, #feed.feed-1col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.feed.feed-3, #feed.has-cover {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 .feed-card {
   background: var(--card);
