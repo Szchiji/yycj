@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>月影车姬</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=20261006a" />
-  <link rel="stylesheet" href="./home-fix.css?v=20261006a" />
+  <link rel="stylesheet" href="./styles.css?v=20261006b" />
+  <link rel="stylesheet" href="./home-fix.css?v=20261006b" />
   <style>
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
@@ -15,11 +15,9 @@
     #pins .pin-card img.pin-cover, #pins .pin-card img.thumb { display:block!important; position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
     #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:28px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
     #feed{margin-top:0!important;}#feedSplit{height:1px;margin:12px 8px 14px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);}
-    #feed.has-cover, #feed.feed-3 { display:flex !important; flex-direction:column !important; gap:12px !important; }
-    #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
+    #feed.has-cover, #favList { display:grid !important; grid-template-columns:1fr 1fr 1fr !important; gap:8px !important; }
     #feed .cover-wrap, #favList .cover-wrap { position:relative !important; display:block !important; overflow:hidden; }
-    #feed .cover-wrap .thumb { width:100%!important; height:220px!important; object-fit:cover!important; display:block!important; border-radius:12px 12px 0 0!important; }
-    #favList .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; border-radius:12px 12px 0 0!important; }
+    #feed .cover-wrap .thumb, #favList .cover-wrap .thumb { width:100%!important; height:168px!important; object-fit:cover!important; display:block!important; border-radius:12px 12px 0 0!important; }
     .cover-card { padding:0 !important; overflow:hidden !important; }
     .fav-btn { position:absolute !important; top:6px; left:6px; width:26px; height:26px; border:0; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; z-index:3; }
     .badge-loc,.badge-tag,.badge-n { position:absolute !important; color:#fff; font-size:9px; padding:2px 6px; border-radius:999px; z-index:3; }
@@ -62,7 +60,7 @@
         </div>
         <div id="pins" class="pins"></div>
         <div id="feedSplit" aria-hidden="true"></div>
-        <div id="feed" class="feed feed-1col has-cover"></div>
+        <div id="feed" class="feed feed-3"></div>
         <button id="btnLoadMore" class="btn block hidden" type="button">加载更多</button>
       </section>
       <section id="view-fav" class="view hidden">
@@ -91,7 +89,6 @@
         </form>
       </section>
       <section id="view-me" class="view hidden">
-        <div id="meCard" class="card"></div>
         <div class="card">
           <h3>我的昵称</h3>
           <div class="row">
@@ -110,7 +107,7 @@
         </div>
         <div class="card hints">
           <div id="adminEntry" class="hidden">
-            <a class="btn primary" href="./desk.html?v=20261006a">管理后台</a>
+            <a class="btn primary" href="./desk.html?v=20261006b">管理后台</a>
           </div>
         </div>
       </section>
@@ -137,22 +134,22 @@
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <div id="rulesSheet" class="sheet hidden"><div class="sheet-panel"><h3 id="rulesTitle">口碑分说明</h3><ul id="rulesList"></ul><button class="btn block" id="rulesClose" type="button">知道了</button></div></div>
-  <script src="./boot-inline.js?v=20261006a"></script>
-  <script src="./cover.js?v=20261006a"></script>
-  <script src="./app.js?v=20261006a"></script>
-  <script src="./home-ui.js?v=20261006a"></script>
-  <script src="./publish-ui.js?v=20261006a"></script>
-  <script src="./me-listings.js?v=20261006a"></script>
-  <script src="./detail-fix.js?v=20261006a"></script>
-  <script src="./detail-kit.js?v=20261006a"></script>
-  <script src="./role-nav.js?v=20261006a"></script>
-  <script src="./fav.js?v=20261006a"></script>
-  <script src="./share.js?v=20261006a"></script>
-  <script src="./keyboard-fix.js?v=20261006a"></script>
-  <script src="./deep-open.js?v=20261006a"></script>
-  <script src="./me-polish.js?v=20261006a"></script>
-  <script src="./admin-go.js?v=20261006a"></script>
-  <script src="./role-gate.js?v=20261006a"></script>
-  <script src="./live-refresh.js?v=20261006a"></script>
+  <script src="./boot-inline.js?v=20261006b"></script>
+  <script src="./cover.js?v=20261006b"></script>
+  <script src="./app.js?v=20261006b"></script>
+  <script src="./home-ui.js?v=20261006b"></script>
+  <script src="./publish-ui.js?v=20261006b"></script>
+  <script src="./me-listings.js?v=20261006b"></script>
+  <script src="./detail-fix.js?v=20261006b"></script>
+  <script src="./detail-kit.js?v=20261006b"></script>
+  <script src="./role-nav.js?v=20261006b"></script>
+  <script src="./fav.js?v=20261006b"></script>
+  <script src="./share.js?v=20261006b"></script>
+  <script src="./keyboard-fix.js?v=20261006b"></script>
+  <script src="./deep-open.js?v=20261006b"></script>
+  <script src="./me-polish.js?v=20261006b"></script>
+  <script src="./admin-go.js?v=20261006b"></script>
+  <script src="./role-gate.js?v=20261006b"></script>
+  <script src="./live-refresh.js?v=20261006b"></script>
 </body>
 </html>
