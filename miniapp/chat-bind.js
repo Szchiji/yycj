@@ -23,10 +23,13 @@
     if (!id) return toast("找不到这条资料", true);
     btn.disabled = true;
     try {
+      const nick = ((document.getElementById("guestNick") && document.getElementById("guestNick").value) || localStorage.getItem("yycj_guest_nick") || "").trim().slice(0, 16);
+      const payload = { lamp_id: id };
+      if (nick) payload.guest_alias = nick;
       const r = await fetch("/api/sessions/request", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
-        body: JSON.stringify({ lamp_id: id }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || data.message || "发起失败");
@@ -37,4 +40,13 @@
       btn.disabled = false;
     }
   }, true);
+
+  const gn = document.getElementById("guestNick");
+  if (gn) gn.value = localStorage.getItem("yycj_guest_nick") || "";
+  const bn = document.getElementById("btnSaveNick");
+  if (bn) bn.addEventListener("click", () => {
+    const v = ((document.getElementById("guestNick") && document.getElementById("guestNick").value) || "").trim().slice(0, 16);
+    localStorage.setItem("yycj_guest_nick", v);
+    toast(v ? "代称已保存" : "已清除代称");
+  });
 })();
