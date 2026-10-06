@@ -3,7 +3,6 @@
   window.__yycjHomeUi = true;
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
-  let pageSize = 3;
   let carouselMs = 4000, carouselTimer = 0, paused = false;
   const TUTORIAL = ["右上角选城市。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
   function token() { return localStorage.getItem("yycj_token") || ""; }
@@ -48,7 +47,7 @@
     }
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",angle":">",'"':'"',"'":"&#39;" }[c]));
   }
   function cover(item) {
     if (item && item.cover_url) {
@@ -100,8 +99,7 @@
   function paint() {
     const feed = $("#feed");
     if (feed) {
-      feed.classList.add("has-cover", "feed-1col");
-      feed.classList.remove("feed-3");
+      feed.classList.add("has-cover");
       feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>暂无上架</p>";
     }
     const pins = $("#pins");
@@ -116,7 +114,6 @@
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
     carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
-    if (data.page_size) pageSize = Math.max(1, Number(data.page_size) || 3);
     lastPins = q ? [] : (data.pins || []);
     const batch = data.items || [];
     lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -140,7 +137,7 @@
         const cached = readCache(city, q);
         if (cached && (cached.items || cached.pins)) applyData(cached, true);
       }
-      const params = new URLSearchParams({ limit: String(pageSize || 3), offset: String(offset && !reset ? offset : 0) });
+      const params = new URLSearchParams({ limit: "12", offset: String(offset && !reset ? offset : 0) });
       if (q) params.set("q", q);
       if (city) params.set("city", city);
       const data = await api("/api/home?" + params.toString());
