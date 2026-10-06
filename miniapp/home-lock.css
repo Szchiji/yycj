@@ -29,7 +29,10 @@ html,body,#app{pointer-events:auto!important;}
   background:linear-gradient(transparent,rgba(0,0,0,.72));
 }
 #feedSplit{height:1px;margin:8px 8px 12px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent);}
-#feed.has-cover,#feed.feed-3,#favList{
+#feed.has-cover,#feed.feed-3,#feed.feed-1col{
+  display:flex!important;flex-direction:column!important;gap:12px!important;
+}
+#favList{
   display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:8px!important;
 }
 #feed .cover-card,#favList .cover-card{padding:0!important;overflow:hidden!important;position:relative;}
