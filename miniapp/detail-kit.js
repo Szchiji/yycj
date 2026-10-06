@@ -185,10 +185,13 @@
     if (!id) return toast("找不到这条资料", true);
     btn.disabled = true;
     try {
+      const nick = ((document.getElementById("guestNick") && document.getElementById("guestNick").value) || localStorage.getItem("yycj_guest_nick") || "").trim().slice(0, 16);
+      const payload = { lamp_id: id };
+      if (nick) payload.guest_alias = nick;
       const r = await fetch("/api/sessions/request", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
-        body: JSON.stringify({ lamp_id: id }),
+        body: JSON.stringify(payload),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "发起失败");
