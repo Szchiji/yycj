@@ -42,8 +42,14 @@ def test_api_guards():
             assert r.status_code == 200, r.text
             r = await c.get("/api/media/poster/BAACunknown", follow_redirects=False)
             assert r.status_code == 404
-            r = await c.post("/webhook", json={"update_id": 1}, headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"})
-            assert r.status_code in (403, 404, 405), r.status_code
+            m.settings.webhook_secret = "s3cret"
+            wh = m.settings.webhook_path or "/webhook"
+            r = await c.post(wh, json={"update_id": 1}, headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"})
+            assert r.status_code == 403, r.status_code
+            r = await c.post(wh, json={"update_id": 1})
+            assert r.status_code == 403, r.status_code
+            r = await c.post(wh, json={"update_id": 1}, headers={"X-Telegram-Bot-Api-Secret-Token": "s3cret"})
+            assert r.status_code == 200, r.status_code
             # me edit: extras sanitized (internal / markup keys dropped)
             r = await c.post("/api/me/listings/LX/edit", json={"extras": {"_bc_mid": "9", "<b>": "x", "微信": "w"}}, headers=tok(9002))
             from bot.services.extras_store import load_extras

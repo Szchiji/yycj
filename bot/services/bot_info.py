@@ -28,9 +28,12 @@ except Exception:
     logger.exception("admin_ops_wire skipped")
 
 
-def _install_shift_jobs() -> None:
+def _install_shift_jobs(scheduler=None) -> None:
+    # The app runs as `python -m bot.main`, so `from bot.main import scheduler` would import a
+    # second copy of the module whose scheduler never runs. The caller passes the live one.
     try:
-        from bot.main import scheduler
+        if scheduler is None:
+            from bot.main import scheduler
         from bot.services.open_shift import expire_unanswered, send_daily
     except Exception:
         return
@@ -81,7 +84,7 @@ async def job_expiry_nudge() -> None:
         logger.exception("expiry nudge failed")
 
 
-async def startup_maintenance() -> None:
+async def startup_maintenance(scheduler=None) -> None:
     """Startup-only work (used to piggyback on /api/home identity refresh)."""
     try:
         from bot.services.admin_acl import warm
@@ -89,11 +92,12 @@ async def startup_maintenance() -> None:
     except Exception:
         logger.exception("warm extra admins failed")
     try:
-        _install_shift_jobs()
+        _install_shift_jobs(scheduler)
     except Exception:
         logger.exception("shift jobs skipped")
     try:
-        from bot.main import scheduler
+        if scheduler is None:
+            from bot.main import scheduler
         if getattr(scheduler, "running", False):
             scheduler.add_job(job_expiry_nudge, "interval", minutes=60, id="expiry_nudge", replace_existing=True)
     except Exception:
