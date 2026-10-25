@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from typing import Any, Dict, Union
 
@@ -97,12 +99,16 @@ async def request_session(cb: CallbackQuery, bot: Bot) -> None:
     try:
         await bot.send_message(
             lamp["user_id"],
-            f"🌕 有人想就你的资料 <b>{lamp.get('title')}</b> 发起匿名会话。\n"
+            f"🌕 有人想就你的资料 <b>{_h(str(lamp.get('title') or ''))}</b> 发起匿名会话。\n"
             f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
             reply_markup=session_accept_kb(sess["session_id"]),
         )
     except Exception:
         pass
+
+
+def _is_participant(sess, user_id: int) -> bool:
+    return bool(sess) and user_id in (sess.get("user_a_id"), sess.get("user_b_id"))
 
 
 @router.callback_query(F.data.startswith("session_accept:"))
@@ -135,10 +141,13 @@ async def accept_session(cb: CallbackQuery, bot: Bot) -> None:
 
 @router.callback_query(F.data.startswith("session_reject:"))
 async def reject_session(cb: CallbackQuery, bot: Bot) -> None:
-    if not cb.data:
+    if not cb.data or not cb.from_user:
         return
     sid = cb.data.split(":", 1)[1]
     sess = await session_service.get_session(sid)
+    if not sess or sess.get("user_b_id") != cb.from_user.id:
+        await cb.answer("无效请求", show_alert=True)
+        return
     await session_service.reject(sid)
     await cb.answer("已拒绝")
     if cb.message:
@@ -152,9 +161,12 @@ async def reject_session(cb: CallbackQuery, bot: Bot) -> None:
 
 @router.callback_query(F.data.startswith("session_end:"))
 async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
-    if not cb.data:
+    if not cb.data or not cb.from_user:
         return
     sid = cb.data.split(":", 1)[1]
+    if not _is_participant(await session_service.get_session(sid), cb.from_user.id):
+        await cb.answer("无效请求", show_alert=True)
+        return
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
     delta = (data or {}).get("settle_delta", 0)
@@ -171,9 +183,14 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
 
 @router.callback_query(F.data.startswith("session_praise:"))
 async def praise_session(cb: CallbackQuery) -> None:
-    if not cb.data:
+    if not cb.data or not cb.from_user:
         return
     sid = cb.data.split(":", 1)[1]
+    sess = await session_service.get_session(sid)
+    # Only the guest side (requester, user_a) may praise; the host can't boost their own score.
+    if not sess or sess.get("user_a_id") != cb.from_user.id:
+        await cb.answer("只有客人一方可以好评", show_alert=True)
+        return
     await session_service.mark_praise(sid)
     await cb.answer("已记录好评，结束时结算加成")
 
@@ -238,21 +255,21 @@ async def relay_message(message: Message, bot: Bot, active_session: dict) -> Non
             file_id=message.sticker.file_id,
         )
 
-    prefix = f"👤 <b>{name}</b>：\n"
+    prefix = f"👤 <b>{_h(str(name))}</b>：\n"
     try:
         if message.text:
-            await bot.send_message(peer, prefix + message.text, parse_mode=None)
+            await bot.send_message(peer, prefix + _h(message.text))
         elif message.photo:
             await bot.send_photo(
-                peer, message.photo[-1].file_id, caption=(prefix + (message.caption or ""))
+                peer, message.photo[-1].file_id, caption=(prefix + _h(message.caption or ""))
             )
         elif message.video:
             await bot.send_video(
-                peer, message.video.file_id, caption=(prefix + (message.caption or ""))
+                peer, message.video.file_id, caption=(prefix + _h(message.caption or ""))
             )
         elif message.document:
             await bot.send_document(
-                peer, message.document.file_id, caption=(prefix + (message.caption or ""))
+                peer, message.document.file_id, caption=(prefix + _h(message.caption or ""))
             )
         elif message.voice:
             await bot.send_voice(peer, message.voice.file_id, caption=prefix)

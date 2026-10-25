@@ -1,6 +1,8 @@
 """今日开课 / 休息 回调。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
@@ -22,6 +24,6 @@ async def cb_shift(query: CallbackQuery) -> None:
     try:
         if query.message:
             await query.message.edit_reply_markup(reply_markup=None)
-            await query.message.answer(msg)
+            await query.message.answer(_h(msg))
     except Exception:
         pass
