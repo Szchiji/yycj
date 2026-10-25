@@ -79,7 +79,7 @@
     return "剩 " + x.days_left + " 天";
   }
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
   async function paintListings() {
     const box = document.getElementById("adminListings");
