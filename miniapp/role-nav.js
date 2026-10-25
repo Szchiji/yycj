@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjRoleNav) return;
+  window.__yycjRoleNav = true;
   function role() {
     try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; }
     catch (e) { return "guest"; }

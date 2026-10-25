@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjDetailFix) return;
+  window.__yycjDetailFix = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   window.__yycjLampCache = window.__yycjLampCache || {};
   if (!document.getElementById("yycj-gallery-css")) {

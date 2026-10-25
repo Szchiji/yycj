@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjDeepOpen) return;
+  window.__yycjDeepOpen = true;
   function restore(raw) {
     let s = String(raw || "").trim();
     if (!s) return "";

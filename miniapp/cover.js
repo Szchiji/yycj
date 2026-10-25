@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjCover) return;
+  window.__yycjCover = true;
   function mediaSrc(u) {
     const s = String(u || "").trim();
     if (!s) return "";

@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjPublishUi) return;
+  window.__yycjPublishUi = true;
   const $ = (s) => document.querySelector(s);
   const token = () => localStorage.getItem("yycj_token") || "";
   let uploaded = [];

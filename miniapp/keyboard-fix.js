@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjKeyboardFix) return;
+  window.__yycjKeyboardFix = true;
   const BG = "#0b1020";
   const root = document.documentElement;
   const body = document.body;

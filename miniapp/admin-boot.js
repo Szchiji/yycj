@@ -5,12 +5,6 @@
 #app,#boot,#gate,#console,.admin-shell,.admin-main{height:auto!important;max-height:none!important;overflow:visible!important;}
 .admin-main{padding-bottom:80px!important;}`;
   document.head.appendChild(st);
-  if (!document.getElementById("yycj-scroll-perf")) {
-    const s = document.createElement("script");
-    s.id = "yycj-scroll-perf";
-    s.src = "./scroll-perf.js?v=20260911ar";
-    document.head.appendChild(s);
-  }
   ["admin-chats.js", "admin-cta.js"].forEach((name) => {
     const id = "yycj-" + name.replace(".js", "");
     if (document.getElementById(id)) return;

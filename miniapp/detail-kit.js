@@ -58,8 +58,9 @@
     const on = ctaOn();
     const text = ctaLabel();
     document.querySelectorAll("#detailChat, [data-cta='chat']").forEach((btn) => {
-      if (on) btn.textContent = text;
-      btn.style.display = on ? "" : "none";
+      if (on && btn.textContent !== text) btn.textContent = text;
+      const disp = on ? "" : "none";
+      if (btn.style.display !== disp) btn.style.display = disp;
     });
   }
   function paintApprox(lamp) {
@@ -154,11 +155,24 @@
       applyCta();
     } catch (e) {}
   }
+  // Coalesce identical concurrent GET /api/home?limit=1 calls (same token, still in flight)
+  // so detail-kit and share.js share one request at boot. Each caller still parses the same JSON.
+  if (!window.__yycjHomeLite) {
+    const inflight = {};
+    window.__yycjHomeLite = () => {
+      const t = token();
+      if (inflight[t]) return inflight[t];
+      const p = fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + t } }).then((r) => r.json());
+      inflight[t] = p;
+      const clear = () => { if (inflight[t] === p) delete inflight[t]; };
+      p.then(clear, clear);
+      return p;
+    };
+  }
   async function loadHomeOnce() {
     if (window.__yycjHome && window.__yycjHome.chat_cta_label) { applyCta(); return; }
     try {
-      const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + token() } });
-      window.__yycjHome = Object.assign({}, window.__yycjHome || {}, await r.json());
+      window.__yycjHome = Object.assign({}, window.__yycjHome || {}, await window.__yycjHomeLite());
       applyCta();
     } catch (e) {}
   }

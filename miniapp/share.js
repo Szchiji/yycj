@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjShare) return;
+  window.__yycjShare = true;
   function botUser() {
     return (window.__yycjBot || localStorage.getItem("yycj_bot") || "").replace(/^@/, "");
   }
@@ -49,8 +51,9 @@
   }, true);
   async function rememberBot() {
     try {
-      const r = await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + (localStorage.getItem("yycj_token") || "") } });
-      const data = await r.json();
+      const data = window.__yycjHomeLite
+        ? await window.__yycjHomeLite()
+        : await (await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + (localStorage.getItem("yycj_token") || "") } })).json();
       const name = ((data.contacts || {}).bot_username) || "";
       if (name) {
         window.__yycjBot = String(name).replace(/^@/, "");
