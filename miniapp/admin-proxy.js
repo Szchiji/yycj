@@ -1,12 +1,6 @@
 (() => {
   const pane = document.getElementById("pane-listings");
   if (!pane) return;
-  if (!document.getElementById("yycj-live")) {
-    const live = document.createElement("script");
-    live.id = "yycj-live";
-    live.src = "./live-refresh.js?v=20260920e";
-    document.head.appendChild(live);
-  }
   const CORE = new Set(["称呼", "城市", "价位", "简介", "地点", "链接", "聊天按钮"]);
   const ID_MAP = { "区域": "District", "大致位置": "Approx", "标签": "Tags" };
   function extraHtml(prefix, keys) {
