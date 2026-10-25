@@ -59,3 +59,21 @@ def test_upload_guard_rejects_big_body():
     scope2 = dict(scope, headers=[(b"content-length", b"5000")])
     asyncio.run(g(scope2, receive, send))
     assert sent[0]["status"] == 413
+
+
+def test_startup_maintenance_uses_live_scheduler(monkeypatch):
+    from bot.services import bot_info
+
+    class FakeSched:
+        running = True
+        def __init__(self):
+            self.ids = []
+        def add_job(self, fn, *a, id=None, **k):
+            self.ids.append(id)
+
+    async def noop():
+        return None
+    monkeypatch.setattr(bot_info, "job_expiry_nudge", noop)
+    sch = FakeSched()
+    asyncio.run(bot_info.startup_maintenance(sch))
+    assert {"open_shift", "shift_timeout", "expiry_nudge"} <= set(sch.ids)

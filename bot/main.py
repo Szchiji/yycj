@@ -146,7 +146,7 @@ async def _startup() -> None:
             logger.exception("bot identity refresh skipped")
         try:
             from bot.services import bot_info
-            await bot_info.startup_maintenance()
+            await bot_info.startup_maintenance(scheduler)
         except Exception:
             logger.exception("startup maintenance skipped")
         if settings.use_webhook:
@@ -314,7 +314,7 @@ async def run_polling() -> None:
     _schedule_jobs()
     try:
         from bot.services import bot_info
-        await bot_info.startup_maintenance()
+        await bot_info.startup_maintenance(scheduler)
     except Exception:
         logger.exception("startup maintenance skipped")
     me = await bot.get_me()
