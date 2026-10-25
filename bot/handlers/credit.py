@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape as _h
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -27,6 +29,6 @@ async def show_credit(message: Message) -> None:
         for h in hist:
             t = h["time"].strftime("%m-%d %H:%M") if h.get("time") else ""
             sign = "+" if h["delta"] >= 0 else ""
-            lines.append(f"<code>{t}</code> {sign}{h['delta']} · {h['reason']}")
+            lines.append(f"<code>{t}</code> {sign}{h['delta']} · {_h(str(h['reason']))}")
     lines.append("\n请点左下角「首页」进入 Mini App。")
     await message.answer("\n".join(lines), reply_markup=remove_kb())

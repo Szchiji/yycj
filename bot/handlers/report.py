@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape as _h
+
 import uuid
 
 from aiogram import Bot, F, Router
@@ -105,10 +107,10 @@ async def report_done(message: Message, state: FSMContext, bot: Bot) -> None:
     title = (lamp or {}).get("title") if lamp else "-"
     card = (
         f"⚠️ 新报告 <code>{report_id[:8]}</code>\n"
-        f"灯笼：<code>{lamp_id[:8]}</code>… {title}\n"
+        f"灯笼：<code>{_h(str(lamp_id[:8]))}</code>… {_h(str(title or ''))}\n"
         f"举报人：{user.id}\n"
-        f"原因：{data.get('reason')}\n"
-        f"{desc[:300]}"
+        f"原因：{_h(str(data.get('reason') or ''))}\n"
+        f"{_h(desc[:300])}"
     )
     for admin_id in settings.admin_id_list:
         try:
