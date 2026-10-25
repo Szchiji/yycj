@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -138,7 +140,7 @@ async def approve_post(post_id: str, *, notify: bool = True) -> Dict[str, Any]:
     if notify:
         await notify_user_best_effort(
             user_id,
-            f"你的灯笼 <b>{lamp['title']}</b> 已通过审核并上架。",
+            f"你的灯笼 <b>{_h(str(lamp['title']))}</b> 已通过审核并上架。",
         )
     return {
         "ok": True,

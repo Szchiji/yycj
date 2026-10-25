@@ -70,21 +70,35 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         logger.info("Bot identity @%s id=%s", _cache["username"], _cache["id"])
     except Exception:
         logger.exception("refresh_bot_identity failed")
+    return dict(_cache)
+
+
+async def job_expiry_nudge() -> None:
+    try:
+        from bot.services.expiry_nudge import nudge_expiring
+        await nudge_expiring(3)
+    except Exception:
+        logger.exception("expiry nudge failed")
+
+
+async def startup_maintenance() -> None:
+    """Startup-only work (used to piggyback on /api/home identity refresh)."""
     try:
         from bot.services.admin_acl import warm
         await warm()
     except Exception:
         logger.exception("warm extra admins failed")
     try:
-        from bot.services.expiry_nudge import nudge_expiring
-        await nudge_expiring(3)
-    except Exception:
-        logger.exception("expiry nudge failed")
-    try:
         _install_shift_jobs()
     except Exception:
         logger.exception("shift jobs skipped")
-    return dict(_cache)
+    try:
+        from bot.main import scheduler
+        if getattr(scheduler, "running", False):
+            scheduler.add_job(job_expiry_nudge, "interval", minutes=60, id="expiry_nudge", replace_existing=True)
+    except Exception:
+        logger.exception("expiry nudge job skipped")
+    await job_expiry_nudge()
 
 
 async def get_bot_identity(bot=None) -> Dict[str, Any]:

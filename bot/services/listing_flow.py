@@ -1,6 +1,8 @@
 """改稿覆盖、代上架、到期提醒、频道推送。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -144,7 +146,7 @@ async def remind_expiring(days: int = 3) -> int:
         try:
             await bot.send_message(
                 lamp.user_id,
-                f"你的资料「{lamp.title}」还有约 {left} 天到期。\n请联系管理员续期，否则会从首页下架。",
+                f"你的资料「{_h(str(lamp.title or ''))}」还有约 {left} 天到期。\n请联系管理员续期，否则会从首页下架。",
             )
             async with session_scope() as s:
                 row = (await s.execute(select(Lamp).where(Lamp.lamp_id == lamp.lamp_id))).scalar_one_or_none()

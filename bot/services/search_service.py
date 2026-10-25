@@ -1,6 +1,8 @@
 """灯笼搜索（关键词 + 城市 + 价位 + 模糊距离）。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 import math
 import re
 import uuid
@@ -210,9 +212,9 @@ def format_lamp_card(lamp: Dict[str, Any]) -> str:
     city = lamp.get("city") or "未知"
     district = lamp.get("district") or ""
     loc = f"{city}" + (f" · {district}" if district else "")
-    lines = [f"🌕 <b>{title}</b>", f"📍 {loc}  |  💰 {price}", f"🏷 {tags}", f"✅ 口碑分 {auth}", f"<code>{lamp.get('lamp_id', '')}</code>"]
+    lines = [f"🌕 <b>{_h(str(title))}</b>", f"📍 {_h(loc)}  |  💰 {_h(str(price))}", f"🏷 {_h(tags)}", f"✅ 口碑分 {auth}", f"<code>{_h(str(lamp.get('lamp_id', '')))}</code>"]
     desc = (lamp.get("description") or "").strip()
     if desc:
         lines.append("")
-        lines.append(desc[:200] + ("…" if len(desc) > 200 else ""))
+        lines.append(_h(desc[:200]) + ("…" if len(desc) > 200 else ""))
     return "\n".join(lines)

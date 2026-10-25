@@ -1,6 +1,8 @@
 """营业时段 + 凌晨开课提醒。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,7 +13,7 @@ from sqlalchemy import select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus
-from bot.services.extras_store import load_extras, save_extras
+from bot.services.extras_store import load_extras, load_extras_bulk, save_extras
 
 logger = logging.getLogger(__name__)
 TZ = ZoneInfo("Asia/Shanghai")
@@ -160,14 +162,17 @@ async def send_daily() -> int:
     except Exception:
         return 0
     grouped: Dict[int, List[Dict[str, Any]]] = {}
-    for lamp in lamps:
-        if lamp.get("expires_at") and lamp["expires_at"] <= datetime.utcnow():
-            continue
-        extras = await load_extras(lamp["lamp_id"])
+    now_utc = datetime.utcnow()
+    live = [x for x in lamps if not (x.get("expires_at") and x["expires_at"] <= now_utc)]
+    all_extras = await load_extras_bulk([x["lamp_id"] for x in live])
+    for lamp in live:
+        extras = dict(all_extras.get(lamp["lamp_id"]) or {})
         hours = parse_hours(extras.get("_hours") or extras.get("hours"))
         if not hours:
             continue
         if extras.get("_remind_on") == "0":
+            if extras.get("_open_today") == "0" and extras.get("_open_date") == day:
+                continue
             extras["_open_today"] = "0"
             extras["_open_date"] = day
             await save_extras(lamp["lamp_id"], extras)
@@ -190,7 +195,7 @@ async def send_daily() -> int:
             for lamp in batch:
                 await bot.send_message(
                     uid,
-                    f"「{lamp['title']}」今日开课吗？",
+                    f"「{_h(str(lamp['title'] or ''))}」今日开课吗？",
                     reply_markup=_kb(lamp["lamp_id"], day),
                 )
             sent += 1
@@ -205,8 +210,9 @@ async def expire_unanswered() -> int:
     async with session_scope() as s:
         rows = (await s.execute(select(Lamp).where(Lamp.status == LampStatus.ACTIVE.value))).scalars().all()
         ids = [r.lamp_id for r in rows]
+    all_extras = await load_extras_bulk(ids)
     for lid in ids:
-        extras = await load_extras(lid)
+        extras = dict(all_extras.get(lid) or {})
         if extras.get("_remind_pending") != "1":
             continue
         raw = extras.get("_remind_sent_at") or ""

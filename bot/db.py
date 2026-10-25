@@ -49,10 +49,13 @@ _ALTER_STATEMENTS = [
 ]
 
 
-async def _ensure_columns(conn) -> None:
+async def _ensure_columns(engine) -> None:
+    # One transaction per statement: in Postgres a failed statement aborts the whole
+    # transaction, which used to make every later ALTER fail too.
     for stmt in _ALTER_STATEMENTS:
         try:
-            await conn.execute(text(stmt))
+            async with engine.begin() as conn:
+                await conn.execute(text(stmt))
         except Exception:
             logger.exception("ensure column failed: %s", stmt)
 
@@ -74,7 +77,7 @@ async def connect_db() -> None:
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await _ensure_columns(conn)
+    await _ensure_columns(_engine)
 
 
 async def close_db() -> None:

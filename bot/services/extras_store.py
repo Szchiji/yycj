@@ -46,6 +46,25 @@ async def load_extras(lamp_id: str) -> Dict[str, Any]:
             return {}
 
 
+async def load_extras_bulk(lamp_ids) -> Dict[str, Dict[str, Any]]:
+    """One query for many lamps (avoids N+1 in the shift scheduler)."""
+    ids = [str(x) for x in (lamp_ids or []) if x]
+    if not ids:
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    async with session_scope() as s:
+        try:
+            rows = (
+                await s.execute(text("SELECT lamp_id, extras FROM lamps WHERE lamp_id = ANY(:ids)"), {"ids": ids})
+            ).all()
+        except Exception:
+            logger.exception("bulk load extras failed")
+            return {}
+    for lid, raw in rows:
+        out[str(lid)] = raw if isinstance(raw, dict) else {}
+    return out
+
+
 async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
     if not lamp_id:
         return

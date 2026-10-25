@@ -24,9 +24,15 @@ async def get_current_user_id(
         raise HTTPException(status_code=401, detail="需要登录（Bearer token）")
     settings = get_settings()
     try:
-        return verify_access_token(raw, settings.bot_token)
+        user_id = verify_access_token(raw, settings.bot_token)
     except WebAppAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+    await warm()
+    if not is_admin(user_id):
+        from bot.services.ban_cache import is_banned
+        if await is_banned(user_id):
+            raise HTTPException(status_code=403, detail="账号已被封禁")
+    return user_id
 
 
 async def get_admin_user_id(user_id: Annotated[int, Depends(get_current_user_id)]) -> int:

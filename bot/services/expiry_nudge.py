@@ -1,6 +1,8 @@
 """上架剩 3 天时提醒老师。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict
@@ -47,7 +49,7 @@ async def nudge_expiring(days: int = 3) -> int:
         try:
             await bot.send_message(
                 int(uid),
-                f"「{lamp.get('title') or ''}」还有约 {left} 天到期。联系管理员续费后可以继续展示。",
+                f"「{_h(str(lamp.get('title') or ''))}」还有约 {left} 天到期。联系管理员续费后可以继续展示。",
             )
             extras["_expiry_nudge"] = mark
             await save_extras(lid, extras)

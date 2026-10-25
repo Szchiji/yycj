@@ -1,5 +1,7 @@
 """兰花信用分：结算、等级、遮蔽、恢复。"""
 from __future__ import annotations
+
+from html import escape as _h
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from sqlalchemy import or_, select
@@ -173,7 +175,7 @@ def format_credit_card(user: Dict[str, Any]) -> str:
     if user.get("is_shadowed"):
         lines.append(f"🌑 月影遮蔽中 · 剩余 {user.get('shadow_days', 0)} 天")
         if user.get("shadow_reason"):
-            lines.append(f"原因：{user['shadow_reason']}")
+            lines.append(f"原因：{_h(str(user['shadow_reason']))}")
     return "\n".join(lines)
 
 def compute_heuristic_q(message_count: int, media_count: int, duration_minutes: float = 0.0, reply_balance: float | None = None) -> int:

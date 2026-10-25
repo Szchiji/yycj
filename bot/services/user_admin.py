@@ -37,7 +37,10 @@ async def set_banned(user_id: int, banned: bool, reason: str = "") -> Dict[str, 
         user.ban_reason = (reason or "")[:256] if banned else None
         user.updated_at = datetime.utcnow()
         await s.flush()
-        return _user_to_dict(user)
+        out = _user_to_dict(user)
+    from bot.services.ban_cache import invalidate
+    invalidate(user_id)
+    return out
 
 
 async def set_shadow(

@@ -11,8 +11,9 @@ _orig = admin_ops.approve_post
 
 
 def _extras(data: dict) -> dict:
+    from bot.services.extras_clean import clean_user_extras
     extra = data.get("extras") if isinstance(data.get("extras"), dict) else {}
-    out = dict(extra)
+    out = clean_user_extras(extra)
     for key in ("联系", "频道", "微信"):
         if data.get(key) and key not in out:
             out[key] = data.get(key)

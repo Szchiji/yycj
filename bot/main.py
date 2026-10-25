@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 import os
 import sys
@@ -19,6 +20,10 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from bot.log_redact import install as _install_log_redact
+
+_install_log_redact()
 
 from bot.api import api_router
 from bot.config import get_settings
@@ -118,6 +123,9 @@ async def _startup() -> None:
         if not settings.bot_token:
             raise RuntimeError("请设置环境变量 BOT_TOKEN")
         logging.getLogger().setLevel(settings.log_level.upper())
+        _install_log_redact()
+        for _quiet in ("httpx", "httpcore"):
+            logging.getLogger(_quiet).setLevel(logging.WARNING)
         await connect_db()
         logger.info("Database connected")
         try:
@@ -136,7 +144,14 @@ async def _startup() -> None:
             await bot_info.refresh_bot_identity(bot)
         except Exception:
             logger.exception("bot identity refresh skipped")
+        try:
+            from bot.services import bot_info
+            await bot_info.startup_maintenance()
+        except Exception:
+            logger.exception("startup maintenance skipped")
         if settings.use_webhook:
+            if not settings.webhook_secret:
+                logger.warning("WEBHOOK_SECRET is not set: webhook requests are not authenticated")
             await bot.set_webhook(
                 url=settings.webhook_url,
                 secret_token=settings.webhook_secret or None,
@@ -198,6 +213,8 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="月影车姬", lifespan=lifespan)
 app.add_middleware(NoCacheMiniapp)
+from bot.api.upload_guard import UploadSizeGuard  # noqa: E402
+app.add_middleware(UploadSizeGuard)
 app.include_router(api_router)
 
 
@@ -273,7 +290,9 @@ async def telegram_webhook(
 ):
     if not _ready:
         raise HTTPException(status_code=503, detail=_startup_error or "starting")
-    if settings.webhook_secret and x_telegram_bot_api_secret_token != settings.webhook_secret:
+    if settings.webhook_secret and not hmac.compare_digest(
+        (x_telegram_bot_api_secret_token or "").encode("utf-8"), settings.webhook_secret.encode("utf-8")
+    ):
         raise HTTPException(status_code=403, detail="invalid secret")
     data = await request.json()
     update = Update.model_validate(data, context={"bot": bot})
@@ -293,6 +312,11 @@ async def run_polling() -> None:
     await anti_brush.allow("__warmup__", limit=1, window_sec=1)
     await bot.delete_webhook(drop_pending_updates=True)
     _schedule_jobs()
+    try:
+        from bot.services import bot_info
+        await bot_info.startup_maintenance()
+    except Exception:
+        logger.exception("startup maintenance skipped")
     me = await bot.get_me()
     logger.info("Polling mode | Bot @%s", me.username)
     webapp = settings.normalized_webapp_url

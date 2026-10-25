@@ -69,7 +69,11 @@ async def update_settings(
     ops_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     async with session_scope() as s:
-        res = await s.execute(select(SiteSettings).where(SiteSettings.key == SETTINGS_KEY))
+        # Row lock: the console fires several saves at once; without FOR UPDATE they
+        # read-modify-write ops_config concurrently and overwrite each other's keys.
+        res = await s.execute(
+            select(SiteSettings).where(SiteSettings.key == SETTINGS_KEY).with_for_update()
+        )
         row = res.scalar_one_or_none()
         if not row:
             row = SiteSettings(key=SETTINGS_KEY)
