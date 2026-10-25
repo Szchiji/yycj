@@ -3,7 +3,7 @@
   window.__yycjAdminRefresh = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   function esc(t) {
-    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&","<":"<",">":">",'"':'"',"'":"&#39;" }[c]));
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
   function zh(s) {
     return ({ active: "已上架", hidden: "已下架", pending: "待审", rejected: "已拒" })[s] || s || "-";

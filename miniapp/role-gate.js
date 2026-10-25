@@ -12,9 +12,10 @@
   }
   async function refresh() {
     try {
-      const token = localStorage.getItem("yycj_token") || "";
-      if (!token) return;
-      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + token() } });
+      const tk = token();
+      if (!tk) return;
+      const r = await fetch("/api/me", { headers: { Authorization: "Bearer " + tk } });
+      if (!r.ok) return;
       const data = await r.json().catch(() => ({}));
       const user = data.user || {};
       localStorage.setItem("yycj_user", JSON.stringify(user));

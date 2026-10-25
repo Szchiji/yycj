@@ -3,12 +3,15 @@
   if (!pane) return;
   const CORE = new Set(["称呼", "城市", "价位", "简介", "地点", "链接", "聊天按钮"]);
   const ID_MAP = { "区域": "District", "大致位置": "Approx", "标签": "Tags" };
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function extraHtml(prefix, keys) {
     return keys.map((k) => {
       const id = ID_MAP[k] ? (prefix + ID_MAP[k]) : "";
-      const extra = ID_MAP[k] ? "" : ` data-extra="${k}"`;
+      const extra = ID_MAP[k] ? "" : ` data-extra="${esc(k)}"`;
       const ph = k === "标签" ? " placeholder=\"空格分隔\"" : "";
-      return `<label>${k}</label><input${id ? ` id="${id}"` : ""}${extra}${ph} maxlength="64" />`;
+      return `<label>${esc(k)}</label><input${id ? ` id="${id}"` : ""}${extra}${ph} maxlength="64" />`;
     }).join("");
   }
   if (!document.getElementById("proxyBox")) {
@@ -90,8 +93,8 @@
       if (m.pending) return `<div class="up-thumb" style="height:88px;display:flex;align-items:center;justify-content:center;background:#111;border-radius:8px">上传中</div>`;
       const src = m.local || m.preview_url || "";
       return m.type === "video"
-        ? `<video class="up-thumb" src="${src}" muted playsinline preload="metadata" style="width:100%;height:88px;object-fit:cover;border-radius:8px;background:#111"></video>`
-        : `<img class="up-thumb" src="${src}" style="width:100%;height:88px;object-fit:cover;border-radius:8px" alt="" />`;
+        ? `<video class="up-thumb" src="${esc(src)}" muted playsinline preload="metadata" style="width:100%;height:88px;object-fit:cover;border-radius:8px;background:#111"></video>`
+        : `<img class="up-thumb" src="${esc(src)}" style="width:100%;height:88px;object-fit:cover;border-radius:8px" alt="" />`;
     }).join("");
   }
   async function uploadFiles(files, bucket, previewId, statusId) {

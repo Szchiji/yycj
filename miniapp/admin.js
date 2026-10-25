@@ -21,6 +21,14 @@
     })[c]);
   }
 
+  function extrasLine(d) {
+    const ex = d && d.extras && typeof d.extras === "object" ? d.extras : {};
+    const parts = Object.keys(ex)
+      .filter((k) => !String(k).startsWith("_") && String(ex[k] ?? "").trim())
+      .map((k) => `${escapeHtml(k)} ${escapeHtml(String(ex[k]))}`);
+    return parts.length ? `<div class="muted">${parts.join(" · ")}</div>` : "";
+  }
+
   function mediaSrc(m) {
     if (!m) return null;
     const url = typeof m === "string" ? m : (m.url || m.file_id || "");
@@ -92,6 +100,7 @@
         <div class="muted">${escapeHtml(d.city || "")} ${escapeHtml(d.district || "")} · 用户 ${p.user_id}
           · ${escapeHtml(d.publisher_role || "")} · ${mediaSummary(d)}</div>
         <div class="muted">价位 ${escapeHtml(d.price_text || "")} · 标签 ${escapeHtml((d.tags || []).join(" "))}</div>
+        ${extrasLine(d)}
         <p>${escapeHtml(d.description || "")}</p>
         ${mediaHtml}
         <div class="row">

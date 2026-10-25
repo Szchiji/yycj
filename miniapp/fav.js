@@ -21,18 +21,21 @@
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById(id)?.classList.remove("hidden");
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function cardHtml(x) {
     const img = cover(x) || x.cover_url || "";
     const loc = [x.city, x.district].filter(Boolean).join("·");
     const tag = (x.tags && x.tags[0]) || "";
     const n = x.media_count || (x.media && x.media.length) || (x.photos && x.photos.length) || 0;
-    return "<div class=\"feed-card compact cover-card\" data-id=\"" + x.lamp_id + "\"><div class=\"cover-wrap\">" +
-      (img ? "<img class=\"thumb\" src=\"" + img + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
-      (loc ? "<span class=\"badge-loc\">" + loc + "</span>" : "") +
-      (tag ? "<span class=\"badge-tag\">" + tag + "</span>" : "") +
-      (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
-      "</div><div class=\"body\"><h3>" + (x.title || "") + "</h3><div class=\"muted price\">" + (x.price_text || "") +
-      "</div><button class=\"btn unfav\" type=\"button\" data-unfav=\"" + x.lamp_id + "\">取消收藏</button></div></div>";
+    return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(x.lamp_id) + "\"><div class=\"cover-wrap\">" +
+      (img ? "<img class=\"thumb\" src=\"" + esc(img) + "\" alt=\"\" loading=\"lazy\" decoding=\"async\" />" : "<div class=\"thumb ph\"></div>") +
+      (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
+      (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
+      (n ? "<span class=\"badge-n\">" + esc(n) + "图</span>" : "") +
+      "</div><div class=\"body\"><h3>" + esc(x.title || "") + "</h3><div class=\"muted price\">" + esc(x.price_text || "") +
+      "</div><button class=\"btn unfav\" type=\"button\" data-unfav=\"" + esc(x.lamp_id) + "\">取消收藏</button></div></div>";
   }
   function paintHearts() {
     document.querySelectorAll("[data-fav]").forEach((b) => {

@@ -31,14 +31,18 @@
     if (/^[A-Za-z][A-Za-z0-9_]{3,31}$/.test(s)) return "https://t.me/" + s;
     return "";
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function linkable(key) {
     return /联系|频道|机器人|链接|用户名|telegram|bot/i.test(String(key || ""));
   }
   function valueHtml(key, val) {
-    const safe = String(val).replace(/[<>]/g, "");
+    const safe = esc(String(val).replace(/[<>]/g, ""));
     const href = tgHref(val) || (linkable(key) ? tgHref(val.replace(/^@/, "@")) : "");
     if (!href) return safe;
-    return `<a class="tg-link" href="${href.replace(/"/g, "")}" data-tg="${href.replace(/"/g, "")}">${safe}</a>`;
+    const h = esc(href.replace(/"/g, ""));
+    return `<a class="tg-link" href="${h}" data-tg="${h}">${safe}</a>`;
   }
   function openTg(href) {
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -100,7 +104,7 @@
     if (!box) { box = document.createElement("div"); box.id = "yycjExtras"; }
     if (row && row.parentNode === card) card.insertBefore(box, row);
     else if (box.parentNode !== card) card.appendChild(box);
-    box.innerHTML = keys.map((k) => `<div class="ex-line"><span class="ex-k">${k}</span><span class="ex-v">${valueHtml(k, data[k])}</span></div>`).join("");
+    box.innerHTML = keys.map((k) => `<div class="ex-line"><span class="ex-k">${esc(k)}</span><span class="ex-v">${valueHtml(k, data[k])}</span></div>`).join("");
   }
   function placeShare(id) {
     document.querySelector("#yycjGallery #detailShare, #yycjGallery [data-share]")?.remove();
