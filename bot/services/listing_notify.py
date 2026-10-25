@@ -1,6 +1,8 @@
 """投稿通知管理员、审核结果通知老师。"""
 from __future__ import annotations
 
+from html import escape as _h
+
 import logging
 from typing import Any, Dict, List
 
@@ -30,12 +32,12 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
     caption = (
         f"🆕 新投稿 <code>{post_id[:8]}</code>\n"
         f"用户 ID：<code>{user_id}</code>\n"
-        f"用户名：@{uname} · 昵称：{nick}\n"
-        f"身份：{role}\n"
-        f"城市：{lamp_data.get('city') or ''} {lamp_data.get('district') or ''}\n"
-        f"称呼：{lamp_data.get('title') or ''}\n"
-        f"价位：{lamp_data.get('price_text') or '面议'}\n"
-        f"{(lamp_data.get('description') or '')[:500]}\n"
+        f"用户名：@{_h(str(uname))} · 昵称：{_h(str(nick))}\n"
+        f"身份：{_h(str(role))}\n"
+        f"城市：{_h(str(lamp_data.get('city') or ''))} {_h(str(lamp_data.get('district') or ''))}\n"
+        f"称呼：{_h(str(lamp_data.get('title') or ''))}\n"
+        f"价位：{_h(str(lamp_data.get('price_text') or '面议'))}\n"
+        f"{_h(str(lamp_data.get('description') or '')[:500])}\n"
         f"媒体：{len(media) or len(photos)} 个"
     )
     kb = admin_post_kb(post_id)

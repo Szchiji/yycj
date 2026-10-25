@@ -24,6 +24,7 @@ DEFAULT_OPS = {
     "admin_btn_label": "管理员",
     "admin_contact": "",
     "required_chats": [],
+    "extra_admin_ids": [],
     "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
     "broadcast_channel": "",
     "media_channel_id": "",
@@ -96,6 +97,15 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["bot_btn_label"] = str(out.get("bot_btn_label") or "机器人")[:16]
     out["admin_btn_label"] = str(out.get("admin_btn_label") or "管理员")[:16]
     out["admin_contact"] = str(out.get("admin_contact") or "").strip()[:128]
+    ids = []
+    for x in out.get("extra_admin_ids") or []:
+        try:
+            n = int(x)
+        except (TypeError, ValueError):
+            continue
+        if n and n not in ids:
+            ids.append(n)
+    out["extra_admin_ids"] = ids[:200]
     chats = out.get("required_chats") or []
     out["required_chats"] = chats if isinstance(chats, list) else []
     return out
