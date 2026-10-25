@@ -1,9 +1,11 @@
 """媒体上传与 Telegram file_id 预览代理。"""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import mimetypes
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -11,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 import httpx
 from aiogram.types import BufferedInputFile
 from fastapi import Depends, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response, StreamingResponse
 
 from bot.api.deps import get_current_user_id
 from bot.api.routes_core import router
@@ -252,15 +254,221 @@ async def api_media_poster(file_id: str):
     return RedirectResponse(url=f"/api/media/file/{thumb}", status_code=307)
 
 
+_HTTP: httpx.AsyncClient | None = None
+_DL: Dict[str, "asyncio.Future[bool]"] = {}
+_BG: Dict[str, "asyncio.Task[bool]"] = {}
+_CACHE_CAP = 1024 * 1024 * 1024  # total bytes kept in /tmp/yycj-media
+_FETCH_MAX = 25 * 1024 * 1024  # Bot API files are <= 20MB
+_CHUNK = 256 * 1024
+
+
+def _http() -> httpx.AsyncClient:
+    """One pooled client: no new TLS handshake to Telegram for every (range) request."""
+    global _HTTP
+    if _HTTP is None or _HTTP.is_closed:
+        _HTTP = httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=32, max_keepalive_connections=16),
+        )
+    return _HTTP
+
+
+def _parse_range(header: str | None, size: int):
+    """Return (start, end) inclusive, None for no/ignored range, or "bad" for unsatisfiable."""
+    if not header:
+        return None
+    h = header.strip().lower()
+    if not h.startswith("bytes=") or "," in h:
+        return None
+    spec = h[6:].strip()
+    try:
+        a, _, b = spec.partition("-")
+        if a == "":
+            n = int(b)
+            if n <= 0:
+                return "bad"
+            return (max(0, size - n), size - 1)
+        start = int(a)
+        end = int(b) if b else size - 1
+    except ValueError:
+        return None
+    if start >= size or start < 0:
+        return "bad"
+    return (start, min(end, size - 1))
+
+
+def _serve_local(local: Path, mime: str, rng_header: str | None):
+    size = local.stat().st_size
+    try:
+        os.utime(local, None)  # LRU touch
+    except OSError:
+        pass
+    rng = _parse_range(rng_header, size)
+    if rng == "bad":
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{size}", "Accept-Ranges": "bytes"})
+    start, end = rng if rng else (0, size - 1)
+    length = end - start + 1
+
+    def body():
+        with local.open("rb") as fh:
+            fh.seek(start)
+            left = length
+            while left > 0:
+                chunk = fh.read(min(_CHUNK, left))
+                if not chunk:
+                    break
+                left -= len(chunk)
+                yield chunk
+
+    headers = dict(_CACHE_HDR)
+    headers["Content-Length"] = str(length)
+    if rng:
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+    return StreamingResponse(body(), status_code=206 if rng else 200, media_type=mime, headers=headers)
+
+
+def _evict() -> None:
+    try:
+        files = [e for e in os.scandir(_DISK_DIR) if e.is_file() and not e.name.endswith(".part")]
+    except OSError:
+        return
+    total = sum(e.stat().st_size for e in files)
+    if total <= _CACHE_CAP:
+        return
+    for e in sorted(files, key=lambda x: x.stat().st_mtime):
+        try:
+            total -= e.stat().st_size
+            os.remove(e.path)
+        except OSError:
+            pass
+        if total <= _CACHE_CAP * 0.8:
+            break
+
+
+async def _download(file_id: str, url: str, local: Path) -> bool:
+    """Fetch the whole file once into the disk cache (shared by concurrent requests)."""
+    fut = _DL.get(file_id)
+    if fut is not None:
+        try:
+            if await asyncio.wait_for(asyncio.shield(fut), timeout=60):
+                return True
+        except Exception:
+            pass
+        if local.is_file():
+            return True
+        if file_id in _DL:
+            return False
+    fut = asyncio.get_running_loop().create_future()
+    _DL[file_id] = fut
+    ok = False
+    tmp = local.with_name(local.name + f".{os.getpid()}.{int(time.time() * 1000)}.part")
+    try:
+        _DISK_DIR.mkdir(parents=True, exist_ok=True)
+        async with _http().stream("GET", url) as resp:
+            if resp.status_code == 200:
+                n = 0
+                with tmp.open("wb") as fh:
+                    async for chunk in resp.aiter_bytes(_CHUNK):
+                        n += len(chunk)
+                        if n > _FETCH_MAX:
+                            raise ValueError("file too large for cache")
+                        fh.write(chunk)
+                tmp.replace(local)
+                ok = True
+    except Exception:
+        logger.warning("media cache download failed", exc_info=False)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        _DL.pop(file_id, None)
+        if not fut.done():
+            fut.set_result(ok)
+    if ok:
+        _evict()
+    return ok
+
+
+async def _tee_stream(file_id: str, url: str, local: Path, mime: str, ranged: bool):
+    """First open (no range / bytes=0-): stream from Telegram to the client immediately
+    while writing the disk cache, so playback starts without waiting for the full file."""
+    try:
+        req = _http().build_request("GET", url)
+        resp = await _http().send(req, stream=True)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败") from exc
+    if resp.status_code != 200:
+        await resp.aclose()
+        _PATH_CACHE.pop(file_id, None)
+        raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
+    try:
+        size = int(resp.headers.get("content-length") or 0)
+    except ValueError:
+        size = 0
+    cacheable = 0 < size <= _FETCH_MAX and file_id not in _DL
+    fut = None
+    tmp = local.with_name(local.name + f".{os.getpid()}.{int(time.time() * 1000)}.part")
+    if cacheable:
+        fut = asyncio.get_running_loop().create_future()
+        _DL[file_id] = fut
+
+    async def body():
+        ok = False
+        fh = None
+        try:
+            if cacheable:
+                _DISK_DIR.mkdir(parents=True, exist_ok=True)
+                fh = tmp.open("wb")
+            n = 0
+            async for chunk in resp.aiter_bytes(_CHUNK):
+                n += len(chunk)
+                if fh:
+                    fh.write(chunk)
+                yield chunk
+            if fh:
+                fh.close()
+                fh = None
+                if n == size:
+                    tmp.replace(local)
+                    ok = True
+        finally:
+            if fh:
+                fh.close()
+            await resp.aclose()
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+            if fut is not None:
+                _DL.pop(file_id, None)
+                if not fut.done():
+                    fut.set_result(ok)
+            if ok:
+                _evict()
+
+    headers = dict(_CACHE_HDR)
+    if size:
+        headers["Content-Length"] = str(size)
+        if ranged:
+            headers["Content-Range"] = f"bytes 0-{size - 1}/{size}"
+    elif ranged:
+        headers.pop("Accept-Ranges", None)
+    return StreamingResponse(body(), status_code=206 if (ranged and size) else 200, media_type=mime, headers=headers)
+
+
 @router.get("/media/file/{file_id:path}")
 async def api_media_file(file_id: str, request: Request):
     settings = get_settings()
     if not settings.bot_token:
         raise HTTPException(status_code=503, detail="BOT_TOKEN 未配置")
+    rng = request.headers.get("range")
     local = _disk_path(file_id)
-    if local.is_file() and local.stat().st_size > 0 and not request.headers.get("range"):
-        mime = _mime_for(file_id, str(local))
-        return FileResponse(local, media_type=mime, headers=_CACHE_HDR)
+    if local.is_file() and local.stat().st_size > 0:
+        return _serve_local(local, _mime_for(file_id, str(local)), rng)
     now = time.time()
     cached = _PATH_CACHE.get(file_id)
     path = cached[0] if cached and cached[1] > now else ""
@@ -269,7 +477,7 @@ async def api_media_file(file_id: str, request: Request):
         try:
             tg_file = await bot.get_file(file_id)
         except Exception as exc:
-            logger.warning("get_file failed: %s", exc)
+            logger.warning("get_file failed: %s", type(exc).__name__)
             raise HTTPException(status_code=404, detail="文件不存在或已失效") from exc
         path = tg_file.file_path or ""
         if not path:
@@ -277,61 +485,42 @@ async def api_media_file(file_id: str, request: Request):
         _PATH_CACHE[file_id] = (path, now + _PATH_TTL)
     url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
     mime = _mime_for(file_id, path)
-    headers = {}
-    rng = request.headers.get("range")
-    if rng:
-        headers["Range"] = rng
-    client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
+    open_ended = (rng or "").replace(" ", "").lower() == "bytes=0-"
+    if (not rng or open_ended) and file_id not in _DL:
+        return await _tee_stream(file_id, url, local, mime, ranged=open_ended)
+    # Specific byte range (e.g. Safari's bytes=0-1 probe, or seeking). Warm the disk cache in
+    # the background; if Telegram answers this range with a real 206, pass it straight through,
+    # otherwise wait for the cached copy and answer the range locally.
+    task = _BG.get(file_id)
+    if task is None or task.done():
+        task = asyncio.create_task(_download(file_id, url, local))
+        _BG[file_id] = task
+        task.add_done_callback(lambda _t, k=file_id: _BG.pop(k, None) if _BG.get(k) is _t else None)
     try:
-        req = client.build_request("GET", url, headers=headers)
-        resp = await client.send(req, stream=True)
-    except Exception as exc:
-        await client.aclose()
-        raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败") from exc
-    if resp.status_code not in (200, 206):
+        req = _http().build_request("GET", url, headers={"Range": rng})
+        resp = await _http().send(req, stream=True)
+    except Exception:
+        resp = None
+    if resp is not None and resp.status_code == 206 and resp.headers.get("content-range"):
+        headers = dict(_CACHE_HDR)
+        headers["Content-Range"] = resp.headers["content-range"]
+        if resp.headers.get("content-length"):
+            headers["Content-Length"] = resp.headers["content-length"]
+
+        async def passthrough():
+            try:
+                async for chunk in resp.aiter_bytes(_CHUNK):
+                    yield chunk
+            finally:
+                await resp.aclose()
+
+        return StreamingResponse(passthrough(), status_code=206, media_type=mime, headers=headers)
+    if resp is not None:
         await resp.aclose()
-        await client.aclose()
-        _PATH_CACHE.pop(file_id, None)
-        raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
-
-    length = 0
     try:
-        length = int(resp.headers.get("content-length") or 0)
-    except ValueError:
-        length = 0
-    can_store = (
-        resp.status_code == 200
-        and not rng
-        and 0 < length <= _DISK_MAX
-        and not file_id.startswith(("BAAC", "BQAC"))
-    )
-    if can_store:
-        try:
-            _DISK_DIR.mkdir(parents=True, exist_ok=True)
-            tmp = local.with_suffix(".part")
-            with tmp.open("wb") as fh:
-                async for chunk in resp.aiter_bytes(64 * 1024):
-                    fh.write(chunk)
-            tmp.replace(local)
-        except Exception:
-            logger.exception("disk cache write failed")
-        finally:
-            await resp.aclose()
-            await client.aclose()
-        if local.is_file():
-            return FileResponse(local, media_type=mime, headers=_CACHE_HDR)
-
-    async def stream():
-        try:
-            async for chunk in resp.aiter_bytes(64 * 1024):
-                yield chunk
-        finally:
-            await resp.aclose()
-            await client.aclose()
-
-    out = dict(_CACHE_HDR)
-    if resp.headers.get("content-range"):
-        out["Content-Range"] = resp.headers["content-range"]
-    if resp.headers.get("content-length"):
-        out["Content-Length"] = resp.headers["content-length"]
-    return StreamingResponse(stream(), status_code=resp.status_code, media_type=mime, headers=out)
+        ok = await asyncio.wait_for(asyncio.shield(task), timeout=60)
+    except Exception:
+        ok = False
+    if (ok or local.is_file()) and local.is_file():
+        return _serve_local(local, mime, rng)
+    raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
