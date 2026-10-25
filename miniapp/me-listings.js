@@ -1,4 +1,6 @@
 (() => {
+  if (window.__yycjMeListings) return;
+  window.__yycjMeListings = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   function role() {
     try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; }
