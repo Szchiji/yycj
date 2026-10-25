@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Dict
 
 from fastapi import Depends, HTTPException
+from pydantic import field_validator
 
 from bot.api.deps import get_current_user_id
 from bot.config import get_settings
@@ -28,6 +29,12 @@ logger = logging.getLogger(__name__)
 
 class PostCreateBody(_PostCreateBody):
     extras: Dict[str, Any] | None = None
+
+    @field_validator("extras", mode="after")
+    @classmethod
+    def _clean_extras(cls, v):
+        from bot.services.extras_clean import clean_user_extras
+        return clean_user_extras(v) if v is not None else None
 
 
 @router.post("/posts")

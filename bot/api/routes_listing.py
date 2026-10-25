@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator, Field
 
 from bot.api.deps import get_admin_user_id, get_current_user_id
 from bot.api.routes_core import MediaItem, _normalize_media, _ser_dt, router
@@ -27,6 +27,12 @@ class EditBody(BaseModel):
     district: Optional[str] = None
     approx_label: Optional[str] = None
     extras: Optional[Dict[str, Any]] = None
+
+    @field_validator("extras", mode="after")
+    @classmethod
+    def _clean_extras(cls, v):
+        from bot.services.extras_clean import clean_user_extras
+        return clean_user_extras(v) if v is not None else None
 
 
 class ProxyBody(EditBody):
