@@ -65,6 +65,13 @@ async def api_admin_extra_ops(
     _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "admin_contact" in ops:
+        from bot.services import bot_info
+        raw = str(ops.get("admin_contact") or "").strip()
+        norm = bot_info.normalize_contact(raw) if raw else ""
+        if raw and not norm:
+            raise HTTPException(status_code=400, detail="管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名")
+        ops["admin_contact"] = norm
     settings = await home_service.update_settings(ops_config=ops or None)
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
     return {"ok": True, "settings": settings}

@@ -45,29 +45,49 @@
     setTimeout(() => el.classList.add("hidden"), 3600);
   }
   function openUrl(url) {
-    const s = String(url || "").trim();
+    let s = String(url || "").trim();
     if (!s) return false;
+    if (/^(t\.me|telegram\.me)\//i.test(s)) s = "https://" + s;
     const tg = window.Telegram && window.Telegram.WebApp;
     try {
-      if (tg && /t\.me\/|tg:\/\//i.test(s) && tg.openTelegramLink) tg.openTelegramLink(s);
-      else if (tg && tg.openLink) tg.openLink(s);
-      else location.href = s;
+      if (/^https?:\/\/(www\.)?(t\.me|telegram\.me)\//i.test(s)) {
+        const tme = s.replace(/^http:/i, "https:").replace(/\/\/(www\.)?telegram\.me\//i, "//t.me/");
+        if (tg && tg.openTelegramLink) tg.openTelegramLink(tme);
+        else if (tg && tg.openLink) tg.openLink(tme);
+        else location.href = tme;
+      } else if (/^tg:\/\//i.test(s)) {
+        location.href = s;
+      } else if (tg && tg.openLink) {
+        tg.openLink(s);
+      } else {
+        location.href = s;
+      }
       return true;
     } catch (e) {
       return false;
     }
   }
-  // Top-left 管理员 link (#topAdmin): previously had no handler (its only binding lived in the
-  // never-loaded home-head script, now removed). Admins go to the console (same-origin relative URL keeps auth);
-  // others are sent to the configured admin contact.
+  async function contacts() {
+    const have = (window.__yycjHomeData && window.__yycjHomeData.contacts) || (window.__yycjHome && window.__yycjHome.contacts);
+    if (have) return have;
+    try {
+      const data = window.__yycjHomeLite
+        ? await window.__yycjHomeLite()
+        : await (await fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + (localStorage.getItem("yycj_token") || "") } })).json();
+      return (data && data.contacts) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  // Top-left 管理员 link (#topAdmin): for everyone (admins included) open the admin's Telegram chat
+  // configured in 运营设置 → 管理员联系链接 (ops_config.admin_contact → /api/home contacts.admin_url).
+  // Admins enter the console via the bot's /admin button, not from here.
   async function topAdmin(ev) {
     if (!ev.target.closest("#topAdmin")) return;
     ev.preventDefault();
     ev.stopPropagation();
-    const admin = isAdmin === null ? await check() : isAdmin;
-    if (admin) { location.href = DESK; return; }
-    const contacts = (window.__yycjHomeData && window.__yycjHomeData.contacts) || {};
-    if (!openUrl(contacts.admin_url)) toast("后台还没填管理员联系");
+    const c = await contacts();
+    if (!openUrl(c.admin_url)) toast("后台还没填管理员联系");
   }
   document.addEventListener("click", go, true);
   document.addEventListener("click", topAdmin, true);

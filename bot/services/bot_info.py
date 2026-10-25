@@ -104,12 +104,16 @@ def normalize_contact(raw: str) -> str:
         return ""
     if s.startswith("tg://"):
         return s
+    if s.startswith(("t.me/", "telegram.me/")):
+        s = "https://" + s
     if s.startswith("http://") or s.startswith("https://"):
-        if "t.me/" in s or "telegram.me/" in s:
+        import re
+        if re.match(r"^https?://(www\.)?(t\.me|telegram\.me)/\S+$", s, re.I):
             return s
         return ""
     if s.startswith("@"):
-        return f"https://t.me/{s[1:]}"
+        name = s[1:]
+        return f"https://t.me/{name}" if name and name.replace("_", "").isalnum() else ""
     if s.lstrip("-").isdigit():
         return f"tg://user?id={s}"
     if s.replace("_", "").isalnum():

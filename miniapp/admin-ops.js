@@ -30,8 +30,28 @@
     document.querySelectorAll(".admin-pane").forEach((p) => p.classList.toggle("active", p.id === "pane-" + btn.dataset.pane));
   });
 
+  // 管理员联系链接: "@name" / "name" / "t.me/name" -> https://t.me/name; returns null when invalid.
+  function normContact(raw) {
+    let s = String(raw || "").trim();
+    if (!s) return "";
+    if (/^tg:\/\//i.test(s)) return s;
+    if (/^(t\.me|telegram\.me)\//i.test(s)) s = "https://" + s;
+    if (/^https?:\/\//i.test(s)) return /^https?:\/\/(t\.me|telegram\.me)\/\S+$/i.test(s) ? s : null;
+    if (s.startsWith("@")) s = s.slice(1);
+    if (/^-?\d+$/.test(s)) return "tg://user?id=" + s;
+    return /^[A-Za-z0-9_]{3,64}$/.test(s) ? "https://t.me/" + s : null;
+  }
   document.addEventListener("click", async (ev) => {
     if (ev.target && ev.target.id === "btnOpsSave") {
+      const contactEl = $("#opsAdminContact");
+      const contact = normContact(contactEl ? contactEl.value : "");
+      if (contact === null) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        alert("管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名");
+        return;
+      }
+      if (contactEl) contactEl.value = contact;
       try {
         const chats = (($("#opsChats") && $("#opsChats").value) || "").split("\n").map((line) => {
           const p = line.split("|").map((x) => x.trim());
@@ -43,7 +63,7 @@
           body: JSON.stringify({
             listing_days: parseInt($("#opsListingDays")?.value, 10) || 30,
             carousel_interval_sec: parseInt($("#opsCarouselSec")?.value, 10) || 4,
-            admin_contact: $("#opsAdminContact")?.value || "",
+            admin_contact: contact,
             show_bot_link: $("#opsShowBot") ? $("#opsShowBot").checked : true,
             show_admin_link: $("#opsShowAdmin") ? $("#opsShowAdmin").checked : true,
             required_chats: chats,
