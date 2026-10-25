@@ -28,6 +28,9 @@
     if (first) first.after(card);
     else me.prepend(card);
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   async function load() {
     mount();
     const box = document.getElementById("myListings");
@@ -43,9 +46,9 @@
       box.innerHTML = items.map((x) => {
         const st = x.status === "active" ? "已上架" : x.status === "hidden" ? "已下架" : x.status;
         return `<div class="pick-item" style="margin:8px 0">
-          <div><strong>${x.title || ""}</strong>
-          <div class="muted">${x.city || ""} · ${st} · ${x.expires_at ? ("到期 " + String(x.expires_at).slice(0,10)) : ""}</div></div>
-          <button class="btn" type="button" data-edit="${x.lamp_id}">改资料</button>
+          <div><strong>${esc(x.title || "")}</strong>
+          <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${x.expires_at ? ("到期 " + esc(String(x.expires_at).slice(0,10))) : ""}</div></div>
+          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">改资料</button>
         </div>`;
       }).join("");
       box.querySelectorAll("[data-edit]").forEach((btn) => {

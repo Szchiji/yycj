@@ -30,6 +30,9 @@
     el.classList.remove("hidden");
     setTimeout(() => el.classList.add("hidden"), 3200);
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function isVideoName(name, type) {
     return (type || "").startsWith("video") || /\.(mp4|mov|webm|mkv)$/i.test(name || "");
   }
@@ -39,8 +42,8 @@
     box.innerHTML = uploaded.map((m) => {
       const src = m.local || m.preview_url || (m.file_id ? "/api/media/file/" + encodeURIComponent(m.file_id) : "");
       const fail = m.failed ? " up-fail" : "";
-      if (m.type === "video") return `<video class="up-thumb${fail}" src="${src}" muted playsinline preload="metadata"></video>`;
-      return src ? `<img class="up-thumb${fail}" src="${src}" alt="" />` : `<div class="up-thumb"></div>`;
+      if (m.type === "video") return `<video class="up-thumb${fail}" src="${esc(src)}" muted playsinline preload="metadata"></video>`;
+      return src ? `<img class="up-thumb${fail}" src="${esc(src)}" alt="" />` : `<div class="up-thumb"></div>`;
     }).join("");
   }
   function extraWrap() {
@@ -94,7 +97,7 @@
       .map((f) => String(f.key));
     Object.keys(FORM_MAP).forEach((key) => toggleInput(FORM_MAP[key], enabled.includes(key)));
     const extraKeys = enabled.filter((k) => !FORM_MAP[k]);
-    wrap.innerHTML = extraKeys.map((k) => `<label>${k}</label><input data-extra="${k.replace(/"/g, "")}" maxlength="64" placeholder="${k}" />`).join("");
+    wrap.innerHTML = extraKeys.map((k) => `<label>${esc(k)}</label><input data-extra="${esc(k.replace(/"/g, ""))}" maxlength="64" placeholder="${esc(k)}" />`).join("");
   }
   async function uploadOne(file) {
     const fd = new FormData();
@@ -164,7 +167,7 @@
       } catch (e) {}
       const done = document.createElement("div");
       done.className = "card";
-      done.innerHTML = `<h3>已提交</h3><p>${editId ? "资料已更新。" : "资料已交给平台审核。"}</p><p class="muted">${editId ? "已上架的会直接改原帖。" : "请联系"+admin+"开通/续期上架。"}</p><button class="btn block" type="button" id="pubAgain">返回上架</button>`;
+      done.innerHTML = `<h3>已提交</h3><p>${editId ? "资料已更新。" : "资料已交给平台审核。"}</p><p class="muted">${editId ? "已上架的会直接改原帖。" : "请联系"+esc(admin)+"开通/续期上架。"}</p><button class="btn block" type="button" id="pubAgain">返回上架</button>`;
       form.classList.add("hidden");
       form.parentNode.insertBefore(done, form.nextSibling);
       $("#pubAgain")?.addEventListener("click", () => { done.remove(); form.classList.remove("hidden"); loadFields(); });
