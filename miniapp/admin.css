@@ -17,10 +17,14 @@ html, body.admin-body {
   background: var(--ad-bg); color: var(--ad-text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
 }
+/* Sticky needs the document (html) to be the scroller: body must not be its own
+   overflow container, otherwise the topbar scrolls away with the page. */
+body.admin-body { overflow: visible !important; }
 .admin-body .topbar {
-  position: sticky; top: 0; z-index: 50;
+  position: sticky; position: -webkit-sticky; top: 0; z-index: 50;
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 10px 12px;
+  padding-top: max(10px, env(safe-area-inset-top));
   background: rgba(11,15,24,.92);
   border-bottom: 1px solid var(--ad-line);
 }
