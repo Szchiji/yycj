@@ -27,6 +27,9 @@
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function paint(lamp) {
     const box = document.getElementById("detail");
     if (!box || !lamp) return;
@@ -37,9 +40,9 @@
       <p class="muted">📍 ${String(loc || "").replace(/[<>]/g, "")}</p>
       <p>${String(lamp.description || "").replace(/[<>]/g, "")}</p>
       <div class="row">
-        <button class="btn primary" id="detailChat" data-lamp="${lamp.lamp_id || ""}" type="button">想聊聊</button>
+        <button class="btn primary" id="detailChat" data-lamp="${esc(lamp.lamp_id || "")}" type="button">想聊聊</button>
         <button class="btn" id="detailReview" type="button">写评价</button>
-        <button class="btn" id="detailShare" data-share="${lamp.lamp_id || ""}" type="button">分享</button>
+        <button class="btn" id="detailShare" data-share="${esc(lamp.lamp_id || "")}" type="button">分享</button>
       </div>
     </div>`;
     window.__yycjOpenLamp = lamp.lamp_id || "";
