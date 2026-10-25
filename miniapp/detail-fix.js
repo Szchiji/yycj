@@ -52,6 +52,9 @@
     });
     return out;
   }
+  function esc(t) {
+    return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
+  }
   function render(items, lampId, idx, play) {
     const el = host();
     if (!el || !items.length) return;
@@ -61,17 +64,17 @@
     const poster = cur.poster || "";
     let hero;
     if (cur.type === "video" && play) {
-      hero = `<video src="${cur.src}" ${poster ? `poster="${poster}"` : ""} playsinline controls preload="auto"></video>`;
+      hero = `<video src="${esc(cur.src)}" ${poster ? `poster="${esc(poster)}"` : ""} playsinline controls preload="auto"></video>`;
     } else if (cur.type === "video") {
-      hero = `${poster ? `<img src="${poster}" alt="" />` : `<div style="height:220px;background:#111"></div>`}<span class="hero-play">▶</span>`;
+      hero = `${poster ? `<img src="${esc(poster)}" alt="" />` : `<div style="height:220px;background:#111"></div>`}<span class="hero-play">▶</span>`;
     } else {
-      hero = `<img src="${cur.src}" alt="" />`;
+      hero = `<img src="${esc(cur.src)}" alt="" />`;
     }
     el.innerHTML = `<div class="gallery-hero" data-play="${cur.type === "video" ? "1" : "0"}">${hero}</div>
       <div class="gallery-thumbs">${items.map((m, i) => `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
         m.type === "video"
-          ? `${m.poster ? `<img src="${m.poster}" alt="" />` : ""}<span class="play">▶</span>`
-          : `<img src="${m.src}" alt="" />`
+          ? `${m.poster ? `<img src="${esc(m.poster)}" alt="" />` : ""}<span class="play">▶</span>`
+          : `<img src="${esc(m.src)}" alt="" />`
       }</button>`).join("")}</div>`;
     el.querySelectorAll("[data-g]").forEach((btn) => {
       btn.onclick = (ev) => {
