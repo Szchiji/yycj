@@ -1,0 +1,74 @@
+/* ===== Admin button-layout proposal (branch only, not deployed) ===== */
+/* 1. Tap targets ≥ 44px everywhere inside panes */
+.admin-pane .btn, .admin-pane button.btn, .admin-pane a.btn { min-height: 44px; padding-top: 0; padding-bottom: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; border-radius: 12px; }
+.admin-pane input:not([type=checkbox]):not([type=file]), .admin-pane select { min-height: 44px; font-size: 15px; }
+#adminSide button { min-height: 44px; }
+
+/* 2. One consistent action row per item: [危险(描边)] ……空隙…… [次要] [主要] */
+.act-row { display: flex !important; flex-wrap: wrap !important; align-items: center; gap: 8px; margin-top: 12px !important; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); width: 100%; }
+.act-row > .a-danger { order: 0; }
+.act-row > .a-gap { order: 1; flex: 1 1 0; min-width: 0; height: 0; }
+.act-row > .a-sec { order: 2; }
+.act-row > .a-primary { order: 3; min-width: 96px; font-weight: 700; }
+.act-row .btn.danger, .pick-actions .btn.danger { background: transparent !important; border: 1px solid rgba(243,18,96,.55) !important; color: #ff8fab !important; }
+.act-row > .ad-more > .btn { min-height: 44px; }
+
+/* 3. 待审资料卡: media as a compact strip, pin as a toggle next to 通过 */
+.media-strip { display: flex; gap: 6px; overflow-x: auto; margin: 8px 0 2px; scrollbar-width: none; }
+.media-strip::-webkit-scrollbar { display: none; }
+.media-strip > img, .media-strip > .vtile { flex: 0 0 72px; width: 72px !important; height: 72px !important; max-width: none !important; margin: 0 !important; border-radius: 10px !important; object-fit: cover; background: #111; }
+.media-strip > .vtile { position: relative; overflow: hidden; border: 0; padding: 0; }
+.media-strip > .vtile video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.media-strip > .vtile::after { content: "▶"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; background: rgba(0,0,0,.3); font-size: 18px; }
+.pin-toggle { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; margin: 10px 0 0; padding: 0 12px; border-radius: 12px; background: rgba(255,255,255,.04); font-size: 14px; color: #c9d1f2; }
+.post-card .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.post-card .edit-diff { margin: 0; }
+
+/* 4. Switch-style checkboxes (settings rows + pin toggle) */
+.admin-pane input.sw, #pane-venue label.row > input[type=checkbox] { -webkit-appearance: none; appearance: none; flex: 0 0 46px; width: 46px; height: 28px; border-radius: 14px; background: #2a3352; position: relative; margin: 0; transition: background .15s; cursor: pointer; }
+.admin-pane input.sw::after, #pane-venue label.row > input[type=checkbox]::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 11px; background: #fff; transition: left .15s; }
+.admin-pane input.sw:checked, #pane-venue label.row > input[type=checkbox]:checked { background: #3dd68c; }
+.admin-pane input.sw:checked::after, #pane-venue label.row > input[type=checkbox]:checked::after { left: 21px; }
+#pane-venue label.row { display: flex !important; flex-direction: row-reverse; justify-content: space-between; align-items: center; min-height: 48px; margin: 6px 0 0; padding: 0 2px; font-size: 15px; color: #e8ecff; width: 100%; }
+
+/* 5. Settings: the save bar is always visible on 站点设置 (reuses #adSaveBar), shows dirty state */
+#pane-venue.active { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+body.pane-venue #adSaveBar.hidden { display: flex !important; }
+#adSaveBar { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)) !important; background: rgba(11,16,32,.96) !important; border-top: 1px solid rgba(255,255,255,.08) !important; }
+#adSaveBar > span { font-size: 13px; color: #9aa3c7; }
+#adSaveBar.is-dirty > span { color: #f5a524; font-weight: 600; }
+#adSaveBar #adSaveNow { min-height: 44px; min-width: 140px; border-radius: 12px; }
+#btnOpsSave.pp-hidden, .pp-hidden { display: none !important; }
+
+/* 6. 卡片置顶 / 精选轮播: search result = name row + [有效小时][按钮] row (no overlap) */
+.pick-item.pick-add { display: grid !important; grid-template-columns: 1fr auto; grid-template-areas: "meta meta" "hrs btn"; gap: 8px; align-items: center; }
+.pick-item.pick-add > .meta { grid-area: meta; }
+.pick-item.pick-add > .hrs { grid-area: hrs; width: 100% !important; min-width: 0; }
+.pick-item.pick-add > .btn { grid-area: btn; min-width: 96px; }
+.pick-now .pick-actions .btn { min-width: 88px; }
+.pick-now .pick-actions .btn.danger::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: #3dd68c; margin-right: 6px; }
+
+/* 6b. list items with an action row: info on top, actions underneath (never overflow sideways) */
+.pick-item.stack { display: block !important; }
+.pick-item.stack > .act-row { margin-top: 10px !important; padding-top: 10px; }
+
+/* 7. Users: actions wrap into a 2-column grid under the user info */
+.pick-item.user-item { display: block !important; }
+.pick-item.user-item > .act-row > .btn { flex: 1 1 calc(50% - 4px) !important; min-width: 0 !important; }
+.pick-item.user-item > .act-row > .a-gap { display: none; }
+
+/* 8. Listings: list first; the two forms folded below */
+details.fold { margin: 12px 0 0; border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); }
+details.fold > summary { min-height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-weight: 600; list-style: none; cursor: pointer; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: "展开"; font-size: 12px; font-weight: 400; color: #9aa3c7; }
+details.fold[open] > summary::after { content: "收起"; }
+details.fold > .card { margin: 0; border: 0; background: none; }
+details.fold > .card > h3:first-child { display: none; }
+
+/* 9. Full-width primary for single-submit forms */
+#adjForm button[type=submit], #btnSaveOps, #btnProxy, #editBox .btn.primary { width: 100%; margin-top: 12px; }
+
+/* 10. Breathing room between a search row and its results */
+#adminListings, #feedPinResults, #pinResults, #adminUsers { margin-top: 10px; }
+#adminListings > .pick-item, #feedPinResults > .pick-item, #pinResults > .pick-item, #adminUsers > .pick-item { margin-bottom: 10px; }
