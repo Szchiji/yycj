@@ -6,7 +6,16 @@
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
-    st.textContent = `#detail .media-grid{display:none!important;}#yycjGallery{margin:8px 0 10px;}#yycjGallery .gallery-hero{width:100%;border-radius:12px;overflow:hidden;background:#111;min-height:180px;position:relative;}#yycjGallery .gallery-hero img,#yycjGallery .gallery-hero video{width:100%;max-height:320px;object-fit:contain;background:#111;display:block;}#yycjGallery .gallery-thumbs{display:flex;gap:6px;overflow-x:auto;margin-top:8px;}#yycjGallery .g-thumb{position:relative;flex:0 0 54px;width:54px;height:54px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#1a2233;}#yycjGallery .g-thumb.on{border-color:#7ea8ff;}#yycjGallery .g-thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#1a2233;}#yycjGallery .g-thumb .play,#yycjGallery .hero-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.28);font-size:18px;pointer-events:none;}`;
+    st.textContent = `#detail .media-grid{display:none!important;}#yycjGallery{margin:8px 0 10px;position:relative;}
+#yycjGallery .yc-track{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;border-radius:12px;background:#111;touch-action:pan-x pan-y;}
+#yycjGallery .yc-track::-webkit-scrollbar{display:none;}
+#yycjGallery .yc-slide{position:relative;flex:0 0 100%;width:100%;height:min(calc(100vw - 24px),60vh);scroll-snap-align:center;scroll-snap-stop:always;padding:0;margin:0;border:0;background:#111;display:block;overflow:hidden;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;}
+#yycjGallery .yc-slide img{width:100%;height:100%;object-fit:contain;display:block;background:#111;-webkit-user-drag:none;user-select:none;}
+#yycjGallery .yc-play{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:28px;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.45);font-size:22px;pointer-events:none;}
+#yycjGallery .yc-count{position:absolute;top:10px;right:10px;padding:3px 9px;border-radius:12px;background:rgba(0,0,0,.5);color:#fff;font-size:12px;line-height:18px;pointer-events:none;}
+#yycjGallery .yc-dots{display:flex;justify-content:center;gap:6px;margin-top:8px;height:6px;}
+#yycjGallery .yc-dot{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.25);transition:width .2s,background .2s;}
+#yycjGallery .yc-dot.on{width:16px;background:#7ea8ff;}`;
     document.head.appendChild(st);
   }
   function host() {
@@ -55,13 +64,6 @@
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
-  function heroHtml(cur) {
-    const poster = cur.poster || "";
-    if (cur.type === "video") {
-      return `${poster ? `<img src="${esc(poster)}" alt="" />` : `<div style="height:220px;background:#111"></div>`}<span class="hero-play">▶</span>`;
-    }
-    return `<img src="${esc(cur.src)}" alt="" />`;
-  }
   function thumbHtml(m, i, idx) {
     return `<button type="button" class="g-thumb${i === idx ? " on" : ""}" data-g="${i}">${
       m.type === "video"
@@ -77,49 +79,61 @@
     if (strip.scrollTo) strip.scrollTo({ left: target, behavior: smooth ? "smooth" : "auto" });
     else strip.scrollLeft = target;
   }
-  function select(el, items, idx) {
-    const cur = items[idx];
-    if (!cur) return;
+  // Inline carousel: one large item per view, swipe horizontally (scroll-snap).
+  // Videos only show a poster here; they load/play in the full-screen viewer.
+  function slideHtml(m, i) {
+    const lazy = i > 1 ? ` loading="lazy"` : "";
+    const inner = m.type === "video"
+      ? `${m.poster ? `<img src="${esc(m.poster)}" alt=""${lazy} decoding="async" draggable="false" />` : ""}<span class="yc-play">▶</span>`
+      : `<img src="${esc(m.src)}" alt=""${lazy} decoding="async" draggable="false" />`;
+    return `<button type="button" class="yc-slide" data-i="${i}" data-type="${m.type}" aria-label="${m.type === "video" ? "播放视频" : "查看图片"} ${i + 1}">${inner}</button>`;
+  }
+  function setIdx(el, idx, n) {
     el.dataset.idx = String(idx);
-    const heroBox = el.querySelector(".gallery-hero");
-    if (heroBox) {
-      // Hold the current height while the new media loads so the page doesn't jump.
-      const h = heroBox.offsetHeight;
-      if (h) heroBox.style.minHeight = h + "px";
-      heroBox.setAttribute("data-play", cur.type === "video" ? "1" : "0");
-      heroBox.innerHTML = heroHtml(cur);
-      const img = heroBox.querySelector("img");
-      const release = () => { heroBox.style.minHeight = ""; };
-      if (img && !img.complete) { img.addEventListener("load", release, { once: true }); img.addEventListener("error", release, { once: true }); }
-      else release();
-    }
-    const strip = el.querySelector(".gallery-thumbs");
-    el.querySelectorAll(".g-thumb").forEach((b, i) => b.classList.toggle("on", i === idx));
-    revealThumb(strip, el.querySelector(`.g-thumb[data-g="${idx}"]`), true);
+    const c = el.querySelector(".yc-count");
+    if (c) c.textContent = `${idx + 1}/${n}`;
+    el.querySelectorAll(".yc-dot").forEach((d, k) => d.classList.toggle("on", k === idx));
+  }
+  function goSlide(el, idx, n) {
+    const track = el.querySelector(".yc-track");
+    if (!track) return;
+    track.scrollLeft = idx * track.clientWidth;
+    setIdx(el, idx, n);
   }
   function render(items, lampId, idx) {
     const el = host();
     if (!el || !items.length) return;
     if (idx < 0 || idx >= items.length) idx = 0;
-    const cur = items[idx];
+    const n = items.length;
     el.dataset.lamp = lampId || "";
     el.dataset.idx = String(idx);
-    el.innerHTML = `<div class="gallery-hero" data-play="${cur.type === "video" ? "1" : "0"}">${heroHtml(cur)}</div>
-      <div class="gallery-thumbs">${items.map((m, i) => thumbHtml(m, i, idx)).join("")}</div>`;
+    el.innerHTML = `<div class="yc-track">${items.map(slideHtml).join("")}</div>${
+      n > 1 ? `<span class="yc-count">${idx + 1}/${n}</span>` : ""}${
+      n > 1 && n <= 12 ? `<div class="yc-dots">${items.map((_, k) => `<span class="yc-dot${k === idx ? " on" : ""}"></span>`).join("")}</div>` : ""}`;
+    // Height follows the first item's aspect ratio (clamped 3:4 portrait .. 4:3 landscape).
+    const first = el.querySelector(".yc-slide img");
+    const fit = () => { if (first && first.naturalWidth) el.style.setProperty("--yc-r", Math.max(0.75, Math.min(4 / 3, first.naturalHeight / first.naturalWidth)).toFixed(4)); };
+    if (first) { if (first.complete) fit(); else first.addEventListener("load", fit, { once: true }); }
+    const track = el.querySelector(".yc-track");
+    let t = 0;
+    track.addEventListener("scroll", () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const w = track.clientWidth || 1;
+        const k = Math.max(0, Math.min(n - 1, Math.round(track.scrollLeft / w)));
+        if (String(k) !== el.dataset.idx) setIdx(el, k, n);
+      }, 60);
+    }, { passive: true });
     el.onclick = (ev) => {
-      const btn = ev.target.closest("[data-g]");
-      if (btn && el.contains(btn)) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        select(el, items, Number(btn.getAttribute("data-g") || 0));
-        return;
-      }
-      if (ev.target.closest(".gallery-hero")) {
-        ev.preventDefault();
-        openViewer(items, Number(el.dataset.idx || 0), (n) => select(el, items, n));
-      }
+      const sl = ev.target.closest(".yc-slide");
+      if (!sl || !el.contains(sl)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const k = Number(sl.getAttribute("data-i") || 0);
+      openViewer(items, k, (m) => goSlide(el, m, n));
     };
-    document.querySelectorAll("#detail .media-grid").forEach((n) => { n.style.display = "none"; });
+    if (idx) goSlide(el, idx, n);
+    document.querySelectorAll("#detail .media-grid").forEach((x) => { x.style.display = "none"; });
   }
 
   // ---- Full-screen viewer: fixed overlay, background locked, swipe between media,
@@ -258,6 +272,7 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     ov.querySelectorAll("video").forEach((v) => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} });
     document.removeEventListener("keydown", ov._onKey);
     const cb = ov._onClose;
+    window.__yycjViewerClosedAt = Date.now();
     ov.remove();
     unlockPage();
     if (cb) cb();
