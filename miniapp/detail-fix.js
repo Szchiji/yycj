@@ -3,6 +3,37 @@
   window.__yycjDetailFix = true;
   const token = () => localStorage.getItem("yycj_token") || "";
   window.__yycjLampCache = window.__yycjLampCache || {};
+  // One detail open used to fire 3 identical GET /api/lamps/<id> (app.js, this file, detail-kit.js;
+  // deep-open.js fires 2 more). Share one in-flight request (+4s reuse); each caller gets a clone.
+  // A caller without ?query may reuse the app.js request that carries ?lat&lng (same payload).
+  if (!window.__yycjLampFetch) {
+    window.__yycjLampFetch = true;
+    const rawFetch = window.fetch.bind(window);
+    const memo = new Map();
+    const RE = /^(?:https?:\/\/[^/]+)?\/api\/lamps\/([^/?#]+)(\?[^#]*)?$/;
+    window.fetch = function (input, init) {
+      try {
+        const url = typeof input === "string" ? input : (input && input.url) || "";
+        const method = String((init && init.method) || (input && typeof input !== "string" && input.method) || "GET").toUpperCase();
+        const mm = method === "GET" && RE.exec(url.replace(location.origin, ""));
+        if (mm) {
+          const auth = new Headers((init && init.headers) || (input && typeof input !== "string" && input.headers) || {}).get("Authorization") || "";
+          const now = Date.now();
+          memo.forEach((e, k) => { if (e.done && now - e.t > 4000) memo.delete(k); });
+          const id = mm[1], q = mm[2] || "";
+          const key = id + "|" + q + "|" + auth;
+          let e = memo.get(key);
+          if (!e && !q) memo.forEach((x, k) => { if (!e && k.startsWith(id + "|") && k.endsWith("|" + auth)) e = x; });
+          if (e) return e.p.then((r) => r.clone());
+          const ent = { p: rawFetch(input, init), t: now, done: false };
+          memo.set(key, ent);
+          ent.p.then((r) => { ent.done = true; ent.t = Date.now(); if (!r.ok) memo.delete(key); }, () => memo.delete(key));
+          return ent.p.then((r) => r.clone());
+        }
+      } catch (e) {}
+      return rawFetch(input, init);
+    };
+  }
   if (!document.getElementById("yycj-gallery-css")) {
     const st = document.createElement("style");
     st.id = "yycj-gallery-css";
@@ -12,6 +43,8 @@
 #yycjGallery .yc-slide{position:relative;flex:0 0 100%;width:100%;height:min(calc(100vw - 24px),60vh);scroll-snap-align:center;scroll-snap-stop:always;padding:0;margin:0;border:0;background:#111;display:block;overflow:hidden;-webkit-appearance:none;appearance:none;-webkit-tap-highlight-color:transparent;}
 #yycjGallery .yc-slide img{width:100%;height:100%;object-fit:contain;display:block;background:#111;-webkit-user-drag:none;user-select:none;}
 #yycjGallery .yc-play{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:28px;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.45);font-size:22px;pointer-events:none;}
+#yycjGallery .yc-slide video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:block;}
+#yycjGallery .yc-slide.playing .yc-play,#yycjGallery .yc-slide.playing>img{display:none;}
 #yycjGallery .yc-count{position:absolute;top:10px;right:10px;padding:3px 9px;border-radius:12px;background:rgba(0,0,0,.5);color:#fff;font-size:12px;line-height:18px;pointer-events:none;}
 #yycjGallery .yc-dots{display:flex;justify-content:center;gap:6px;margin-top:8px;height:6px;}
 #yycjGallery .yc-dot{width:6px;height:6px;border-radius:3px;background:rgba(255,255,255,.25);transition:width .2s,background .2s;}
@@ -80,13 +113,13 @@
     else strip.scrollLeft = target;
   }
   // Inline carousel: one large item per view, swipe horizontally (scroll-snap).
-  // Videos only show a poster here; they load/play in the full-screen viewer.
+  // Videos show their poster (no download: no <video> yet) and play in place on tap.
   function slideHtml(m, i) {
     const lazy = i > 1 ? ` loading="lazy"` : "";
     const inner = m.type === "video"
       ? `${m.poster ? `<img src="${esc(m.poster)}" alt=""${lazy} decoding="async" draggable="false" />` : ""}<span class="yc-play">▶</span>`
       : `<img src="${esc(m.src)}" alt=""${lazy} decoding="async" draggable="false" />`;
-    return `<button type="button" class="yc-slide" data-i="${i}" data-type="${m.type}" aria-label="${m.type === "video" ? "播放视频" : "查看图片"} ${i + 1}">${inner}</button>`;
+    return `<div class="yc-slide" data-i="${i}" data-type="${m.type}"${m.type === "video" ? ` role="button" tabindex="0" aria-label="播放视频 ${i + 1}"` : ` aria-label="图片 ${i + 1}"`}>${inner}</div>`;
   }
   function setIdx(el, idx, n) {
     el.dataset.idx = String(idx);
@@ -100,11 +133,44 @@
     track.scrollLeft = idx * track.clientWidth;
     setIdx(el, idx, n);
   }
+  function unloadVideo(v) {
+    try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {}
+    const sl = v.closest(".yc-slide");
+    if (sl) sl.classList.remove("playing");
+    v.remove();
+  }
+  // Stop + release every inline video (frees the decoder and the network stream).
+  function stopVideos(root) {
+    (root || document.getElementById("yycjGallery"))?.querySelectorAll("video").forEach(unloadVideo);
+  }
+  window.__yycjStopDetailVideos = () => stopVideos();
+  function pauseOthers(el, keep) {
+    el.querySelectorAll(".yc-slide video").forEach((v) => {
+      if (Number(v.parentNode.getAttribute("data-i")) !== keep && !v.paused) { try { v.pause(); } catch (e) {} }
+    });
+  }
+  function playInline(sl, m) {
+    let v = sl.querySelector("video");
+    if (!v) {
+      v = document.createElement("video");
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "");
+      v.controls = true;
+      v.preload = "metadata";
+      if (m.poster) v.poster = m.poster;
+      v.src = m.src;
+      sl.appendChild(v);
+      sl.classList.add("playing");
+    }
+    const r = v.play();
+    if (r && r.catch) r.catch(() => {});
+  }
   function render(items, lampId, idx) {
     const el = host();
     if (!el || !items.length) return;
     if (idx < 0 || idx >= items.length) idx = 0;
     const n = items.length;
+    stopVideos(el);
     el.dataset.lamp = lampId || "";
     el.dataset.idx = String(idx);
     el.innerHTML = `<div class="yc-track">${items.map(slideHtml).join("")}</div>${
@@ -122,15 +188,22 @@
         const w = track.clientWidth || 1;
         const k = Math.max(0, Math.min(n - 1, Math.round(track.scrollLeft / w)));
         if (String(k) !== el.dataset.idx) setIdx(el, k, n);
+        pauseOthers(el, k);
       }, 60);
     }, { passive: true });
+    // Tap: video slide plays in place (native controls pause/seek/fullscreen); image slide does nothing.
     el.onclick = (ev) => {
       const sl = ev.target.closest(".yc-slide");
       if (!sl || !el.contains(sl)) return;
-      ev.preventDefault();
+      if (ev.target.closest("video")) return;
       ev.stopPropagation();
       const k = Number(sl.getAttribute("data-i") || 0);
-      openViewer(items, k, (m) => goSlide(el, m, n));
+      if (items[k] && items[k].type === "video") { ev.preventDefault(); pauseOthers(el, k); playInline(sl, items[k]); }
+    };
+    el.onkeydown = (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      const sl = ev.target.closest && ev.target.closest('.yc-slide[data-type="video"]');
+      if (sl && !sl.querySelector("video")) { ev.preventDefault(); const k = Number(sl.getAttribute("data-i") || 0); playInline(sl, items[k]); }
     };
     if (idx) goSlide(el, idx, n);
     document.querySelectorAll("#detail .media-grid").forEach((x) => { x.style.display = "none"; });
@@ -278,6 +351,14 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     if (cb) cb();
   }
   window.__yycjCloseViewer = closeViewer;
+  {
+    const view = document.getElementById("view-detail");
+    if (view) new MutationObserver(() => { if (view.classList.contains("hidden")) stopVideos(); })
+      .observe(view, { attributes: true, attributeFilter: ["class"] });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) document.querySelectorAll("#yycjGallery video").forEach((v) => { try { v.pause(); } catch (e) {} });
+    });
+  }
   try {
     const tg = window.Telegram && window.Telegram.WebApp;
     if (tg && tg.onEvent) tg.onEvent("backButtonClicked", closeViewer);
@@ -299,6 +380,7 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
   }
   window.openLamp = function (id) {
     closeViewer();
+    stopVideos();
     window.__yycjBack = window.__yycjBack || "home";
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
