@@ -8,7 +8,17 @@
   if (!document.getElementById("yycj-xhs-css")) {
     const st = document.createElement("style");
     st.id = "yycj-xhs-css";
-    st.textContent = `body.xhs-detail .bottom-nav{display:none!important;}
+    st.textContent = `:root{--xhs-safe:max(env(safe-area-inset-top,0px),calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px)));--xhs-top-h:calc(48px + var(--xhs-safe));}
+body.xhs-detail .bottom-nav{display:none!important;}
+body.xhs-detail .topbar{display:none!important;}
+#xhsTop{position:fixed;top:0;left:0;right:0;z-index:60;display:none;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;box-sizing:border-box;height:var(--xhs-top-h);padding:var(--xhs-safe) 4px 0;background:rgba(11,16,32,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.07);}
+body.xhs-detail #xhsTop{display:grid;}
+#xhsTop .xt-back{width:44px;height:44px;margin:0 0 0 2px;padding:0;border:0;border-radius:22px;background:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+#xhsTop .xt-back::before{content:"";width:11px;height:11px;border-left:2px solid #e8ecff;border-bottom:2px solid #e8ecff;transform:translateX(3px) rotate(45deg);}
+#xhsTop .xt-back:active{background:rgba(255,255,255,.08);}
+#xhsTop .xt-name{min-width:0;text-align:center;font-size:16px;font-weight:700;color:#e8ecff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#view-detail.xhs{padding-top:var(--xhs-top-h);}
+#view-detail.xhs #btnBackHome{display:none!important;}
 #view-detail.xhs{position:relative;padding-bottom:calc(76px + env(safe-area-inset-bottom));}
 #view-detail.xhs #btnBackHome{position:absolute;top:10px;left:10px;z-index:6;width:36px;height:36px;min-height:0;padding:0;margin:0;border-radius:18px;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:0;line-height:0;display:flex;align-items:center;justify-content:center;}
 #view-detail.xhs #btnBackHome::before{content:"";width:10px;height:10px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:translateX(2px) rotate(45deg);}
@@ -133,14 +143,42 @@
     const chat = document.getElementById("detailChat");
     if (chat && chat.parentNode !== bar) bar.appendChild(chat);
   }
-  function syncBody() {
-    document.body.classList.toggle("xhs-detail", !view.classList.contains("hidden"));
+  // Fixed detail top bar: back (same as the existing 返回) + 花名 centered.
+  let top = document.getElementById("xhsTop");
+  if (!top) {
+    top = document.createElement("div");
+    top.id = "xhsTop";
+    top.innerHTML = `<button type="button" class="xt-back" aria-label="返回"></button><div class="xt-name"></div><span></span>`;
+    document.body.appendChild(top);
   }
+  function goBack() {
+    if (document.getElementById("yycjViewer") && window.__yycjCloseViewer) { window.__yycjCloseViewer(); return; }
+    document.getElementById("btnBackHome")?.click();
+  }
+  top.querySelector(".xt-back").addEventListener("click", (ev) => { ev.preventDefault(); goBack(); });
+  function syncName() {
+    const n = (document.querySelector("#detail .xhs-pub h3, #detail > .card h3")?.textContent || "").trim();
+    const el = top.querySelector(".xt-name");
+    if (el.textContent !== n) { el.textContent = n; el.title = n; }
+  }
+  const tg = window.Telegram && window.Telegram.WebApp;
+  function syncBody() {
+    const on = !view.classList.contains("hidden");
+    document.body.classList.toggle("xhs-detail", on);
+    try { if (tg && tg.BackButton) { if (on) tg.BackButton.show(); else tg.BackButton.hide(); } } catch (e) {}
+  }
+  // Telegram BackButton: closes the full-screen viewer first (detail-fix.js), otherwise goes back like 返回.
+  try {
+    if (tg && tg.onEvent) tg.onEvent("backButtonClicked", () => {
+      if (Date.now() - (window.__yycjViewerClosedAt || 0) < 400) return;
+      if (!view.classList.contains("hidden")) goBack();
+    });
+  } catch (e) {}
   let busy = false;
   new MutationObserver(() => {
     if (busy) return;
     busy = true;
-    try { decorate(); } finally { Promise.resolve().then(() => { busy = false; }); }
+    try { decorate(); syncName(); } finally { Promise.resolve().then(() => { busy = false; }); }
   }).observe(view, { childList: true, subtree: true });
   new MutationObserver(syncBody).observe(view, { attributes: true, attributeFilter: ["class"] });
   syncBody();

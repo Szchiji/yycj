@@ -272,6 +272,7 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     ov.querySelectorAll("video").forEach((v) => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} });
     document.removeEventListener("keydown", ov._onKey);
     const cb = ov._onClose;
+    window.__yycjViewerClosedAt = Date.now();
     ov.remove();
     unlockPage();
     if (cb) cb();
