@@ -46,16 +46,10 @@ body.pane-venue #adSaveBar.hidden { display: flex !important; }
 .pick-item.pick-add > .hrs { grid-area: hrs; width: 100% !important; min-width: 0; }
 .pick-item.pick-add > .btn { grid-area: btn; min-width: 96px; }
 .pick-now .pick-actions .btn { min-width: 88px; }
-.pick-now .pick-actions .btn.danger::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: #3dd68c; margin-right: 6px; }
 
 /* 6b. list items with an action row: info on top, actions underneath (never overflow sideways) */
 .pick-item.stack { display: block !important; }
 .pick-item.stack > .act-row { margin-top: 10px !important; padding-top: 10px; }
-
-/* 7. Users: actions wrap into a 2-column grid under the user info */
-.pick-item.user-item { display: block !important; }
-.pick-item.user-item > .act-row > .btn { flex: 1 1 calc(50% - 4px) !important; min-width: 0 !important; }
-.pick-item.user-item > .act-row > .a-gap { display: none; }
 
 /* 8. Listings: list first; the two forms folded below */
 details.fold { margin: 12px 0 0; border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); }
@@ -72,3 +66,29 @@ details.fold > .card > h3:first-child { display: none; }
 /* 10. Breathing room between a search row and its results */
 #adminListings, #feedPinResults, #pinResults, #adminUsers { margin-top: 10px; }
 #adminListings > .pick-item, #feedPinResults > .pick-item, #pinResults > .pick-item, #adminUsers > .pick-item { margin-bottom: 10px; }
+
+/* 11. Unified list-row action bar: [危险 左] … [更多 ⋯] [主操作 右] */
+.lb-host.pick-item { display: block !important; }
+.lb-host.pick-now { display: grid !important; grid-template-columns: auto minmax(0,1fr); align-items: center; column-gap: 12px; }
+.lb-host.pick-now > .lbar { grid-column: 1 / -1; }
+.lbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; width: 100%; flex: 0 0 100%; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); }
+.lbar > .btn, .lbar .lb-more { flex: 0 0 auto; min-height: 44px !important; height: 44px; padding: 0 16px !important; margin: 0 !important; border-radius: 12px; font-size: 15px; white-space: nowrap; }
+.lbar > .lb-gap { flex: 1 1 auto; min-width: 0; }
+.lbar > .lb-danger { min-width: 88px; background: transparent !important; border: 1px solid rgba(243,18,96,.6) !important; color: #ff8fab !important; }
+.lbar > .lb-main { min-width: 104px; font-weight: 700; }
+.lbar > .lb-main:not(.primary):not(.danger) { background: #7aa2ff !important; color: #081018 !important; border-color: transparent !important; }
+.lbar .lb-more { background: rgba(255,255,255,.06) !important; border: 1px solid rgba(255,255,255,.12) !important; color: #e8ecff !important; }
+.lbar .lb-more i { font-style: normal; margin-left: 4px; letter-spacing: 1px; }
+.lb-store { display: none !important; }
+.lb-sheet { position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }
+.lb-sheet.hidden { display: none; }
+.lb-sheet .lb-card { width: 100%; background: #151b2f; border-radius: 16px 16px 0 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.lb-sheet .lb-title { font-size: 13px; color: #9aa3c7; text-align: center; padding: 4px 0 6px; }
+.lb-sheet .btn { width: 100%; min-height: 48px; font-size: 16px; border-radius: 12px; justify-content: center; display: flex; align-items: center; }
+.lb-sheet .lb-item.danger { background: transparent; border: 1px solid rgba(243,18,96,.6); color: #ff8fab; }
+.lb-sheet .lb-cancel { margin-top: 4px; background: rgba(255,255,255,.06); }
+
+/* 12. Confirm dialog (every confirm here guards a destructive action): big buttons, red 确定 on the right */
+#adConfirm .ad-modal-card .row { display: flex; gap: 10px; }
+#adConfirm .ad-modal-card .btn { flex: 1 1 0; min-height: 44px; font-size: 15px; border-radius: 12px; }
+#adConfirm #adConfirmOk { background: #f31260 !important; color: #fff !important; border-color: transparent !important; font-weight: 700; }

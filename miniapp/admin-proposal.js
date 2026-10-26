@@ -19,6 +19,147 @@
     });
     if (!row.querySelector(":scope > .a-gap")) { const g = document.createElement("span"); g.className = "a-gap"; row.appendChild(g); }
   }
+
+  // ===== Unified list-row action bar =====
+  // [危险(红, 左)] ……… [更多 ⋯] [主操作(右)]  — at most 2 visible actions; the rest live in 更多 (bottom sheet).
+  // Real buttons never leave their list container, so every existing handler/API call still fires unchanged.
+  function mk(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function lbar(host, spec, anchor) {
+    const sig = spec.sig || "";
+    let bar = host.querySelector(":scope > .lbar");
+    if (bar && bar.dataset.sig === sig) return;
+    if (!bar) { bar = mk("div", "lbar"); (anchor ? anchor.after(bar) : host.appendChild(bar)); }
+    bar.dataset.sig = sig;
+    const keep = [spec.danger, spec.main, ...(spec.more || [])].filter(Boolean);
+    bar.innerHTML = "";
+    if (spec.danger) { spec.danger.classList.add("lb-danger"); bar.appendChild(spec.danger); }
+    bar.appendChild(mk("span", "lb-gap"));
+    if (spec.more && spec.more.length) {
+      const wrap = mk("div", "lb-morewrap");
+      const btn = mk("button", "btn lb-more", "更多 <i>⋯</i>");
+      btn.type = "button";
+      const store = mk("div", "lb-store");
+      spec.more.forEach((b) => { b.classList.remove("lb-danger", "lb-main"); store.appendChild(b); });
+      wrap.appendChild(btn);
+      wrap.appendChild(store);
+      bar.appendChild(wrap);
+    }
+    if (spec.main) { spec.main.classList.add("lb-main"); bar.appendChild(spec.main); }
+    keep.forEach((b) => { b.classList.remove("a-danger", "a-sec", "a-primary"); b.style.display = ""; });
+    host.classList.add("lb-host");
+  }
+  const q = (root, sel) => root.querySelector(sel);
+  function lists() {
+    // 待审资料: 拒绝 | 通过 (同时上轮播 = switch above the bar)
+    $$("#adminPosts > .card").forEach((c) => {
+      const row = c.querySelector(":scope > .row, :scope > .lbar");
+      const ok = q(c, '[data-admin="post-ok"]'), no = q(c, '[data-admin="post-no"]'), pin = q(c, '[data-admin="post-pin"]');
+      if (!ok) return;
+      lbar(c, { sig: "post", danger: no, main: ok, more: [] }, row);
+      if (pin && !pin.closest(".lb-store")) { const st = c.querySelector(".lbar"); let s = st.querySelector(".lb-store"); if (!s) { s = mk("div", "lb-store"); st.appendChild(s); } s.appendChild(pin); }
+      if (row && row.classList.contains("row") && !row.children.length) row.remove();
+    });
+    // 待审评价: 拒绝 | 更多(拒绝刷评) 通过
+    $$("#adminReviews > .card").forEach((c) => {
+      const row = c.querySelector(":scope > .row");
+      const ok = q(c, '[data-admin="rev-ok"]'), no = q(c, '[data-admin="rev-no"]'), brush = q(c, '[data-admin="rev-brush"]');
+      if (!ok) return;
+      lbar(c, { sig: "rev", danger: no, main: ok, more: [brush].filter(Boolean) }, row);
+      if (row && !row.children.length) row.remove();
+    });
+    // 举报: 驳回 | 采纳
+    $$("#adminReports > .card").forEach((c) => {
+      const row = c.querySelector(":scope > .row");
+      const ok = q(c, '[data-admin="rep-ok"]'), no = q(c, '[data-admin="rep-no"]');
+      if (!ok) return;
+      lbar(c, { sig: "rep", danger: no, main: ok, more: [] }, row);
+      if (row && !row.children.length) row.remove();
+    });
+    // 上架资料: 上架中 → 下架 | 更多(续期) 代改 ; 已下架 → 更多(代改, 续期) 重新上架
+    $$("#adminListings > .pick-item").forEach((it) => {
+      if (it.dataset.ux !== "1") return; // wait for admin-ux.js to finish its own pass first
+      const on = !!it.querySelector(".st-active");
+      const find = (sel) => it.querySelector(sel);
+      const unlist = find('[data-list="unlist"]'), relist = find('[data-list="relist"]'), renew = find('[data-list="renew"]'), proxy = find("[data-fill-proxy]");
+      // drop admin-ux's own 更多 + duplicate buttons (a second 下架 lived in its menu)
+      it.querySelectorAll('[data-list="unlist"]').forEach((b) => { if (b !== unlist) b.remove(); });
+      const oldRow = it.querySelector(":scope > .row");
+      if (renew && renew.textContent !== "续期") renew.textContent = "续期";
+      if (proxy && proxy.textContent !== "代改") proxy.textContent = "代改";
+      const spec = on ? { sig: "L1", danger: unlist, main: proxy, more: [renew] } : { sig: "L0", danger: null, main: relist, more: [proxy, renew] };
+      spec.more = spec.more.filter(Boolean);
+      lbar(it, spec);
+      if (oldRow) oldRow.remove();
+    });
+    // 卡片置顶 / 精选轮播 (current): 取消置顶 / 移出轮播 (red, left, already confirmed by admin-picks.js)
+    $$("#adminFeedPins .pick-now, #adminPins .pick-now").forEach((it) => {
+      const b = it.querySelector("[data-pin-act]");
+      if (!b) return;
+      const lbl = b.getAttribute("data-pin-act") === "feed-unpin" ? "取消置顶" : "移出轮播";
+      if (b.textContent !== lbl) b.textContent = lbl;
+      const acts = it.querySelector(":scope > .pick-actions");
+      lbar(it, { sig: "pin", danger: b, main: null, more: [] });
+      if (acts && !acts.children.length) acts.remove();
+    });
+    // 用户: 正常 → 拉黑 | 更多(解除拉黑, 解锁角色) 填入遮蔽 ; 已拉黑 → 更多(填入遮蔽, 解锁角色, 拉黑) 解除拉黑
+    $$("#adminUsers > .pick-item").forEach((it) => {
+      const ban = it.querySelector('[data-ban="1"]'), unban = it.querySelector('[data-ban="0"]'), fill = it.querySelector("[data-fill-shadow]"), unlock = it.querySelector("[data-unlock-role]");
+      if (!ban && !unban) return;
+      const banned = /已拉黑/.test(it.querySelector(".muted")?.textContent || "");
+      const row = it.querySelector(":scope > .row");
+      const spec = banned
+        ? { sig: "U1" + (unlock ? "r" : ""), danger: null, main: unban, more: [fill, unlock, ban] }
+        : { sig: "U0" + (unlock ? "r" : ""), danger: ban, main: fill, more: [unban, unlock] };
+      spec.more = spec.more.filter(Boolean);
+      lbar(it, spec);
+      if (row && !row.children.length) row.remove();
+    });
+  }
+  // 更多 → bottom sheet with proxies of the real (hidden) buttons
+  function sheet() {
+    let s = document.getElementById("lbSheet");
+    if (!s) {
+      s = mk("div", "lb-sheet hidden", `<div class="lb-card"><div class="lb-title"></div><div class="lb-items"></div><button type="button" class="btn lb-cancel">取消</button></div>`);
+      s.id = "lbSheet";
+      document.body.appendChild(s);
+      s.addEventListener("click", (e) => { if (e.target === s || e.target.closest(".lb-cancel")) s.classList.add("hidden"); });
+    }
+    return s;
+  }
+  document.addEventListener("click", (ev) => {
+    const more = ev.target.closest(".lb-more");
+    if (!more) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const store = more.parentNode.querySelector(".lb-store");
+    const host = more.closest(".lb-host");
+    const s = sheet();
+    s.querySelector(".lb-title").textContent = (host?.querySelector("strong")?.textContent || "").trim() || "更多操作";
+    const items = s.querySelector(".lb-items");
+    items.innerHTML = "";
+    [...(store?.children || [])].filter((b) => b.getAttribute("data-admin") !== "post-pin").forEach((real) => {
+      const p = mk("button", "btn lb-item" + (real.classList.contains("danger") ? " danger" : ""), "");
+      p.type = "button";
+      p.textContent = real.textContent.trim();
+      p.addEventListener("click", () => { s.classList.add("hidden"); real.click(); });
+      items.appendChild(p);
+    });
+    s.classList.remove("hidden");
+  }, true);
+  // Confirm every destructive list action that didn't already have one.
+  const NEEDS = '[data-admin="rev-no"], [data-admin="rev-brush"], [data-admin="rep-no"], [data-ban="1"]';
+  const MSG = { "rev-no": "确定拒绝这条评价？", "rev-brush": "确定判为刷评并拒绝？", "rep-no": "确定驳回这条举报？" };
+  window.addEventListener("click", async (ev) => {
+    const b = ev.target.closest && ev.target.closest(NEEDS);
+    if (!b || b.dataset.confirmed === "1" || !window.yycjConfirm) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const msg = MSG[b.getAttribute("data-admin")] || ("确定拉黑用户 " + (b.getAttribute("data-id") || "") + "？");
+    if (!(await window.yycjConfirm(msg))) return;
+    b.dataset.confirmed = "1";
+    b.click();
+    setTimeout(() => { delete b.dataset.confirmed; }, 500);
+  }, true);
   function moveBadge(card) {
     const diff = card.querySelector(":scope > .edit-diff");
     if (!diff) return;
@@ -124,16 +265,11 @@
   }
   function decorate() {
     $$("#adminPosts > .card").forEach((c) => { postCard(c); moveBadge(c); });
-    $$(".admin-pane .card > .row, .admin-pane .pick-item > .row, .admin-pane .ops-card > .row").forEach(actRow);
+    $$(".admin-pane .ops-card > .row").forEach(actRow);
     $$(".pick-item").forEach((it) => {
       if (!it.classList.contains("pick-add") && it.querySelector(":scope > .hrs")) it.classList.add("pick-add");
-      if (!it.classList.contains("user-item") && it.querySelector("[data-ban]")) it.classList.add("user-item");
     });
-    $$(".pick-now .pick-actions .btn.danger").forEach((b) => {
-      if (b.dataset.pp) return;
-      b.dataset.pp = "1";
-      b.textContent = b.closest("#adminPins") ? "轮播中 · 移除" : "置顶中 · 取消";
-    });
+    lists();
     listings();
     venue();
     syncPane();
