@@ -134,7 +134,8 @@
     placeShare(id);
   }
   function tune(v) {
-    if (!v || v.dataset.tuned) return;
+    // Carousel videos are user-started with sound + controls (detail-fix.js); don't force muted autoplay loops.
+    if (!v || v.dataset.tuned || v.closest("#yycjGallery")) return;
     v.dataset.tuned = "1";
     v.muted = true;
     v.autoplay = true;
