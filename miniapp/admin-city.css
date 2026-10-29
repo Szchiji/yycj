@@ -1,0 +1,24 @@
+/* ===== 后台城市分区 (proposal/admin-city-scope) ===== */
+.admin-body .topbar.has-city { flex-wrap: wrap; row-gap: 8px; }
+#cityBar { flex: 0 0 100%; min-width: 0; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -12px -4px; padding: 0 12px 2px; -webkit-overflow-scrolling: touch; }
+#cityBar::-webkit-scrollbar { display: none; }
+#cityBar .cb-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--ad-line); background: var(--ad-card); color: var(--ad-text); font-size: 14px; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+#cityBar .cb-chip.on { background: var(--ad-accent); border-color: var(--ad-accent); color: #0b0f18; font-weight: 700; }
+#cityBar .cb-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #f31260; color: #fff; font-size: 11px; line-height: 18px; text-align: center; font-weight: 700; }
+#cityBar .cb-chip.on .cb-n { background: #0b0f18; color: #fff; }
+#cityBar .cb-n.zero { display: none; }
+#cityBar .cb-scope { flex: 0 0 auto; font-size: 12px; color: var(--ad-mute); padding-right: 4px; }
+#citySum { flex: 0 0 100%; font-size: 12px; color: var(--ad-mute); margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#citySum b { color: var(--ad-text); font-weight: 600; }
+.city-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; margin: 0 0 6px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #0b0f18; background: #9fc3ff; vertical-align: middle; }
+.city-tag.c1 { background: #ffb38a; } .city-tag.c2 { background: #8ce0b5; } .city-tag.c3 { background: #e0a8ff; } .city-tag.c4 { background: #ffe08a; } .city-tag.c5 { background: #8adfff; }
+.city-tag.unknown { background: #3a4459; color: var(--ad-text); }
+.city-tag-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.city-off { display: none !important; }
+.city-empty { margin: 8px 0; }
+#cityCard .cc-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+#cityCard .cc-row .city-tag { margin: 0; }
+#cityCard .cc-ann { font-size: 13px; color: var(--ad-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 0; min-width: 0; }
+#cityCard textarea { width: 100%; box-sizing: border-box; }
+#cityCard .cc-op { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin: 6px 0; }
+#cityCard .cc-op code { font-size: 13px; }

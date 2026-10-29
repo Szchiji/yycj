@@ -20,6 +20,18 @@ def _is_admin(user_id: int) -> bool:
     return get_settings().is_admin(user_id)
 
 
+async def _in_scope(cb: CallbackQuery, kind: str, target: str) -> bool:
+    """City-scoped operators can't act on other cities from bot buttons either."""
+    from fastapi import HTTPException
+    from bot.services import city_scope
+    try:
+        await city_scope.guard(cb.from_user.id, kind, target)
+    except HTTPException as exc:
+        await cb.answer(str(exc.detail), show_alert=True)
+        return False
+    return True
+
+
 @router.message(Command("admin"))
 async def admin_help(message: Message) -> None:
     if not message.from_user:
@@ -79,6 +91,8 @@ async def post_ok(cb: CallbackQuery, bot: Bot) -> None:
         await cb.answer("无权限", show_alert=True)
         return
     post_id = cb.data.split(":", 1)[1]
+    if not await _in_scope(cb, "post", post_id):
+        return
     try:
         await admin_ops.approve_post(post_id, notify=True)
     except AdminActionError as exc:
@@ -95,6 +109,8 @@ async def post_no(cb: CallbackQuery, bot: Bot) -> None:
         await cb.answer("无权限", show_alert=True)
         return
     post_id = cb.data.split(":", 1)[1]
+    if not await _in_scope(cb, "post", post_id):
+        return
     try:
         await admin_ops.reject_post(post_id, notify=True)
     except AdminActionError as exc:
@@ -111,6 +127,8 @@ async def report_ok(cb: CallbackQuery, bot: Bot) -> None:
         await cb.answer("无权限", show_alert=True)
         return
     report_id = cb.data.split(":", 1)[1]
+    if not await _in_scope(cb, "report", report_id):
+        return
     try:
         await admin_ops.accept_report(report_id, notify=True)
     except AdminActionError as exc:
@@ -127,6 +145,8 @@ async def report_no(cb: CallbackQuery, bot: Bot) -> None:
         await cb.answer("无权限", show_alert=True)
         return
     report_id = cb.data.split(":", 1)[1]
+    if not await _in_scope(cb, "report", report_id):
+        return
     try:
         await admin_ops.reject_report(report_id, notify=True)
     except AdminActionError as exc:

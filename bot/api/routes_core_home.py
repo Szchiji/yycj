@@ -123,6 +123,10 @@ async def api_home(
     announcement = None
     if settings.get("announcement_enabled") and settings.get("announcement_text"):
         announcement = {"text": settings["announcement_text"], "enabled": True}
+    # Per-city announcement (set in 后台 → 城市) replaces the global one for that city only.
+    city_ann = (settings.get("city_announcements") or {}).get(use_city or "")
+    if isinstance(city_ann, dict) and city_ann.get("enabled") and str(city_ann.get("text") or "").strip():
+        announcement = {"text": city_ann["text"], "enabled": True}
 
     safe_items = []
     for x in items:

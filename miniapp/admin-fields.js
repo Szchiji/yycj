@@ -2,7 +2,7 @@
   if (!document.getElementById("yycj-admin-refresh")) {
     const s = document.createElement("script");
     s.id = "yycj-admin-refresh";
-    s.src = "./admin-refresh.js?v=20260920e";
+    s.src = "./admin-refresh.js?v=20261029d";
     document.head.appendChild(s);
   }
   if (window.__yycjAdminFields) return;

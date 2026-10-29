@@ -25,6 +25,10 @@ DEFAULT_OPS = {
     "admin_contact": "",
     "required_chats": [],
     "extra_admin_ids": [],
+    # {"<operator user_id>": ["深圳", ...]}: operators listed here only see / act on those cities.
+    "operator_cities": {},
+    # {"深圳": {"text": "...", "enabled": true}}: overrides the global announcement on that city's home.
+    "city_announcements": {},
     "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
     "broadcast_channel": "",
     "media_channel_id": "",
@@ -108,6 +112,19 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["extra_admin_ids"] = ids[:200]
     chats = out.get("required_chats") or []
     out["required_chats"] = chats if isinstance(chats, list) else []
+    from bot.services.city_scope import clean_operator_cities
+    out["operator_cities"] = clean_operator_cities(out.get("operator_cities"))
+    anns = {}
+    raw_anns = out.get("city_announcements")
+    if isinstance(raw_anns, dict):
+        for city, v in list(raw_anns.items())[:50]:
+            c = str(city or "").strip()[:32]
+            if not c or not isinstance(v, dict):
+                continue
+            text = str(v.get("text") or "")[:2000]
+            if text.strip() or v.get("enabled"):
+                anns[c] = {"text": text, "enabled": bool(v.get("enabled")) and bool(text.strip())}
+    out["city_announcements"] = anns
     return out
 
 

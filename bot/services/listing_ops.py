@@ -132,14 +132,15 @@ async def purge_old_hidden(days: int = 30) -> int:
     return n
 
 
-async def list_listed(limit: int = 100) -> List[Dict[str, Any]]:
+async def list_listed(limit: int = 100, cities: Optional[set] = None) -> List[Dict[str, Any]]:
     now = datetime.utcnow()
+    stmt = select(Lamp).where(or_(Lamp.status == LampStatus.ACTIVE.value, Lamp.status == LampStatus.HIDDEN.value))
+    if cities is not None:
+        from bot.services.city_scope import city_in
+        stmt = stmt.where(city_in(Lamp.city, cities))
     async with session_scope() as s:
         res = await s.execute(
-            select(Lamp)
-            .where(or_(Lamp.status == LampStatus.ACTIVE.value, Lamp.status == LampStatus.HIDDEN.value))
-            .order_by(Lamp.expires_at.asc().nullslast(), Lamp.updated_at.desc())
-            .limit(max(1, min(limit, 300)))
+            stmt.order_by(Lamp.expires_at.asc().nullslast(), Lamp.updated_at.desc()).limit(max(1, min(limit, 300)))
         )
         rows = list(res.scalars().all())
     out = []
