@@ -102,9 +102,9 @@
   }
   function pinHtml(p, idx) {
     const t = (p && p.lamp) || p || {};
-    const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
+    // 轮播只放封面 + 称呼，不显示营业状态 / 营业时间
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
-      imgTag(cover(t), "pin-cover", idx === 0) + open +
+      imgTag(cover(t), "pin-cover", idx === 0) +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
   function paint() {
