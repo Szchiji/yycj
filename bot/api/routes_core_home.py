@@ -71,14 +71,17 @@ async def api_home(
     offset: int = Query(default=0, ge=0, le=500),
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    settings = await home_service.get_or_create_settings()
-    page_size = int(settings.get("home_feed_page_size") or 3)
-    if limit == 3 and page_size != 3:
-        limit = page_size
-    enabled = list(settings.get("enabled_cities") or [])
+    base_settings = await home_service.get_or_create_settings()
+    enabled = list(base_settings.get("enabled_cities") or [])
     use_city = city if city else (enabled[0] if enabled else None)
     if use_city and enabled and use_city not in enabled:
         use_city = enabled[0] if enabled else None
+    # Per-city overrides (后台 → 站点设置 → 城市); unset keys keep the site-wide value.
+    from bot.services.home_feed import ops_for_city
+    settings = ops_for_city(base_settings, use_city)
+    page_size = int(settings.get("home_feed_page_size") or 3)
+    if limit == 3 and page_size != 3:
+        limit = page_size
 
     pins = []
     try:
