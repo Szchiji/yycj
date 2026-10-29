@@ -95,7 +95,7 @@
         box.innerHTML = "<p class='muted'>还没有上架记录</p>";
         return;
       }
-      const lead = data.remind_lead_min || 60;
+      const lead = data.remind_lead_min || 30;
       box.innerHTML = items.map((x) => {
         const st = x.status === "active" ? "已上架" : x.status === "hidden" ? "已下架" : x.status;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">

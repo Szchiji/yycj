@@ -61,7 +61,7 @@ def test_hours_flow():
             it = r.json()["items"][0]
             assert it["hours"] == [{"start": "10:00", "end": "22:00"}]
             assert not any(k.startswith("_") for k in it["extras"]), it["extras"]
-            assert it["shop"]["code"] in ("wait", "rest", "closed") and it["shop"]["remind_on"] is True
+            assert it["shop"]["remind_on"] is True and it["shop"]["auto"] is True   # defaults
 
             # publish: "_" keys dropped, hours canonical in the pending post
             r = await c.post("/api/posts", headers=tok, json={
@@ -91,29 +91,37 @@ def test_hours_flow():
             assert r.status_code == 200 and "_hours" not in await load_extras("H1")
 
         # scheduler: night shift, prompt 1h before start, once
-        await save_extras("H1", {"_hours": [{"start": "20:00", "end": "04:00"}]}, drop=("_open_date", "_open_today"))
+        await save_extras("H1", {"_hours": [{"start": "20:00", "end": "04:00"}], "_auto_open": "0"}, drop=("_open_date", "_open_today"))
         d = datetime.now(o.TZ).date()
         at = lambda days, hh, mm=0: datetime(d.year, d.month, d.day, hh, mm, tzinfo=o.TZ) + timedelta(days=days)
         fb = FakeBot()
-        assert await o.send_due(now=at(0, 18, 50), bot=fb) == 0
-        assert await o.send_due(now=at(0, 19, 5), bot=fb) == 1
-        assert await o.send_due(now=at(0, 19, 10), bot=fb) == 0
+        assert await o.send_due(now=at(0, 19, 20), bot=fb) == 0
+        assert await o.send_due(now=at(0, 19, 35), bot=fb) == 1
+        assert await o.send_due(now=at(0, 19, 40), bot=fb) == 0
         uid, text, kb = fb.sent[0]
         assert uid == 9101 and "今天 20:00 开课吗" in text and "20:00–次日04:00" in text
         assert kb.inline_keyboard[0][0].callback_data == f"shift:open:H1:{d.isoformat()}"
         # no reply → today only counts as rest, reminders stay on
-        assert await o.expire_unanswered(now=at(0, 20, 40)) == 1
+        assert await o.expire_unanswered(now=at(0, 22, 30)) == 0      # < 3h after prompt
+        assert await o.expire_unanswered(now=at(0, 22, 36)) == 1
         ex = await load_extras("H1")
         assert ex["_open_today"] == "0" and ex.get("_remind_off") != "1" and ex["_remind_missed"] == d.isoformat()
-        assert o.shop_status(ex, "active", None, now=at(0, 21))["code"] == "rest"
+        assert o.shop_status(ex, "active", None, now=at(0, 23))["code"] == "rest"
         # late tap still works during the shift; shift survives midnight
-        msg = await o.apply_choice("H1", 9101, "open", d.isoformat(), now=at(0, 21))
+        msg = await o.apply_choice("H1", 9101, "open", d.isoformat(), now=at(0, 23))
         assert "开课" in msg, msg
         ex = await load_extras("H1")
         assert "_remind_missed" not in ex
         assert o.shop_status(ex, "active", None, now=at(1, 1, 30))["code"] == "open"
         # tomorrow's prompt still comes
-        assert await o.send_due(now=at(1, 19, 5), bot=fb) == 1
+        assert await o.send_due(now=at(1, 19, 35), bot=fb) == 1
+        # legacy: old logic wrote _remind_on="0" → stays off
+        async with session_scope() as s:
+            s.add(Lamp(lamp_id="H2", user_id=9101, title="旧", city="深圳", status="active",
+                       expires_at=datetime.utcnow() + timedelta(days=5)))
+        await save_extras("H2", {"_hours": "20-4", "_remind_on": "0", "_auto_open": "0"})
+        fb2 = FakeBot()
+        assert await o.send_due(now=at(2, 19, 35), bot=fb2) == 1 and fb2.sent[0][2].inline_keyboard[0][0].callback_data.split(":")[2] == "H1"
         # stale prompt
         assert "过期" in await o.apply_choice("H1", 9101, "open", (d - timedelta(days=2)).isoformat(), now=at(1, 19, 6))
         assert "不是你的" in await o.apply_choice("H1", 1, "open", now=at(1, 19, 6))

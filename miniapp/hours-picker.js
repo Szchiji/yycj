@@ -73,7 +73,7 @@
     const add = el.querySelector(".hp-add");
     if (add) add.hidden = rows.length >= (+el.dataset.max || 3);
     const hint = el.querySelector(".hp-hint");
-    if (hint) hint.textContent = txt.length ? "首页显示：营业 " + txt.join("、") : "不填则首页不显示营业状态。结束早于开始 = 跨夜到次日";
+    if (hint) hint.textContent = txt.length ? "首页显示：营业 " + txt.join("、") + "。默认到点自动营业，可在「我的」改成每天确认" : "不填则首页不显示营业状态。结束早于开始 = 跨夜到次日";
   }
   function render(el, list) {
     const rows = (list && list.length ? list : [null]).slice(0, +el.dataset.max || 3);

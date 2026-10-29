@@ -59,7 +59,7 @@ def test_status_day_shift():
     c = st(ex, at(30, "22:30"))
     assert c["code"] == "closed" and c["text"] == "已打烊"
     # not confirmed during hours → 休息中; before hours → 未到点
-    ex2 = {"_hours": H_DAY}
+    ex2 = {"_hours": H_DAY, "_auto_open": "0"}
     assert st(ex2, at(30, "09:00"))["code"] == "wait"
     assert st(ex2, at(30, "12:00"))["code"] == "rest"
     # 今日休息 → 休息中 all day, next day back to normal
@@ -73,10 +73,14 @@ def test_overnight_shift_survives_midnight():
     assert st(ex, at(30, "21:00"))["code"] == "open"
     assert st(ex, at(31, "01:30"))["code"] == "open"     # still last night's shift
     assert st(ex, at(31, "05:00"))["code"] == "wait"     # tonight 20:00 next
-    assert st(ex, at(31, "20:30"))["code"] == "rest"     # new shift, not confirmed
+    assert st({**ex, "_auto_open": "0"}, at(31, "20:30"))["code"] == "rest"  # new shift, not confirmed
 
 
 def test_auto_mode():
+    # default ON: nothing stored → auto; explicit "0" → manual
+    assert st({"_hours": H_DAY}, at(30, "12:00"))["code"] == "open"
+    assert st({"_hours": H_DAY}, at(30, "12:00"))["auto"] is True
+    assert st({"_hours": H_DAY, "_auto_open": "0"}, at(30, "12:00"))["auto"] is False
     ex = {"_hours": H_DAY, "_auto_open": "1"}
     assert st(ex, at(30, "12:00"))["code"] == "open"
     ex["_open_date"], ex["_open_today"] = "2026-10-30", "0"
@@ -99,29 +103,37 @@ def test_next_shift_target():
 
 
 def test_due_prompt_window():
-    ex = {"_hours": H_NIGHT}
-    assert o.due_prompt(ex, at(30, "18:59")) is None
-    d = o.due_prompt(ex, at(30, "19:00"))
+    assert o.REMIND_LEAD_MIN == 30 and o.TIMEOUT_MIN == 180
+    ex = {"_hours": H_NIGHT, "_auto_open": "0"}
+    assert o.due_prompt(ex, at(30, "19:29")) is None
+    d = o.due_prompt(ex, at(30, "19:30"))
     assert d and d[0].isoformat() == "2026-10-30" and d[1].strftime("%H:%M") == "20:00"
     assert o.due_prompt(ex, at(30, "20:25"))              # late job still sends
     assert o.due_prompt(ex, at(30, "20:31")) is None
-    assert o.due_prompt({**ex, "_remind_sent_date": "2026-10-30"}, at(30, "19:30")) is None
-    assert o.due_prompt({**ex, "_open_date": "2026-10-30"}, at(30, "19:30")) is None  # already decided
-    assert o.due_prompt({**ex, "_remind_off": "1"}, at(30, "19:30")) is None
-    # legacy auto-written _remind_on="0" (old timeout / 今日休息) no longer silences reminders
-    assert o.due_prompt({**ex, "_remind_on": "0"}, at(30, "19:30"))
-    assert o.due_prompt({**ex, "_auto_open": "1"}, at(30, "19:30")) is None
+    assert o.due_prompt({**ex, "_remind_sent_date": "2026-10-30"}, at(30, "19:40")) is None
+    assert o.due_prompt({**ex, "_open_date": "2026-10-30"}, at(30, "19:40")) is None  # already decided
+    assert o.due_prompt({**ex, "_remind_off": "1"}, at(30, "19:40")) is None
+    assert o.due_prompt({"_hours": H_NIGHT}, at(30, "19:40")) is None           # auto is the default
+    assert o.due_prompt({**ex, "_auto_open": "1"}, at(30, "19:40")) is None
+    # legacy reminders switched off by the old logic stay off; explicit switch wins
+    assert o.due_prompt({**ex, "_remind_on": "0"}, at(30, "19:40")) is None
+    assert o.due_prompt({**ex, "_remind_on": "0", "_remind_off": "0"}, at(30, "19:40"))
+    assert o.due_prompt({**ex, "_remind_on": "1"}, at(30, "19:40"))
     # rest yesterday does not stop today's prompt
-    assert o.due_prompt({**ex, "_open_date": "2026-10-29", "_open_today": "0"}, at(30, "19:30"))
+    assert o.due_prompt({**ex, "_open_date": "2026-10-29", "_open_today": "0"}, at(30, "19:40"))
 
 
 def test_due_prompt_after_midnight_start_and_first_range_only():
-    ex = {"_hours": [{"start": "00:30", "end": "06:00"}]}
-    d = o.due_prompt(ex, at(30, "23:40"))
+    ex = {"_hours": [{"start": "00:30", "end": "06:00"}], "_auto_open": "0"}
+    assert o.due_prompt(ex, at(30, "23:55")) is None
+    d = o.due_prompt(ex, at(31, "00:05"))
     assert d and d[0].isoformat() == "2026-10-31"
-    two = {"_hours": "10:00-14:00 18:00-23:00"}
-    assert o.due_prompt(two, at(30, "09:10"))
-    assert o.due_prompt(two, at(30, "17:10")) is None     # one prompt per day
+    ex = {"_hours": [{"start": "00:10", "end": "06:00"}], "_auto_open": "0"}
+    d = o.due_prompt(ex, at(30, "23:45"))                 # window crosses midnight → tomorrow's shift
+    assert d and d[0].isoformat() == "2026-10-31"
+    two = {"_hours": "10:00-14:00 18:00-23:00", "_auto_open": "0"}
+    assert o.due_prompt(two, at(30, "09:40"))
+    assert o.due_prompt(two, at(30, "17:40")) is None     # one prompt per day
 
 
 def test_remind_text():

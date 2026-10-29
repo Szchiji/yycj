@@ -24,9 +24,9 @@ from bot.services.extras_store import load_extras, load_extras_bulk, save_extras
 
 logger = logging.getLogger(__name__)
 TZ = ZoneInfo("Asia/Shanghai")
-REMIND_LEAD_MIN = 60   # 开工前多久提醒
+REMIND_LEAD_MIN = 30   # 开工前多久提醒
 REMIND_LATE_MIN = 30   # 任务晚跑（重启）时，开工后这么久内仍补发
-TIMEOUT_MIN = 90       # 发出后多久没回复算「今日休息」
+TIMEOUT_MIN = 180      # 发出后多久没回复算「今日休息」
 MAX_RANGES = 3
 
 _FW = str.maketrans("０１２３４５６７８９：～－", "0123456789:~-")
@@ -183,9 +183,18 @@ def _day_word(d: date, now: datetime) -> str:
 
 
 def reminders_on(extras: Dict[str, Any]) -> bool:
-    """Only an explicit switch-off by the teacher (_remind_off=1) stops reminders.
-    The legacy _remind_on="0" was written automatically by the old 00:05 logic and is ignored."""
-    return (extras or {}).get("_remind_off") != "1"
+    """Explicit switch (_remind_off) wins; otherwise a legacy _remind_on="0" (old logic) stays off;
+    no stored value → on."""
+    ex = extras or {}
+    off = ex.get("_remind_off")
+    if off in ("0", "1"):
+        return off == "0"
+    return ex.get("_remind_on") != "0"
+
+
+def auto_open(extras: Dict[str, Any]) -> bool:
+    """按营业时间自动营业: default ON unless the teacher explicitly turned it off."""
+    return (extras or {}).get("_auto_open") != "0"
 
 
 def shop_status(
@@ -199,7 +208,7 @@ def shop_status(
     hours = parse_hours(extras.get("_hours") or extras.get("hours"))
     label = hours_label(hours)
     remind_on = reminders_on(extras)
-    auto = extras.get("_auto_open") == "1"
+    auto = auto_open(extras)
     base = {"hours": label, "remind_on": remind_on, "auto": auto}
     if status and status != LampStatus.ACTIVE.value:
         return {**base, "code": "off", "text": ""}
@@ -282,11 +291,11 @@ async def apply_choice(
     extras = await load_extras(lamp_id)
     if action in ("remind", "remind_on"):
         extras["_remind_off"] = "0"
-        await save_extras(lamp_id, extras, drop=("_remind_on",))
+        await save_extras(lamp_id, extras)
         return f"已开启：{title} · 每日开工前 {REMIND_LEAD_MIN} 分钟提醒"
     if action == "remind_off":
         extras["_remind_off"] = "1"
-        await save_extras(lamp_id, extras, drop=("_remind_on",))
+        await save_extras(lamp_id, extras)
         return f"已关闭：{title} · 不再每日提醒（可随时在「我的」打开）"
     if action in ("auto_on", "auto_off"):
         extras["_auto_open"] = "1" if action == "auto_on" else "0"
@@ -317,7 +326,7 @@ async def apply_choice(
     word = _day_word(target, now)
     if action == "open":
         return f"已记：{title} · {word}开课，到点首页显示营业中"
-    tail = "，明天照常提醒" if reminders_on(extras) and extras.get("_auto_open") != "1" else ""
+    tail = "，明天照常提醒" if reminders_on(extras) and not auto_open(extras) else ""
     return f"已记：{title} · {word}休息{tail}"
 
 
@@ -328,7 +337,7 @@ async def resume_remind(lamp_id: str, user_id: int) -> str:
 def due_prompt(extras: Dict[str, Any], now: datetime) -> Optional[Tuple[date, datetime]]:
     """(day, first_start) if this lamp should get its prompt now, else None."""
     hours = parse_hours(extras.get("_hours") or extras.get("hours"))
-    if not hours or extras.get("_auto_open") == "1" or not reminders_on(extras):
+    if not hours or auto_open(extras) or not reminders_on(extras):
         return None
     today = now.astimezone(TZ).date()
     for d in (today, today + timedelta(days=1)):
