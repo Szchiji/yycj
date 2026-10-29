@@ -61,6 +61,36 @@ async def get_or_create_settings() -> Dict[str, Any]:
         return _settings_to_dict(row)
 
 
+async def update_city_overrides(city: str, changes: Dict[str, Any]) -> Dict[str, Any]:
+    """Set / clear one city's overrides under the settings row lock. A None / empty value clears that key."""
+    city = (city or "").strip()[:32]
+    async with session_scope() as s:
+        res = await s.execute(select(SiteSettings).where(SiteSettings.key == SETTINGS_KEY).with_for_update())
+        row = res.scalar_one_or_none()
+        if not row:
+            row = SiteSettings(key=SETTINGS_KEY)
+            s.add(row)
+            await s.flush()
+        ops = dict(getattr(row, "ops_config", None) or {})
+        allc = dict(ops.get("city_overrides") or {}) if isinstance(ops.get("city_overrides"), dict) else {}
+        cur = dict(allc.get(city) or {})
+        for k, v in (changes or {}).items():
+            cv = home_feed.clean_override_value(k, v)
+            if cv is None:
+                cur.pop(k, None)
+            else:
+                cur[k] = cv
+        if cur:
+            allc[city] = cur
+        else:
+            allc.pop(city, None)
+        ops["city_overrides"] = allc
+        row.ops_config = home_feed.merge_ops(ops)
+        row.updated_at = datetime.utcnow()
+        await s.flush()
+        return _settings_to_dict(row)
+
+
 async def update_settings(
     *,
     announcement_text: Optional[str] = None,
