@@ -211,7 +211,8 @@
       const panel = document.createElement("div");
       panel.id = "areaPanel";
       panel.className = "area-panel hidden";
-      row.insertAdjacentElement("afterend", panel);
+      // overlay inside the search row (absolute) so the page never shifts
+      row.appendChild(panel);
     }
     const me = $("#view-me");
     if (me && !$("#meTutorial")) {
@@ -239,6 +240,10 @@
       else loadFeed(true);
     }
     if (ev.target.closest && ev.target.closest("#btnArea")) { ev.preventDefault(); toggleArea(); }
+    else if (!(ev.target.closest && ev.target.closest("#areaPanel")) && $("#areaPanel") && !$("#areaPanel").classList.contains("hidden")) {
+      // tap outside just closes the overlay (doesn't also open a card underneath)
+      ev.preventDefault(); ev.stopPropagation(); toggleArea(false); return;
+    }
     const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
     if (chip) {
       setArea(chip.getAttribute("data-area") || "");

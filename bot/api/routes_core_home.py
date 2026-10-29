@@ -86,6 +86,7 @@ async def api_home(
     if limit == 3 and page_size != 3:
         limit = page_size
 
+    area_key = search_service.district_key(district) if district else ""
     pins = []
     try:
         pins_raw = await pin_query.list_active_pins()
@@ -93,6 +94,9 @@ async def api_home(
             try:
                 lamp = await _with_shop(p.get("lamp") or {})
                 if use_city and lamp.get("city") and lamp.get("city") != use_city:
+                    continue
+                # 地区筛选同时作用于轮播；该区没有轮播时前端自动隐藏轮播
+                if area_key and search_service.district_key(lamp.get("district")) != area_key:
                     continue
                 pins.append(
                     {

@@ -25,6 +25,10 @@ def test_district_filter():
             s.add(User(user_id=9201, role="guest"))
             for i, (city, d) in enumerate([("深圳", "南山区"), ("深圳", "南山"), ("深圳", "福田"), ("深圳", None), ("广州", "朝阳")]):
                 s.add(Lamp(lamp_id=f"D{i}", user_id=9201, title=f"t{i}", city=city, district=d, status="active"))
+        from bot.models import HomepagePin
+        async with session_scope() as s:
+            s.add(HomepagePin(lamp_id="D0", sort_order=1))   # 南山区
+            s.add(HomepagePin(lamp_id="D2", sort_order=2))   # 福田
         m._ready = True
         tok = {"Authorization": "Bearer " + issue_access_token(9201, get_settings().bot_token)}
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=m.app), base_url="http://t") as c:
@@ -36,6 +40,11 @@ def test_district_filter():
             r = await c.get("/api/home?city=深圳&limit=20&district=南山", headers=tok)
             ids = sorted(x["lamp_id"] for x in r.json()["items"])
             assert ids == ["D0", "D1"] and r.json()["district"] == "南山"
+            assert [p["lamp"]["lamp_id"] for p in r.json()["pins"]] == ["D0"]      # carousel filtered too
+            r = await c.get("/api/home?city=深圳&limit=20", headers=tok)
+            assert [p["lamp"]["lamp_id"] for p in r.json()["pins"]] == ["D0", "D2"]
+            r = await c.get("/api/home?city=深圳&limit=20&district=宝安", headers=tok)
+            assert r.json()["pins"] == [] and r.json()["items"] == []               # empty → carousel hidden client-side
             r = await c.get("/api/home?city=深圳&limit=20&offset=1&district=南山", headers=tok)
             assert r.json()["districts"] is None
             r = await c.get("/api/home?city=深圳&district=" + "x" * 40, headers=tok)

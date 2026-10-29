@@ -5,7 +5,8 @@ html body #btnArea .area-lbl{position:absolute;inset:0;display:flex;align-items:
 html body #btnArea.long .area-lbl{font-size:11px;letter-spacing:-.6px;}
 html body #btnArea.on{border-color:var(--t-accent);color:var(--t-accent);}
 html body #btnArea[aria-expanded=true]{border-color:var(--t-accent);}
-html body .area-panel{margin:8px 0 6px;padding:10px;border-radius:12px;background:var(--t-card);border:1px solid var(--t-line);}
+html body .search-row{position:relative;}
+html body .area-panel{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:35;max-height:50vh;overflow:auto;margin:0;padding:10px;border-radius:12px;background:var(--t-card);border:1px solid var(--t-line);box-shadow:0 10px 28px rgba(0,0,0,.45);}
 html body .area-chips{display:flex;flex-wrap:wrap;gap:8px;}
 html body .area-chip{display:inline-flex;align-items:center;min-height:32px;padding:5px 12px;border-radius:999px;border:1px solid var(--t-line);background:transparent;color:var(--t-text);font-size:13px;}
 html body .area-chip i{font-style:normal;margin-left:5px;font-size:11px;color:var(--t-muted);}
