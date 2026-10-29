@@ -1,7 +1,7 @@
 (() => {
   if (window.__yycjKeyboardFix) return;
   window.__yycjKeyboardFix = true;
-  const BG = "#0b1020";
+  const BG = "#EFE8DF";
   const root = document.documentElement;
   const body = document.body;
   root.style.background = BG;
@@ -10,6 +10,7 @@
   try {
     tg?.setBackgroundColor?.(BG);
     tg?.setHeaderColor?.(BG);
+    tg?.setBottomBarColor?.(BG);
     tg?.expand?.();
   } catch (e) {}
   const isAdmin = !!(body && body.classList.contains("admin-body")) || !!document.getElementById("console");
