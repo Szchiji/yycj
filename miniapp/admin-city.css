@@ -22,3 +22,24 @@
 #cityCard textarea { width: 100%; box-sizing: border-box; }
 #cityCard .cc-op { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin: 6px 0; }
 #cityCard .cc-op code { font-size: 13px; }
+/* per-city settings (城市设置) */
+#cityCard .cc-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 8px; padding-bottom: 2px; }
+#cityCard .cc-tabs::-webkit-scrollbar { display: none; }
+#cityCard .cc-tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--ad-line); background: transparent; color: var(--ad-text); font-size: 14px; white-space: nowrap; }
+#cityCard .cc-tab.on { background: var(--ad-accent); border-color: var(--ad-accent); color: #0b0f18; font-weight: 700; }
+#cityCard .cc-cnt { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; font-size: 11px; line-height: 16px; text-align: center; background: rgba(255,255,255,.14); }
+#cityCard .cc-tab.on .cc-cnt { background: rgba(11,15,24,.2); }
+#cityCard .cc-lead { margin: 0 0 8px; }
+#cityCard .cc-f { margin: 0 0 12px; padding: 0 0 0 10px; border-left: 2px solid var(--ad-line); }
+#cityCard .cc-f.own { border-left-color: var(--ad-accent); }
+#cityCard .cc-fh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 4px; }
+#cityCard .cc-fh label { margin: 0; }
+#cityCard .cc-badge { font-size: 11px; height: 18px; line-height: 18px; padding: 0 6px; border-radius: 9px; background: #3a4459; color: var(--ad-mute); }
+#cityCard .cc-badge.own { background: var(--ad-accent); color: #0b0f18; font-weight: 700; }
+#cityCard .cc-lock { font-size: 11px; color: var(--ad-mute); }
+#cityCard .cc-clear { margin-left: auto; min-height: 0; height: 26px; padding: 0 10px; font-size: 12px; }
+#cityCard .cc-hint { margin: 4px 0 0; font-size: 12px; color: var(--ad-mute); }
+#cityCard .cc-f input, #cityCard .cc-f select, #cityCard .cc-f textarea { width: 100%; box-sizing: border-box; }
+#cityCard .cc-f input::placeholder, #cityCard .cc-f textarea::placeholder { color: var(--ad-mute); opacity: .75; }
+#cityCard .cc-save { width: 100%; margin-top: 4px; }
+#cityCard .cc-foot { margin: 12px 0 0; }

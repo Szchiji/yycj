@@ -171,8 +171,11 @@ async def api_create_review(
         s = (p or "").strip()
         if s:
             photos.append(_normalize_one_url(s))
+    # 评价需审核 (per card city, fallback site-wide, unset = ON): off -> publish directly.
+    auto = not await home_service.review_needs_audit(lamp.get("city"))
     try:
         rev = await home_service.create_review(
+            auto_approve=auto,
             guest_id=user_id,
             lamp_id=body.lamp_id,
             stars=body.stars,

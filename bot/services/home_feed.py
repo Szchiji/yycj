@@ -29,6 +29,8 @@ DEFAULT_OPS = {
     "operator_cities": {},
     # {"深圳": {"text": "...", "enabled": true}}: overrides the global announcement on that city's home.
     "city_announcements": {},
+    # {"深圳": {"broadcast_channel": "@sz_ch", ...}}: per-city overrides; missing/empty = site-wide value.
+    "city_overrides": {},
     "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
     "broadcast_channel": "",
     "media_channel_id": "",
@@ -46,6 +48,94 @@ DEFAULT_OPS = {
         {"key": "聊天按钮", "label": "聊天按钮", "form": False},
     ],
 }
+
+
+# Settings a city may override (key, label, type, extra). Everything else stays site-wide.
+# "super": only the super admin may set it (a scoped operator sees it read-only).
+CITY_KEYS = [
+    {"key": "broadcast_channel", "label": "推送频道", "type": "text", "max": 128, "super": True,
+     "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
+    {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
+    {"key": "approve_promo_text", "label": "上架通过后发给老师的话", "type": "textarea", "max": 2000},
+    {"key": "chat_cta_label", "label": "聊天按钮文字", "type": "text", "max": 32},
+    {"key": "admin_contact", "label": "管理员联系链接", "type": "text", "max": 128,
+     "hint": "首页「管理员」按钮打开的链接，https://t.me/用户名 或 @用户名"},
+    {"key": "admin_btn_label", "label": "管理员按钮文字", "type": "text", "max": 16},
+    {"key": "show_admin_link", "label": "首页显示管理员按钮", "type": "bool"},
+    {"key": "review_require_audit", "label": "评价需审核", "type": "bool",
+     "hint": "关 = 这个城市的新评价直接发布，不进待审"},
+    {"key": "home_feed_page_size", "label": "首页每次加载卡片数", "type": "int", "min": 1, "max": 50},
+    {"key": "carousel_interval_sec", "label": "轮播间隔（秒）", "type": "int", "min": 2, "max": 15},
+    {"key": "listing_days", "label": "上架天数", "type": "int", "min": 1, "max": 365, "super": True},
+]
+CITY_KEY_MAP = {x["key"]: x for x in CITY_KEYS}
+
+
+def audit_on(value: Any) -> bool:
+    """评价需审核: only an explicit off turns it off; missing / null / junk keeps today's behaviour (ON)."""
+    if value is False or value == 0:
+        return False
+    if isinstance(value, str) and value.strip().lower() in ("false", "0", "off", "no"):
+        return False
+    return True
+
+
+def clean_override_value(key: str, value: Any) -> Any:
+    """Return the cleaned override value, or None when it means 'use the site-wide value'."""
+    meta = CITY_KEY_MAP.get(key)
+    if meta is None or value is None:
+        return None
+    t = meta["type"]
+    if t == "bool":
+        if isinstance(value, str):
+            v = value.strip().lower()
+            if v in ("", "inherit"):
+                return None
+            return v in ("1", "true", "on", "yes")
+        return bool(value)
+    if t == "int":
+        if isinstance(value, str) and not value.strip():
+            return None
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            return None
+        return max(meta["min"], min(meta["max"], n))
+    text = str(value)
+    if t == "text":
+        text = text.strip()
+    text = text[: meta.get("max", 2000)]
+    return text if text.strip() else None
+
+
+def clean_city_overrides(raw: Any) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for city, vals in list(raw.items())[:50]:
+        c = str(city or "").strip()[:32]
+        if not c or not isinstance(vals, dict):
+            continue
+        clean = {}
+        for k, v in vals.items():
+            cv = clean_override_value(str(k), v)
+            if cv is not None:
+                clean[str(k)] = cv
+        if clean:
+            out[c] = clean
+    return out
+
+
+def ops_for_city(settings: Dict[str, Any], city: Optional[str]) -> Dict[str, Any]:
+    """Site settings with that city's overrides applied. No city / unknown city = site-wide."""
+    over = (settings.get("city_overrides") or {}).get(str(city or "").strip()) if city else None
+    if not over:
+        return settings
+    out = dict(settings)
+    for k, v in over.items():
+        if k in CITY_KEY_MAP and v is not None:
+            out[k] = v
+    return out
 
 
 def _sanitize_listing_fields(fields, fallback=None):
@@ -87,7 +177,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
-    out["review_require_audit"] = bool(out.get("review_require_audit", True))
+    out["review_require_audit"] = audit_on(out.get("review_require_audit"))
     try:
         out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
     except (TypeError, ValueError):
@@ -125,6 +215,7 @@ def merge_ops(raw) -> Dict[str, Any]:
             if text.strip() or v.get("enabled"):
                 anns[c] = {"text": text, "enabled": bool(v.get("enabled")) and bool(text.strip())}
     out["city_announcements"] = anns
+    out["city_overrides"] = clean_city_overrides(out.get("city_overrides"))
     return out
 
 

@@ -18,6 +18,12 @@ class CityAnnounceBody(BaseModel):
     enabled: bool = True
 
 
+class CitySettingsBody(BaseModel):
+    city: str
+    # {key: value}; null / "" = clear (use the site-wide value)
+    overrides: Dict[str, Any] = {}
+
+
 class OperatorCitiesBody(BaseModel):
     operator_cities: Dict[str, List[str]] = {}
 
@@ -34,6 +40,8 @@ async def api_city_summary(admin_id: int = Depends(get_admin_user_id)) -> Dict[s
         "scope": sorted(scope) if scope is not None else None,
         "enabled_cities": enabled,
         "city_announcements": settings.get("city_announcements") or {},
+        "global_announcement": settings.get("announcement_text") or "",
+        "city_override_counts": {c: len(v or {}) for c, v in (settings.get("city_overrides") or {}).items()},
         **data,
     }
 
@@ -75,3 +83,66 @@ async def api_operator_cities(
         raise HTTPException(status_code=400, detail="不是运营管理员：" + ", ".join(unknown))
     settings = await home_service.update_settings(ops_config={"operator_cities": cleaned})
     return {"ok": True, "operator_cities": settings.get("operator_cities") or {}}
+
+
+async def _city_edit_rights(admin_id: int, city: str) -> Dict[str, bool]:
+    """Super: everything. Operator explicitly assigned to the city: non-super keys. Others: read-only."""
+    if is_super(admin_id):
+        return {"can_edit": True, "can_edit_super": True}
+    scope = await city_scope.scope_for(admin_id)
+    mine = scope is not None and city in scope
+    return {"can_edit": mine, "can_edit_super": False}
+
+
+def _city_settings_payload(settings: Dict[str, Any], city: str, rights: Dict[str, bool]) -> Dict[str, Any]:
+    from bot.services.home_feed import CITY_KEYS
+    over = (settings.get("city_overrides") or {}).get(city) or {}
+    keys = []
+    for meta in CITY_KEYS:
+        k = meta["key"]
+        keys.append({**meta, "global": settings.get(k), "override": over.get(k)})
+    return {"ok": True, "city": city, "keys": keys, "overrides": over, **rights}
+
+
+@router.get("/admin/cities/settings")
+async def api_city_settings(city: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    city = (city or "").strip()[:32]
+    if not city:
+        raise HTTPException(status_code=400, detail="缺少城市")
+    await city_scope.ensure_city(admin_id, city)
+    settings = await home_service.get_or_create_settings()
+    return _city_settings_payload(settings, city, await _city_edit_rights(admin_id, city))
+
+
+@router.post("/admin/cities/settings")
+async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    from bot.services.home_feed import CITY_KEY_MAP
+    city = (body.city or "").strip()[:32]
+    if not city:
+        raise HTTPException(status_code=400, detail="缺少城市")
+    settings = await home_service.get_or_create_settings()
+    if city not in (settings.get("enabled_cities") or []):
+        raise HTTPException(status_code=400, detail="不是已开通的城市")
+    rights = await _city_edit_rights(admin_id, city)
+    if not rights["can_edit"]:
+        raise HTTPException(status_code=403, detail="只有超管或负责这个城市的运营能改城市设置")
+    changes: Dict[str, Any] = {}
+    for k, v in (body.overrides or {}).items():
+        meta = CITY_KEY_MAP.get(k)
+        if meta is None:
+            raise HTTPException(status_code=400, detail=f"这一项不能按城市设置：{k}")
+        if meta.get("super") and not rights["can_edit_super"]:
+            raise HTTPException(status_code=403, detail=f"「{meta['label']}」只有超管能改")
+        if k == "admin_contact" and v not in (None, ""):
+            from bot.services import bot_info
+            norm = bot_info.normalize_contact(str(v).strip())
+            if not norm:
+                raise HTTPException(status_code=400, detail="管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名")
+            v = norm
+        if k == "broadcast_channel" and v not in (None, ""):
+            from bot.services.broadcast import normalize_chat
+            if not normalize_chat(str(v)):
+                raise HTTPException(status_code=400, detail="推送频道格式不对，示例 @频道名 或 -100…")
+        changes[k] = v
+    settings = await home_service.update_city_overrides(city, changes)
+    return _city_settings_payload(settings, city, rights)

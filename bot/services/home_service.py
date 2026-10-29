@@ -61,6 +61,36 @@ async def get_or_create_settings() -> Dict[str, Any]:
         return _settings_to_dict(row)
 
 
+async def update_city_overrides(city: str, changes: Dict[str, Any]) -> Dict[str, Any]:
+    """Set / clear one city's overrides under the settings row lock. A None / empty value clears that key."""
+    city = (city or "").strip()[:32]
+    async with session_scope() as s:
+        res = await s.execute(select(SiteSettings).where(SiteSettings.key == SETTINGS_KEY).with_for_update())
+        row = res.scalar_one_or_none()
+        if not row:
+            row = SiteSettings(key=SETTINGS_KEY)
+            s.add(row)
+            await s.flush()
+        ops = dict(getattr(row, "ops_config", None) or {})
+        allc = dict(ops.get("city_overrides") or {}) if isinstance(ops.get("city_overrides"), dict) else {}
+        cur = dict(allc.get(city) or {})
+        for k, v in (changes or {}).items():
+            cv = home_feed.clean_override_value(k, v)
+            if cv is None:
+                cur.pop(k, None)
+            else:
+                cur[k] = cv
+        if cur:
+            allc[city] = cur
+        else:
+            allc.pop(city, None)
+        ops["city_overrides"] = allc
+        row.ops_config = home_feed.merge_ops(ops)
+        row.updated_at = datetime.utcnow()
+        await s.flush()
+        return _settings_to_dict(row)
+
+
 async def update_settings(
     *,
     announcement_text: Optional[str] = None,
@@ -169,11 +199,23 @@ def _review_to_dict(r: Review) -> Dict[str, Any]:
     return {"review_id": r.review_id, "session_id": r.session_id, "lamp_id": r.lamp_id, "target_user_id": r.target_user_id, "guest_id": r.guest_id, "stars": r.stars, "text": r.text or "", "photos": list(r.photos or []), "status": r.status, "created_at": r.created_at, "reviewed_at": r.reviewed_at, "review_note": r.review_note}
 
 
-async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None) -> Dict[str, Any]:
+async def review_needs_audit(city: Optional[str]) -> bool:
+    """评价需审核 for a card's city (city override, else site-wide; unset = ON)."""
+    settings = home_feed.ops_for_city(await get_or_create_settings(), city)
+    return home_feed.audit_on(settings.get("review_require_audit"))
+
+
+async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None, auto_approve: bool = False) -> Dict[str, Any]:
     stars = max(1, min(5, int(stars)))
     review_id = str(uuid.uuid4())
     async with session_scope() as s:
         r = Review(review_id=review_id, session_id=session_id, lamp_id=lamp_id, target_user_id=target_user_id, guest_id=guest_id, stars=stars, text=(text or "")[:2000], photos=list(photos or [])[:6], status=ReviewStatus.PENDING.value)
+        if auto_approve:
+            # Same end state as an admin approval (set_review_status APPROVED): visible on the
+            # card and counted in reputation, which is computed from approved reviews.
+            r.status = ReviewStatus.APPROVED.value
+            r.reviewed_at = datetime.utcnow()
+            r.review_note = "免审直接发布"
         s.add(r)
         await s.flush()
         return _review_to_dict(r)
