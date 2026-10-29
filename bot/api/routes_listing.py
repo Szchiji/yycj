@@ -12,7 +12,7 @@ from bot.models import LampStatus, UserRole
 from bot.services import credit_service, listing_flow, listing_notify, search_service
 from bot.services.admin_ops import notify_user_best_effort
 from bot.services.broadcast import update_broadcast
-from bot.services.extras_store import save_extras
+from bot.services.extras_store import save_extras, save_user_fields
 
 
 class EditBody(BaseModel):
@@ -27,6 +27,13 @@ class EditBody(BaseModel):
     district: Optional[str] = None
     approx_label: Optional[str] = None
     extras: Optional[Dict[str, Any]] = None
+    hours: Optional[Any] = None
+
+    @field_validator("hours", mode="after")
+    @classmethod
+    def _norm_hours(cls, v):
+        from bot.services.open_shift import normalize_hours
+        return normalize_hours(v) if v is not None else None
 
     @field_validator("extras", mode="after")
     @classmethod
@@ -42,10 +49,18 @@ class ProxyBody(EditBody):
 
 @router.get("/me/listings")
 async def api_me_listings(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    from bot.services.open_shift import REMIND_LEAD_MIN, normalize_hours, shop_status
     items = await listing_flow.list_my_lamps(user_id)
     for it in items:
+        extras = it.get("extras") if isinstance(it.get("extras"), dict) else {}
+        try:
+            it["shop"] = shop_status(extras, it.get("status"), it.get("expires_at"))
+        except Exception:
+            it["shop"] = {}
+        it["hours"] = normalize_hours(extras.get("_hours") or extras.get("hours"))
+        it["extras"] = {k: v for k, v in extras.items() if not str(k).startswith("_")}
         it["expires_at"] = _ser_dt(it.get("expires_at"))
-    return {"ok": True, "items": items}
+    return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN}
 
 
 @router.post("/me/listings/{lamp_id}/edit")
@@ -76,6 +91,7 @@ async def api_me_edit(
         "district": (body.district or "").strip()[:64] or None,
         "approx_label": (body.approx_label or "").strip()[:128] or None,
         "extras": dict(body.extras or {}),
+        "hours": body.hours,
     }
     if current.get("status") == LampStatus.ACTIVE.value:
         lamp = await listing_flow.apply_edit(lamp_id, payload, owner_id=user_id)
@@ -134,7 +150,7 @@ async def api_admin_proxy(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
-        await save_extras((lamp or {}).get("lamp_id"), body.extras)
+        await save_user_fields((lamp or {}).get("lamp_id"), {"extras": body.extras, "hours": body.hours})
         await listing_flow.broadcast_listing(lamp, body.extras)
     except Exception:
         pass
@@ -169,6 +185,7 @@ async def api_admin_proxy_edit(
         "district": body.district,
         "approx_label": body.approx_label,
         "extras": dict(body.extras or {}),
+        "hours": body.hours,
     }
     if media:
         payload["media"] = media

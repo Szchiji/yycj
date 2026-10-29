@@ -26,6 +26,7 @@
       <label>价位</label><input id="proxyPrice" />
       <label>简介</label><textarea id="proxyDesc" rows="3"></textarea>
       <div id="proxyExtras"></div>
+      <div id="proxyHours"></div>
       <label>相册</label>
       <input id="proxyFiles" type="file" accept="image/*,video/*" multiple />
       <div id="proxyStatus" class="muted"></div>
@@ -46,6 +47,7 @@
       <label>价位</label><input id="editPrice" />
       <label>简介</label><textarea id="editDesc" rows="3"></textarea>
       <div id="editExtras"></div>
+      <div id="editHours"></div>
       <label>相册（可选，选了就替换）</label>
       <input id="editFiles" type="file" accept="image/*,video/*" multiple />
       <div id="editStatus" class="muted"></div>
@@ -55,6 +57,11 @@
     if (proxy && proxy.nextSibling) pane.insertBefore(box, proxy.nextSibling);
     else pane.appendChild(box);
   }
+  if (window.yycjHours) {
+    window.yycjHours.mount(document.getElementById("proxyHours"));
+    window.yycjHours.mount(document.getElementById("editHours"));
+  }
+  const hoursOf = (id) => (window.yycjHours ? window.yycjHours.get(document.getElementById(id)) : undefined);
   const token = () => localStorage.getItem("yycj_token") || "";
   const uploadedP = [];
   const uploadedE = [];
@@ -157,6 +164,7 @@
           approx_label: val("proxyApprox"),
           tags: val("proxyTags").split(/[,，\s]+/).filter(Boolean),
           extras: collectExtras("proxyBox"),
+          hours: hoursOf("proxyHours"),
           media: mediaOf(uploadedP),
           publisher_role: "teacher",
         }),
@@ -184,6 +192,7 @@
           approx_label: val("editApprox"),
           tags: val("editTags").split(/[,，\s]+/).filter(Boolean),
           extras: collectExtras("editBox"),
+          hours: hoursOf("editHours"),
           media: mediaOf(uploadedE),
         }),
       });
@@ -210,6 +219,7 @@
     document.querySelectorAll("#editBox [data-extra]").forEach((el) => {
       el.value = extras[el.getAttribute("data-extra")] || "";
     });
+    if (window.yycjHours) window.yycjHours.set(document.getElementById("editHours"), (item.hours && item.hours.length ? item.hours : null) || extras._hours || item.hours_text || extras["营业时间"] || []);
     document.getElementById("editBox")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   syncExtras();

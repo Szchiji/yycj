@@ -16,7 +16,7 @@ from bot.api.routes_core_base import (
 from bot.services import anti_brush, credit_service, home_service, search_service, session_service
 from bot.services import pin_query
 from bot.services.extras_store import load_extras
-from bot.services.open_shift import shop_status
+from bot.services.open_shift import normalize_hours, shop_status
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,8 @@ async def _with_shop(lamp: Dict[str, Any]) -> Dict[str, Any]:
         data["open_code"] = st.get("code") or ""
         data["open_text"] = st.get("text") or ""
         data["hours_text"] = st.get("hours") or ""
+        ex = data.get("extras") or {}
+        data["hours"] = normalize_hours(ex.get("_hours") or ex.get("hours"))
     except Exception:
         data.setdefault("open_code", "")
         data.setdefault("open_text", "")
@@ -229,7 +231,11 @@ async def api_lamp_detail(
         r["created_at"] = _ser_dt(r.get("created_at"))
         r.pop("guest_id", None)
         r.pop("target_user_id", None)
-    return {"ok": True, "lamp": _ser_lamp(lamp), "reputation": rep, "reviews": reviews}
+    out = _ser_lamp(lamp)
+    if isinstance(out.get("extras"), dict):
+        # internal state (_open_today, _remind_*, _bc_*) is not for the public detail page
+        out["extras"] = {k: v for k, v in out["extras"].items() if not str(k).startswith("_")}
+    return {"ok": True, "lamp": out, "reputation": rep, "reviews": reviews}
 
 
 @router.post("/sessions/request")

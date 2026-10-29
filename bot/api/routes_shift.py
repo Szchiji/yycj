@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from bot.api.deps import get_current_user_id
 from bot.api.routes_core import router
-from bot.services.open_shift import apply_choice, resume_remind, shop_status, today_str
+from bot.services.open_shift import apply_choice, shop_status
 from bot.services.extras_store import load_extras
 from bot.services import listing_flow
 
@@ -24,12 +24,9 @@ async def api_me_shift(
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
     action = (body.action or "").strip()
-    if action == "remind":
-        msg = await resume_remind(lamp_id, user_id)
-    elif action in ("open", "rest"):
-        msg = await apply_choice(lamp_id, user_id, action, today_str())
-    else:
-        raise HTTPException(status_code=400, detail="action 仅支持 open/rest/remind")
+    if action not in ("open", "rest", "remind", "remind_on", "remind_off", "auto_on", "auto_off"):
+        raise HTTPException(status_code=400, detail="action 仅支持 open/rest/remind_on/remind_off/auto_on/auto_off")
+    msg = await apply_choice(lamp_id, user_id, action)
     extras = await load_extras(lamp_id)
     mine = await listing_flow.list_my_lamps(user_id)
     current = next((x for x in mine if x.get("lamp_id") == lamp_id), None) or {}

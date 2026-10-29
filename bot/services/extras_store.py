@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Iterable, Tuple
 
 from sqlalchemy import text
 
@@ -65,14 +65,18 @@ async def load_extras_bulk(lamp_ids) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-async def save_extras(lamp_id: str, extras: Dict[str, Any] | None) -> None:
+async def save_extras(lamp_id: str, extras: Dict[str, Any] | None, drop: Iterable[str] = ()) -> None:
+    """Replace user fields; internal "_" keys survive unless overwritten or named in `drop`."""
     if not lamp_id:
         return
+    gone = {str(k) for k in drop}
     incoming = _clean_incoming(extras)
     current = await load_extras(lamp_id)
     for key, val in current.items():
         if _keep_internal(str(key)) and key not in incoming:
             incoming[key] = val
+    for key in gone:
+        incoming.pop(key, None)
     async with session_scope() as s:
         try:
             await s.execute(
@@ -148,21 +152,37 @@ async def get_lamp(lamp_id: str):
     return lamp
 
 
+def _user_extras(data: Dict[str, Any] | None) -> Dict[str, str]:
+    """Only user-visible fields; any client-sent "_" key (e.g. _open_today) is dropped."""
+    from bot.services.extras_clean import clean_user_extras
+    raw = (data or {}).get("extras")
+    return clean_user_extras(raw if isinstance(raw, dict) else {})
+
+
+async def save_user_fields(lamp_id: str, data: Dict[str, Any] | None) -> None:
+    """Save user extras + (if the caller sent `hours`) the canonical _hours."""
+    from bot.services.open_shift import normalize_hours
+    data = data or {}
+    extras: Dict[str, Any] = dict(_user_extras(data))
+    drop: Tuple[str, ...] = ()
+    if "hours" in data and data.get("hours") is not None:
+        hours = normalize_hours(data.get("hours"))
+        if hours:
+            extras["_hours"] = hours
+        else:
+            drop = ("_hours",)
+    await save_extras(lamp_id, extras, drop=drop)
+
+
 async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin: bool = False):
     lamp = await _orig_apply(lamp_id, data, owner_id=owner_id, admin=admin)
-    extras = dict((data or {}).get("extras") or {})
-    if data.get("_hours"):
-        extras["_hours"] = data.get("_hours")
-    await save_extras(lamp_id, extras)
+    await save_user_fields(lamp_id, data)
     return lamp
 
 
 async def apply_admin_edit(lamp_id: str, data: Dict[str, Any]):
     lamp = await _orig_admin(lamp_id, data)
-    extras = dict((data or {}).get("extras") or {})
-    if data.get("_hours"):
-        extras["_hours"] = data.get("_hours")
-    await save_extras(lamp_id, extras)
+    await save_user_fields(lamp_id, data)
     return lamp
 
 

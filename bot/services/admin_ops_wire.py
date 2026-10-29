@@ -47,6 +47,9 @@ async def approve_post(post_id: str, *, notify: bool = True):
             await notify_publisher_approved(user_id, lamp.get("title") or "资料", album, city=(full or lamp or {}).get("city"))
         return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True, "edited_in_place": bool(album)}
     result = await _orig(post_id, notify=False)
+    if data.get("hours") and result.get("lamp_id"):
+        from bot.services.extras_store import save_user_fields
+        await save_user_fields(result["lamp_id"], {"extras": extras, "hours": data.get("hours")})
     if notify:
         lamp = await search_service.get_lamp(result.get("lamp_id") or "")
         title = (lamp or {}).get("title") or "资料"

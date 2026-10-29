@@ -56,6 +56,17 @@
     form.insertBefore(el, form.querySelector("button[type=submit]"));
     return el;
   }
+  function hoursBox() {
+    let el = document.getElementById("pubHours");
+    if (el) return el;
+    const form = document.getElementById("publishForm");
+    if (!form || !window.yycjHours) return null;
+    el = document.createElement("div");
+    el.id = "pubHours";
+    form.insertBefore(el, form.querySelector("button[type=submit]"));
+    window.yycjHours.mount(el);
+    return el;
+  }
   function toggleInput(id, on) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -98,6 +109,7 @@
     Object.keys(FORM_MAP).forEach((key) => toggleInput(FORM_MAP[key], enabled.includes(key)));
     const extraKeys = enabled.filter((k) => !FORM_MAP[k]);
     wrap.innerHTML = extraKeys.map((k) => `<label>${esc(k)}</label><input data-extra="${esc(k.replace(/"/g, ""))}" maxlength="64" placeholder="${esc(k)}" />`).join("");
+    hoursBox();
   }
   async function uploadOne(file) {
     const fd = new FormData();
@@ -127,6 +139,7 @@
   });
   const form = $("#publishForm");
   if (!form) return;
+  hoursBox();
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     ev.stopImmediatePropagation();
@@ -149,6 +162,8 @@
       tags: ($("#pubTags")?.value || "").trim().split(/\s+/).filter(Boolean).slice(0, 5),
       description: ($("#pubDesc")?.value || "").trim(), media, extras,
     };
+    const hb = hoursBox();
+    if (hb && window.yycjHours) body.hours = window.yycjHours.get(hb);
     const digits = (body.price_text || "").replace(/\D/g, "");
     if (digits) body.price = parseInt(digits, 10);
     const url = editId ? `/api/me/listings/${editId}/edit` : "/api/posts";
@@ -159,6 +174,7 @@
       uploaded = [];
       if ($("#editLampId")) $("#editLampId").value = "";
       form.reset();
+      if (hb && window.yycjHours) window.yycjHours.set(hb, []);
       previewBox();
       let admin = "管理员";
       try {

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any, Dict, Optional
-from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +33,14 @@ def _install_shift_jobs(scheduler=None) -> None:
     try:
         if scheduler is None:
             from bot.main import scheduler
-        from bot.services.open_shift import expire_unanswered, send_daily
+        from bot.services.open_shift import expire_unanswered, send_due
     except Exception:
         return
     if not getattr(scheduler, "running", False):
         return
     async def job_open_shift() -> None:
         try:
-            n = await send_daily()
+            n = await send_due()
             if n:
                 logger.info("shift remind users=%s", n)
         except Exception:
@@ -53,7 +52,8 @@ def _install_shift_jobs(scheduler=None) -> None:
                 logger.info("shift timeout closed=%s", n)
         except Exception:
             logger.exception("shift timeout failed")
-    scheduler.add_job(job_open_shift, "cron", hour=0, minute=5, timezone=ZoneInfo("Asia/Shanghai"), id="open_shift", replace_existing=True)
+    # Every 5 min: each teacher gets the prompt ~1h before their own first shift of the day.
+    scheduler.add_job(job_open_shift, "interval", minutes=5, id="open_shift", replace_existing=True)
     scheduler.add_job(job_shift_timeout, "interval", minutes=10, id="shift_timeout", replace_existing=True)
 
 

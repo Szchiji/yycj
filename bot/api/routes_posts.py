@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 
 class PostCreateBody(_PostCreateBody):
     extras: Dict[str, Any] | None = None
+    hours: Any = None
+
+    @field_validator("hours", mode="after")
+    @classmethod
+    def _norm_hours(cls, v):
+        from bot.services.open_shift import normalize_hours
+        return normalize_hours(v) if v is not None else None
 
     @field_validator("extras", mode="after")
     @classmethod
@@ -80,6 +87,7 @@ async def api_create_post(
         "approx_label": (body.approx_label or "").strip()[:128] or None,
         "publisher_role": role,
         "extras": dict(body.extras or {}),
+        "hours": body.hours or [],
     }
     post_id = str(uuid.uuid4())
     async with session_scope() as s:
