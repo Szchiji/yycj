@@ -24,8 +24,10 @@ class FeedPinHoursBody(BaseModel):
 @router.post("/admin/homepage/feed-pin")
 async def api_feed_pin_hours(
     body: FeedPinHoursBody,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    from bot.services import city_scope
+    await city_scope.guard(admin_id, "lamp", body.lamp_id)
     until = None
     if body.pinned and body.expires_hours not in (None, 0):
         until = datetime.utcnow() + timedelta(hours=max(1, int(body.expires_hours)))

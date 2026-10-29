@@ -13,7 +13,7 @@ from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import HomepagePin, Lamp
-from bot.services import home_service, listing_flow, listing_ops, search_service, user_admin
+from bot.services import city_scope, home_service, listing_flow, listing_ops, search_service, user_admin
 from bot.services.role_lock import unlock_role
 
 logger = logging.getLogger(__name__)
@@ -81,10 +81,21 @@ async def api_admin_extra_ops(
 async def api_admin_users(
     q: str = "",
     limit: int = Query(default=50, ge=1, le=200),
-    _: int = Depends(get_admin_user_id),
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
     items = await user_admin.search_users(q, limit=limit)
-    return {"ok": True, "items": [_ser_user(x) for x in items]}
+    cities = await city_scope.effective(admin_id, city)
+    if cities is not None:
+        keep = await city_scope.filter_user_ids(cities, (x.get("user_id") for x in items))
+        items = [x for x in items if int(x.get("user_id") or 0) in keep]
+    cmap = await city_scope.user_city_map(x.get("user_id") for x in items)
+    out = []
+    for x in items:
+        u = _ser_user(x)
+        u["cities"] = cmap.get(int(x.get("user_id") or 0), [])
+        out.append(u)
+    return {"ok": True, "items": out}
 
 
 @router.post("/admin/users/ban")
@@ -94,6 +105,7 @@ async def api_admin_ban(
 ) -> Dict[str, Any]:
     if get_settings().is_admin(body.user_id):
         raise HTTPException(status_code=400, detail="不能拉黑管理员")
+    await city_scope.guard_user(admin_id, body.user_id)
     user = await user_admin.set_banned(body.user_id, body.banned, body.reason)
     if body.banned:
         async with session_scope() as s:
@@ -114,6 +126,7 @@ async def api_admin_shadow(
 ) -> Dict[str, Any]:
     if get_settings().is_admin(body.user_id):
         raise HTTPException(status_code=400, detail="不能遮蔽管理员")
+    await city_scope.guard_user(admin_id, body.user_id)
     user = await user_admin.set_shadow(
         body.user_id,
         shadowed=body.shadowed,
@@ -128,13 +141,18 @@ async def api_admin_unlock_role(
     body: UnlockRoleBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard_user(admin_id, body.user_id)
     user = await unlock_role(body.user_id)
     return {"ok": True, "user": _ser_user(user), "by": admin_id}
 
 
 @router.get("/admin/listings")
-async def api_admin_listings(_: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
-    items = await listing_ops.list_listed()
+async def api_admin_listings(
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    cities = await city_scope.effective(admin_id, city)
+    items = await listing_ops.list_listed(cities=cities)
     for it in items:
         it["expires_at"] = _ser_dt(it.get("expires_at"))
         it["updated_at"] = _ser_dt(it.get("updated_at"))
@@ -143,8 +161,9 @@ async def api_admin_listings(_: int = Depends(get_admin_user_id)) -> Dict[str, A
 
 @router.post("/admin/listings/{lamp_id}/unlist")
 async def api_admin_unlist(
-    lamp_id: str, body: LampOpBody = LampOpBody(), _: int = Depends(get_admin_user_id)
+    lamp_id: str, body: LampOpBody = LampOpBody(), admin_id: int = Depends(get_admin_user_id)
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "lamp", lamp_id)
     try:
         data = await listing_ops.unlist_lamp(lamp_id, reason=body.reason or "admin")
     except ValueError as exc:
@@ -153,7 +172,8 @@ async def api_admin_unlist(
 
 
 @router.post("/admin/listings/{lamp_id}/relist")
-async def api_admin_relist(lamp_id: str, _: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+async def api_admin_relist(lamp_id: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "lamp", lamp_id)
     try:
         data = await listing_ops.relist_lamp(lamp_id)
     except ValueError as exc:
@@ -164,8 +184,9 @@ async def api_admin_relist(lamp_id: str, _: int = Depends(get_admin_user_id)) ->
 
 @router.post("/admin/listings/{lamp_id}/renew")
 async def api_admin_renew(
-    lamp_id: str, body: LampOpBody = LampOpBody(), _: int = Depends(get_admin_user_id)
+    lamp_id: str, body: LampOpBody = LampOpBody(), admin_id: int = Depends(get_admin_user_id)
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "lamp", lamp_id)
     try:
         data = await listing_ops.set_listing_expiry(lamp_id, days=body.days)
     except ValueError as exc:
@@ -182,7 +203,11 @@ async def api_admin_renew(
 
 
 @router.post("/admin/homepage/pins/remove")
-async def api_pin_remove(body: PinRemoveBody, _: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+async def api_pin_remove(body: PinRemoveBody, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    if body.pin_id:
+        await city_scope.guard(admin_id, "pin", body.pin_id)
+    if body.lamp_id:
+        await city_scope.guard(admin_id, "lamp", body.lamp_id)
     removed = 0
     async with session_scope() as s:
         if body.pin_id:

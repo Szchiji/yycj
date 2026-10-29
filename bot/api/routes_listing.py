@@ -113,6 +113,8 @@ async def api_admin_proxy(
     body: ProxyBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    from bot.services import city_scope
+    await city_scope.ensure_city(admin_id, body.city)
     media = _normalize_media(body.media, body.photos)
     try:
         lamp = await listing_flow.proxy_publish(
@@ -152,6 +154,10 @@ async def api_admin_proxy_edit(
     body: EditBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    from bot.services import city_scope
+    await city_scope.guard(admin_id, "lamp", lamp_id)
+    if body.city:
+        await city_scope.ensure_city(admin_id, body.city)
     media = _normalize_media(body.media, body.photos)
     payload = {
         "city": body.city,

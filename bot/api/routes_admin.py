@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import Depends, HTTPException, Query
 
 from bot.api.deps import get_admin_user_id, get_super_user_id
 from bot.models import ReviewStatus
 from bot.services import credit_service, home_service, session_service
-from bot.services import admin_ops
+from bot.services import admin_ops, city_scope
 from bot.services.admin_ops import AdminActionError
 from bot.api.routes_core import (
     router,
@@ -33,11 +33,14 @@ logger = logging.getLogger(__name__)
 @router.get("/admin/posts/pending")
 async def api_admin_pending_posts(
     limit: int = Query(default=50, ge=1, le=200),
-    _: int = Depends(get_admin_user_id),
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    items = await admin_ops.list_pending_posts(limit=limit)
+    cities = await city_scope.effective(admin_id, city)
+    items = await admin_ops.list_pending_posts(limit=limit, cities=cities)
     for it in items:
         it["created_at"] = _ser_dt(it.get("created_at"))
+        it["city"] = (it.get("lamp_data") or {}).get("city") or city_scope.UNKNOWN
     return {"ok": True, "items": items}
 
 @router.post("/admin/posts/{post_id}/approve")
@@ -45,6 +48,7 @@ async def api_admin_approve_post(
     post_id: str,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "post", post_id)
     try:
         result = await admin_ops.approve_post(post_id, notify=True)
     except AdminActionError as exc:
@@ -58,6 +62,7 @@ async def api_admin_approve_pin(
     body: ApprovePinBody = ApprovePinBody(),
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "post", post_id)
     try:
         result = await admin_ops.approve_post_and_pin(
             post_id,
@@ -78,6 +83,7 @@ async def api_admin_reject_post(
     post_id: str,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "post", post_id)
     try:
         result = await admin_ops.reject_post(post_id, notify=True)
     except AdminActionError as exc:
@@ -88,11 +94,16 @@ async def api_admin_reject_post(
 @router.get("/admin/reports/pending")
 async def api_admin_pending_reports(
     limit: int = Query(default=50, ge=1, le=200),
-    _: int = Depends(get_admin_user_id),
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    items = await admin_ops.list_pending_reports(limit=limit)
+    cities = await city_scope.effective(admin_id, city)
+    items = await admin_ops.list_pending_reports(limit=limit, cities=cities)
+    info = await city_scope.cities_of_lamps(x.get("lamp_id") for x in items)
     for it in items:
         it["created_at"] = _ser_dt(it.get("created_at"))
+        it["city"] = (info.get(it.get("lamp_id")) or {}).get("city") or city_scope.UNKNOWN
+        it["lamp_title"] = (info.get(it.get("lamp_id")) or {}).get("title") or ""
     return {"ok": True, "items": items}
 
 @router.post("/admin/reports/{report_id}/accept")
@@ -100,6 +111,7 @@ async def api_admin_accept_report(
     report_id: str,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "report", report_id)
     try:
         result = await admin_ops.accept_report(report_id, notify=True)
     except AdminActionError as exc:
@@ -112,6 +124,7 @@ async def api_admin_reject_report(
     report_id: str,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "report", report_id)
     try:
         result = await admin_ops.reject_report(report_id, notify=True)
     except AdminActionError as exc:
@@ -122,18 +135,24 @@ async def api_admin_reject_report(
 @router.get("/admin/reviews/pending")
 async def api_admin_pending_reviews(
     limit: int = Query(default=50, ge=1, le=200),
-    _: int = Depends(get_admin_user_id),
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    items = await home_service.list_pending_reviews(limit=limit)
+    cities = await city_scope.effective(admin_id, city)
+    items = await home_service.list_pending_reviews(limit=limit, cities=cities)
+    info = await city_scope.cities_of_lamps(x.get("lamp_id") for x in items)
     for it in items:
         it["created_at"] = _ser_dt(it.get("created_at"))
+        it["city"] = (info.get(it.get("lamp_id")) or {}).get("city") or city_scope.UNKNOWN
+        it["lamp_title"] = (info.get(it.get("lamp_id")) or {}).get("title") or ""
     return {"ok": True, "items": items}
 
 @router.post("/admin/reviews/{review_id}/approve")
 async def api_admin_approve_review(
     review_id: str,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "review", review_id)
     try:
         rev = await home_service.set_review_status(review_id, ReviewStatus.APPROVED.value)
     except LookupError as exc:
@@ -147,8 +166,9 @@ async def api_admin_approve_review(
 @router.post("/admin/reviews/{review_id}/reject")
 async def api_admin_reject_review(
     review_id: str,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "review", review_id)
     try:
         rev = await home_service.set_review_status(review_id, ReviewStatus.REJECTED.value)
     except LookupError as exc:
@@ -162,8 +182,9 @@ async def api_admin_reject_review(
 @router.post("/admin/reviews/{review_id}/brush")
 async def api_admin_brush_review(
     review_id: str,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "review", review_id)
     try:
         rev = await home_service.set_review_status(
             review_id, ReviewStatus.BRUSH.value, note="拒绝刷评"
@@ -177,9 +198,15 @@ async def api_admin_brush_review(
     return {"ok": True, "review": rev}
 
 @router.get("/admin/homepage")
-async def api_admin_homepage(_: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+async def api_admin_homepage(
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    cities = await city_scope.effective(admin_id, city)
     settings = await home_service.get_or_create_settings()
     pins = await home_service.list_all_pins()
+    if cities is not None:
+        pins = [p for p in pins if city_scope.allowed(cities, (p.get("lamp") or {}).get("city"))]
     for p in pins:
         p["expires_at"] = _ser_dt(p.get("expires_at"))
         p["created_at"] = _ser_dt(p.get("created_at"))
@@ -187,6 +214,9 @@ async def api_admin_homepage(_: int = Depends(get_admin_user_id)) -> Dict[str, A
             p["lamp"] = _ser_lamp(p["lamp"])
     feed_pins = await home_service.list_feed_pins()
     lamps = await home_service.list_approved_lamps_brief(limit=100)
+    if cities is not None:
+        feed_pins = [x for x in feed_pins if city_scope.allowed(cities, x.get("city"))]
+        lamps = [x for x in lamps if city_scope.allowed(cities, x.get("city"))]
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
     return {
         "ok": True,
@@ -223,6 +253,7 @@ async def api_admin_add_pin(
     body: PinBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "lamp", body.lamp_id)
     try:
         pin = await home_service.add_pin(
             body.lamp_id,
@@ -238,8 +269,9 @@ async def api_admin_add_pin(
 @router.delete("/admin/homepage/pins/{pin_id}")
 async def api_admin_remove_pin(
     pin_id: int,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "pin", pin_id)
     ok = await home_service.remove_pin(pin_id)
     if not ok:
         raise HTTPException(status_code=404, detail="置顶不存在")
@@ -248,8 +280,10 @@ async def api_admin_remove_pin(
 @router.post("/admin/homepage/pins/reorder")
 async def api_admin_reorder_pins(
     body: PinReorderBody,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    for pid in body.ordered_ids:
+        await city_scope.guard(admin_id, "pin", pid)
     pins = await home_service.reorder_pins(body.ordered_ids)
     for p in pins:
         p["expires_at"] = _ser_dt(p.get("expires_at"))
@@ -268,6 +302,7 @@ async def api_admin_credit_adjust(
     body: CreditAdjustBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard_user(admin_id, body.user_id)
     if body.delta == 0:
         raise HTTPException(status_code=400, detail="delta 不能为 0")
     if abs(body.delta) > 500:
@@ -285,17 +320,23 @@ async def api_admin_credit_adjust(
 @router.get("/admin/shadow")
 async def api_admin_shadow_list(
     limit: int = Query(default=100, ge=1, le=500),
-    _: int = Depends(get_admin_user_id),
+    city: Optional[str] = None,
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
     items = await admin_ops.list_shadowed_users(limit=limit)
+    cities = await city_scope.effective(admin_id, city)
+    if cities is not None:
+        keep = await city_scope.filter_user_ids(cities, (x.get("user_id") for x in items))
+        items = [x for x in items if int(x.get("user_id") or 0) in keep]
     return {"ok": True, "items": [_ser_user(x) for x in items]}
 
 @router.get("/admin/sessions/{session_id}/messages")
 async def api_admin_session_messages(
     session_id: str,
     limit: int = Query(default=100, ge=1, le=500),
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "session", session_id)
     sess = await session_service.get_session(session_id)
     if not sess:
         raise HTTPException(status_code=404, detail="会话不存在")
@@ -312,8 +353,9 @@ async def api_admin_session_messages(
 @router.post("/admin/homepage/feed-pins")
 async def api_admin_set_feed_pin(
     body: FeedPinBody,
-    _: int = Depends(get_admin_user_id),
+    admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
+    await city_scope.guard(admin_id, "lamp", body.lamp_id)
     try:
         data = await home_service.set_feed_pin(body.lamp_id, pinned=body.pinned)
     except ValueError as exc:
