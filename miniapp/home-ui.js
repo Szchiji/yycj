@@ -73,13 +73,24 @@
     const load = eager ? "eager" : "lazy";
     return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\" />";
   }
+  // Card hours, compact (full label with 次日 stays on the detail page):
+  // "10-22" -> "10–22点", "20:00–次日04:00" -> "20–04点", "9:30~21:00" -> "9:30–21点"; unparsable text is shown as-is.
+  function fmtHours(raw) {
+    const s = String(raw || "").trim().replace(/：/g, ":");
+    if (!s) return "";
+    const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*[-–—~～至到]\s*(?:次日)?\s*(\d{1,2})(?::(\d{2}))?$/);
+    if (!m) return s;
+    const a = m[2] && m[2] !== "00" ? m[1] + ":" + m[2] : m[1];
+    const b = m[4] && m[4] !== "00" ? m[3] + ":" + m[4] : m[3];
+    return a.padStart(2, "0") + "–" + b.padStart(2, "0") + "点";
+  }
   function cardHtml(t, idx) {
     const img = cover(t);
     const loc = [t.city, t.district].filter(Boolean).join("·");
     const tag = String((t.tags && t.tags[0]) || "").replace(/^#+/, "");
     const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
-    const open = t.open_text ? "<span class=\"badge-open " + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
+    const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
       imgTag(img, "thumb", idx < 3) +
       "<button class=\"fav-btn\" type=\"button\" data-fav=\"" + esc(t.lamp_id) + "\">♡</button>" +
@@ -87,11 +98,11 @@
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
       (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
-      "</div><div class=\"body\"><h3>" + pin + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + (t.hours_text ? " · " + esc(t.hours_text) : "") + "</div></div></div>";
+      "</div><div class=\"body\"><h3>" + pin + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + (fmtHours(t.hours_text) ? "<span class=\"st-hours\"> · " + esc(fmtHours(t.hours_text)) + "</span>" : "") + "</div></div></div>";
   }
   function pinHtml(p, idx) {
     const t = (p && p.lamp) || p || {};
-    const open = t.open_text ? "<span class=\"badge-open " + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
+    const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
       imgTag(cover(t), "pin-cover", idx === 0) + open +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
