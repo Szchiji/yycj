@@ -1,7 +1,7 @@
 (() => {
   if (window.__yycjAdminGo) return;
   window.__yycjAdminGo = true;
-  const DESK = "./desk.html?v=20260925b";
+  const DESK = "./desk.html?v=20261029d";
   let isAdmin = null;
   let pending = null;
   function go(ev) {

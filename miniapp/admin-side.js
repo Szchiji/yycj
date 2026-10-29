@@ -2,7 +2,7 @@
   if (!document.getElementById("yycj-back-top")) {
     const s = document.createElement("script");
     s.id = "yycj-back-top";
-    s.src = "./back-top.js?v=20260925t";
+    s.src = "./back-top.js?v=20261029d";
     document.body.appendChild(s);
   }
   if (window.__yycjAdminSide) return;
