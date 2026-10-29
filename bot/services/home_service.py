@@ -188,9 +188,13 @@ async def list_reviews_for_lamp(lamp_id: str, *, approved_only: bool = True) -> 
         return [_review_to_dict(x) for x in res.scalars().all()]
 
 
-async def list_pending_reviews(limit: int = 50) -> List[Dict[str, Any]]:
+async def list_pending_reviews(limit: int = 50, cities: Optional[set] = None) -> List[Dict[str, Any]]:
+    stmt = select(Review).where(Review.status == ReviewStatus.PENDING.value)
+    if cities is not None:
+        from bot.services.city_scope import city_in
+        stmt = stmt.where(Review.lamp_id.in_(select(Lamp.lamp_id).where(city_in(Lamp.city, cities))))
     async with session_scope() as s:
-        res = await s.execute(select(Review).where(Review.status == ReviewStatus.PENDING.value).order_by(Review.created_at.asc()).limit(max(1, min(limit, 200))))
+        res = await s.execute(stmt.order_by(Review.created_at.asc()).limit(max(1, min(limit, 200))))
         return [_review_to_dict(x) for x in res.scalars().all()]
 
 

@@ -33,14 +33,13 @@ async def notify_user_best_effort(user_id: int, text: str) -> bool:
         return False
 
 
-async def list_pending_posts(limit: int = 50) -> List[Dict[str, Any]]:
+async def list_pending_posts(limit: int = 50, cities: Optional[set] = None) -> List[Dict[str, Any]]:
+    stmt = select(Post).where(Post.status == PostStatus.PENDING.value)
+    if cities is not None:
+        from bot.services.city_scope import city_in
+        stmt = stmt.where(city_in(Post.lamp_data["city"].astext, cities))
     async with session_scope() as s:
-        res = await s.execute(
-            select(Post)
-            .where(Post.status == PostStatus.PENDING.value)
-            .order_by(Post.created_at.asc())
-            .limit(max(1, min(limit, 200)))
-        )
+        res = await s.execute(stmt.order_by(Post.created_at.asc()).limit(max(1, min(limit, 200))))
         rows = res.scalars().all()
         return [
             {
@@ -54,14 +53,14 @@ async def list_pending_posts(limit: int = 50) -> List[Dict[str, Any]]:
         ]
 
 
-async def list_pending_reports(limit: int = 50) -> List[Dict[str, Any]]:
+async def list_pending_reports(limit: int = 50, cities: Optional[set] = None) -> List[Dict[str, Any]]:
+    stmt = select(Report).where(Report.status == ReportStatus.PENDING.value)
+    if cities is not None:
+        from bot.models import Lamp
+        from bot.services.city_scope import city_in
+        stmt = stmt.where(Report.lamp_id.in_(select(Lamp.lamp_id).where(city_in(Lamp.city, cities))))
     async with session_scope() as s:
-        res = await s.execute(
-            select(Report)
-            .where(Report.status == ReportStatus.PENDING.value)
-            .order_by(Report.created_at.asc())
-            .limit(max(1, min(limit, 200)))
-        )
+        res = await s.execute(stmt.order_by(Report.created_at.asc()).limit(max(1, min(limit, 200))))
         rows = res.scalars().all()
         return [
             {
