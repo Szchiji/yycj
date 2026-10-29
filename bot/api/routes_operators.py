@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from bot.api.deps import get_admin_user_id
 from bot.api.routes_core import router
 from bot.config import get_settings
+from bot.services import city_scope
 from bot.services.admin_acl import extra_ids, is_super, save, warm
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ async def api_list_operators(admin_id: int = Depends(get_admin_user_id)) -> Dict
         "is_super": is_super(admin_id),
         "super_ids": get_settings().admin_id_list,
         "extra_admin_ids": sorted(extra_ids()),
+        "operator_cities": await city_scope.operator_cities(),
     }
 
 
