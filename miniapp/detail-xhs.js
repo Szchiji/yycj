@@ -100,7 +100,7 @@ body.xhs-detail #xhsTop{display:grid;}
       let open = pub.querySelector(".xhs-open");
       const ot = String(lamp.open_text || "").trim();
       if (ot && !open) { open = document.createElement("span"); open.className = "xhs-open"; pub.appendChild(open); }
-      if (open) { if (!ot) open.remove(); else { if (open.textContent !== ot) open.textContent = ot; const off = lamp.open_code !== "open"; if (open.classList.contains("off") !== off) open.classList.toggle("off", off); } }
+      if (open) { if (!ot) open.remove(); else { if (open.textContent !== ot) open.textContent = ot; const off = lamp.open_code !== "open"; if (open.classList.contains("off") !== off) open.classList.toggle("off", off); if (open.dataset.code !== String(lamp.open_code || "")) open.dataset.code = String(lamp.open_code || ""); } }
     }
     // price / location lines are plain .muted lines written by app.js
     const lines = [...card.querySelectorAll(":scope > .muted, :scope > p.muted, :scope > .xhs-meta .muted")];
