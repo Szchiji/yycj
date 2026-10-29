@@ -256,7 +256,7 @@
     if (now && now.textContent !== "保存全部设置") now.textContent = "保存全部设置";
     save.classList.add("pp-hidden");
     const sync = $("#btnSyncBot");
-    const contact = $("#opsAdminContact")?.closest(".ops-card");
+    const contact = $("#opsWelcome")?.closest(".ops-card");
     if (sync && contact && sync.parentNode !== contact) { sync.classList.add("block"); contact.appendChild(sync); }
   }
   function syncPane() {

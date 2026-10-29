@@ -43,3 +43,11 @@
 #cityCard .cc-f input::placeholder, #cityCard .cc-f textarea::placeholder { color: var(--ad-mute); opacity: .75; }
 #cityCard .cc-save { width: 100%; margin-top: 4px; }
 #cityCard .cc-foot { margin: 12px 0 0; }
+/* merged 站点设置 layout */
+.cc-hide { display: none !important; }
+#ccGlobal .cc-f > input, #ccGlobal .cc-f > textarea { width: 100%; box-sizing: border-box; margin: 0; }
+#ccGlobal .cc-f label.row { margin-top: 0; }
+#ccGlobal .cc-f { border-left-color: var(--ad-accent); }
+#ccGlobal #ccGlobalFields { margin-bottom: 4px; }
+#ccSiteOnly .cc-site-h { margin: 18px 0 10px; font-size: 15px; }
+body.cc-no-sitebar #adSaveBar, body.pane-venue.cc-no-sitebar #adSaveBar.hidden { display: none !important; }
