@@ -11,7 +11,7 @@ body,body.admin-body{height:auto!important;max-height:none!important;overflow:vi
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20260912k";
+    s.src = "./" + name + "?v=20261029d";
     document.head.appendChild(s);
   });
 })();
