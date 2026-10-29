@@ -1,7 +1,7 @@
 (() => {
   if (window.__yycjKeyboardFix) return;
   window.__yycjKeyboardFix = true;
-  const BG = "#EFE8DF";
+  const BG = "#0F2420";
   const root = document.documentElement;
   const body = document.body;
   root.style.background = BG;
