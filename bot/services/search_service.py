@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import String, and_, cast, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus
@@ -116,11 +116,46 @@ def parse_query(text: str) -> Dict[str, Any]:
     return {"city": city, "price_min": price_min, "price_max": price_max, "keywords": keywords, "raw": text}
 
 
-async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None) -> List[Dict[str, Any]]:
+def district_key(raw: Any) -> str:
+    """Group free-text districts: "静安区" and "静安" → "静安"; "浦东新区" stays whole."""
+    d = re.sub(r"\s+", "", str(raw or ""))[:32]
+    if len(d) >= 3 and d.endswith("区") and not d.endswith("新区"):
+        d = d[:-1]
+    return d
+
+
+def district_variants(key: str) -> List[str]:
+    k = district_key(key)
+    return [k, k + "区"] if k else []
+
+
+async def district_counts(city: str | None) -> Dict[str, Any]:
+    """Active listings per district in a city (one GROUP BY)."""
+    async with session_scope() as s:
+        conds = [Lamp.status == LampStatus.ACTIVE.value]
+        if city:
+            conds.append(Lamp.city == city)
+        rows = (await s.execute(
+            select(func.trim(Lamp.district), func.count()).where(and_(*conds)).group_by(func.trim(Lamp.district))
+        )).all()
+    total = 0
+    groups: Dict[str, int] = {}
+    for name, n in rows:
+        total += int(n)
+        k = district_key(name)
+        if k:
+            groups[k] = groups.get(k, 0) + int(n)
+    items = sorted(({"key": k, "count": n} for k, n in groups.items()), key=lambda x: (-x["count"], x["key"]))
+    return {"total": total, "items": items[:40]}
+
+
+async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None, district: str | None = None) -> List[Dict[str, Any]]:
     async with session_scope() as s:
         conditions = [Lamp.status == LampStatus.ACTIVE.value]
         if city:
             conditions.append(Lamp.city == city)
+        if district and district_variants(district):
+            conditions.append(func.trim(Lamp.district).in_(district_variants(district)))
         if price_min is not None:
             conditions.append(or_(Lamp.price.is_(None), Lamp.price >= price_min))
         if price_max is not None:
