@@ -199,11 +199,23 @@ def _review_to_dict(r: Review) -> Dict[str, Any]:
     return {"review_id": r.review_id, "session_id": r.session_id, "lamp_id": r.lamp_id, "target_user_id": r.target_user_id, "guest_id": r.guest_id, "stars": r.stars, "text": r.text or "", "photos": list(r.photos or []), "status": r.status, "created_at": r.created_at, "reviewed_at": r.reviewed_at, "review_note": r.review_note}
 
 
-async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None) -> Dict[str, Any]:
+async def review_needs_audit(city: Optional[str]) -> bool:
+    """评价需审核 for a card's city (city override, else site-wide; unset = ON)."""
+    settings = home_feed.ops_for_city(await get_or_create_settings(), city)
+    return home_feed.audit_on(settings.get("review_require_audit"))
+
+
+async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None, auto_approve: bool = False) -> Dict[str, Any]:
     stars = max(1, min(5, int(stars)))
     review_id = str(uuid.uuid4())
     async with session_scope() as s:
         r = Review(review_id=review_id, session_id=session_id, lamp_id=lamp_id, target_user_id=target_user_id, guest_id=guest_id, stars=stars, text=(text or "")[:2000], photos=list(photos or [])[:6], status=ReviewStatus.PENDING.value)
+        if auto_approve:
+            # Same end state as an admin approval (set_review_status APPROVED): visible on the
+            # card and counted in reputation, which is computed from approved reviews.
+            r.status = ReviewStatus.APPROVED.value
+            r.reviewed_at = datetime.utcnow()
+            r.review_note = "免审直接发布"
         s.add(r)
         await s.flush()
         return _review_to_dict(r)

@@ -62,11 +62,22 @@ CITY_KEYS = [
      "hint": "首页「管理员」按钮打开的链接，https://t.me/用户名 或 @用户名"},
     {"key": "admin_btn_label", "label": "管理员按钮文字", "type": "text", "max": 16},
     {"key": "show_admin_link", "label": "首页显示管理员按钮", "type": "bool"},
+    {"key": "review_require_audit", "label": "评价需审核", "type": "bool",
+     "hint": "关 = 这个城市的新评价直接发布，不进待审"},
     {"key": "home_feed_page_size", "label": "首页每次加载卡片数", "type": "int", "min": 1, "max": 50},
     {"key": "carousel_interval_sec", "label": "轮播间隔（秒）", "type": "int", "min": 2, "max": 15},
     {"key": "listing_days", "label": "上架天数", "type": "int", "min": 1, "max": 365, "super": True},
 ]
 CITY_KEY_MAP = {x["key"]: x for x in CITY_KEYS}
+
+
+def audit_on(value: Any) -> bool:
+    """评价需审核: only an explicit off turns it off; missing / null / junk keeps today's behaviour (ON)."""
+    if value is False or value == 0:
+        return False
+    if isinstance(value, str) and value.strip().lower() in ("false", "0", "off", "no"):
+        return False
+    return True
 
 
 def clean_override_value(key: str, value: Any) -> Any:
@@ -166,7 +177,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
-    out["review_require_audit"] = bool(out.get("review_require_audit", True))
+    out["review_require_audit"] = audit_on(out.get("review_require_audit"))
     try:
         out["listing_days"] = max(1, min(365, int(out.get("listing_days") or 30)))
     except (TypeError, ValueError):
