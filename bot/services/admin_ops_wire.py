@@ -44,7 +44,7 @@ async def approve_post(post_id: str, *, notify: bool = True):
             await save_extras((full or {}).get("lamp_id") or edit_id, extras)
             album = await update_broadcast(full, extras)
         if notify:
-            await notify_publisher_approved(user_id, lamp.get("title") or "资料", album)
+            await notify_publisher_approved(user_id, lamp.get("title") or "资料", album, city=(full or lamp or {}).get("city"))
         return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True, "edited_in_place": bool(album)}
     result = await _orig(post_id, notify=False)
     if notify:
@@ -54,7 +54,7 @@ async def approve_post(post_id: str, *, notify: bool = True):
         if lamp:
             await save_extras((lamp or {}).get("lamp_id") or result.get("lamp_id"), extras)
             album = await listing_flow.broadcast_listing(lamp, extras)
-        await notify_publisher_approved(result["user_id"], title, album)
+        await notify_publisher_approved(result["user_id"], title, album, city=(lamp or {}).get("city"))
     return result
 
 

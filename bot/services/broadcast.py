@@ -112,7 +112,9 @@ async def _remember(lamp_id: str, chat: str, mid: int) -> None:
 
 
 async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]]) -> tuple[str, str]:
-    site = await home_service.get_or_create_settings()
+    from bot.services.home_feed import ops_for_city
+    # The card's own city picks the channel / template; no city or no override = site-wide.
+    site = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
     chat = normalize_chat(str(site.get("broadcast_channel") or ""))
     from bot.services import bot_info
     ident = await bot_info.get_bot_identity()

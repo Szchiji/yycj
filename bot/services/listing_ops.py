@@ -15,13 +15,18 @@ from bot.services import home_service
 logger = logging.getLogger(__name__)
 
 
-async def _listing_days() -> int:
-    settings = await home_service.get_or_create_settings()
+async def _listing_days(city: Optional[str] = None) -> int:
+    from bot.services.home_feed import ops_for_city
+    settings = ops_for_city(await home_service.get_or_create_settings(), city)
     return int(settings.get("listing_days") or 30)
 
 
 async def set_listing_expiry(lamp_id: str, *, days: Optional[int] = None) -> Dict[str, Any]:
-    days = int(days if days is not None else await _listing_days())
+    if days is None:
+        async with session_scope() as s:
+            city = (await s.execute(select(Lamp.city).where(Lamp.lamp_id == lamp_id))).scalar_one_or_none()
+        days = await _listing_days(city)
+    days = int(days)
     until = datetime.utcnow() + timedelta(days=max(1, days))
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))

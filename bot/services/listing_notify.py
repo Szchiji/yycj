@@ -68,11 +68,12 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
         logger.warning("no admin received post %s", post_id)
 
 
-async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None) -> None:
+async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None) -> None:
     from bot.main import bot
     from bot.services import bot_info
 
-    site = await home_service.get_or_create_settings()
+    from bot.services.home_feed import ops_for_city
+    site = ops_for_city(await home_service.get_or_create_settings(), city)
     promo = (site.get("approve_promo_text") or "").strip()
     ident = await bot_info.get_bot_identity()
     uname = ident.get("username") or ""
