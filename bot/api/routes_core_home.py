@@ -67,6 +67,7 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
 async def api_home(
     city: Optional[str] = None,
     q: Optional[str] = None,
+    district: Optional[str] = Query(default=None, max_length=32),
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     limit: int = Query(default=3, ge=1, le=50),
@@ -115,6 +116,7 @@ async def api_home(
             offset=offset,
             lat=lat,
             lng=lng,
+            district=(district or "").strip() or None,
         )
         pinned = [x for x in items if x.get("feed_pinned")]
         fresh = [x for x in items if not x.get("feed_pinned")]
@@ -140,6 +142,14 @@ async def api_home(
         except Exception:
             logger.exception("serialize lamp failed")
 
+    # 地区筛选：当前城市各区在架数（仅首屏返回）。轮播不受筛选影响。
+    districts = None
+    if offset == 0:
+        try:
+            districts = await search_service.district_counts(use_city)
+        except Exception:
+            logger.exception("district counts failed")
+
     contacts = {}
     try:
         contacts = await _home_contacts(settings)
@@ -153,6 +163,8 @@ async def api_home(
         "announcement": announcement,
         "pins": pins,
         "items": safe_items,
+        "district": search_service.district_key(district) if district else "",
+        "districts": districts,
         "count": len(safe_items),
         "limit": limit,
         "offset": offset,

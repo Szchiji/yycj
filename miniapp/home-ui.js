@@ -2,11 +2,20 @@
   if (window.__yycjHomeUi) return;
   window.__yycjHomeUi = true;
   const $ = (s) => document.querySelector(s);
-  let offset = 0, q = "", lastItems = [], lastPins = [], cities = [];
+  let offset = 0, q = "", lastItems = [], lastPins = [], cities = [], lastAreas = null;
   let carouselMs = 4000, carouselTimer = 0, paused = false;
-  const TUTORIAL = ["右上角选城市。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
+  const TUTORIAL = ["右上角选城市，左上「地区」按区筛选。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
+  // 地区筛选：单选，本次会话内记住（按城市），切城市自动清空。只筛信息流，轮播不变。
+  function curCity() { return localStorage.getItem("yycj_city") || ""; }
+  function getArea() {
+    try { const o = JSON.parse(sessionStorage.getItem("yycj_area") || "null"); return o && o.city === curCity() ? String(o.key || "") : ""; }
+    catch (e) { return ""; }
+  }
+  function setArea(key) {
+    try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
+  }
   function token() { return localStorage.getItem("yycj_token") || ""; }
-  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || ""); }
+  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea(); }
   function readCache(city, qq) {
     try {
       const raw = sessionStorage.getItem(cacheKey(city, qq));
@@ -111,7 +120,7 @@
     const feed = $("#feed");
     if (feed) {
       feed.classList.add("has-cover");
-      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>暂无上架</p>";
+      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (getArea() ? "这个区域暂无上架" : "暂无上架") + "</p>";
     }
     const pins = $("#pins");
     if (pins) {
@@ -126,6 +135,8 @@
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
     carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
     lastPins = q ? [] : (data.pins || []);
+    if (data.districts) lastAreas = data.districts;
+    paintArea();
     const batch = data.items || [];
     lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
     offset = lastItems.length;
@@ -151,6 +162,7 @@
       const params = new URLSearchParams({ limit: "12", offset: String(offset && !reset ? offset : 0) });
       if (q) params.set("q", q);
       if (city) params.set("city", city);
+      if (getArea()) params.set("district", getArea());
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -159,14 +171,55 @@
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
     }
   }
+  function areaLabel(k) { return k.length <= 3 ? k : k.slice(0, 2) + "…"; }
+  function paintArea() {
+    const btn = $("#btnArea");
+    const k = getArea();
+    if (btn) {
+      const lbl = btn.querySelector(".area-lbl");
+      if (lbl) lbl.textContent = k ? areaLabel(k) : "地区▾";
+      btn.classList.toggle("on", !!k);
+      btn.classList.toggle("long", k.length > 2);
+      btn.setAttribute("aria-label", k ? "地区：" + k : "地区筛选");
+    }
+    const panel = $("#areaPanel");
+    if (!panel || panel.classList.contains("hidden")) return;
+    const d = lastAreas || { total: 0, items: [] };
+    const chips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
+      .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
+    panel.innerHTML = "<div class=\"area-chips\">" + chips.join("") + "</div>" +
+      ((d.items || []).length ? "" : "<p class=\"muted area-empty\">这个城市的资料还没填区域</p>");
+  }
+  function toggleArea(open) {
+    const panel = $("#areaPanel");
+    if (!panel) return;
+    const on = open == null ? panel.classList.contains("hidden") : open;
+    panel.classList.toggle("hidden", !on);
+    $("#btnArea")?.setAttribute("aria-expanded", on ? "true" : "false");
+    paintArea();
+  }
   function mountGuide() {
     const row = document.querySelector(".search-row");
-    if (row && !$("#btnGuide")) {
+    if (row && !$("#btnArea")) {
       const btn = document.createElement("button");
-      btn.id = "btnGuide";
+      btn.id = "btnArea";
       btn.type = "button";
-      btn.textContent = "教程";
+      btn.setAttribute("aria-expanded", "false");
+      // invisible "教程" keeps the old button's exact size; the visible label sits on top
+      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">地区▾</span>";
       row.insertBefore(btn, row.firstChild);
+      const panel = document.createElement("div");
+      panel.id = "areaPanel";
+      panel.className = "area-panel hidden";
+      row.insertAdjacentElement("afterend", panel);
+    }
+    const me = $("#view-me");
+    if (me && !$("#meTutorial")) {
+      const card = document.createElement("div");
+      card.id = "meTutorial";
+      card.className = "card";
+      card.innerHTML = "<button class=\"btn block\" id=\"btnTutorial\" type=\"button\">使用教程</button>";
+      me.appendChild(card);
     }
     if (!$("#guideSheet")) {
       const sheet = document.createElement("div");
@@ -185,7 +238,14 @@
       if (lastItems.length) paint();
       else loadFeed(true);
     }
-    if (ev.target.id === "btnGuide") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
+    if (ev.target.closest && ev.target.closest("#btnArea")) { ev.preventDefault(); toggleArea(); }
+    const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
+    if (chip) {
+      setArea(chip.getAttribute("data-area") || "");
+      toggleArea(false);
+      loadFeed(true);
+    }
+    if (ev.target.id === "btnTutorial") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
     if (ev.target.id === "btnCity" || (ev.target.closest && ev.target.closest("#btnCity"))) {
       ev.preventDefault();
@@ -197,6 +257,9 @@
     if (opt) {
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
+      setArea("");
+      lastAreas = null;
+      toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
       loadFeed(true);
