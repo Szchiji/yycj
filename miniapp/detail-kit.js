@@ -145,6 +145,27 @@
     v.preload = "metadata";
     v.play().catch(() => {});
   }
+  // Tags / contacts / reviews are painted into the info card. The card can be (re)rendered after
+  // they were painted (app.js and this file read the same response in either order), which wiped
+  // them; so remember the data and repaint whenever a new card node shows up for the same listing.
+  let last = null, paintedCard = null;
+  function paintAll(data, id) {
+    const lamp = data.lamp || data;
+    paintApprox(lamp);
+    paintTags(lamp);
+    paintExtras(lamp.extras || data.extras || {});
+    paintReviews(data.reviews || data.approved_reviews || lamp.reviews || [], id);
+    applyCta();
+    paintedCard = document.querySelector("#detail > .card");
+  }
+  function repaintIfNewCard() {
+    if (!last) return;
+    const box = document.getElementById("detail");
+    const card = box && box.querySelector(":scope > .card");
+    if (!card || card === paintedCard) return;
+    const id = box.getAttribute("data-lamp") || window.__yycjOpenLamp || "";
+    if (id && id === last.id) { try { paintAll(last.data, id); } catch (e) {} }
+  }
   async function loadLamp(id) {
     if (!id) return;
     window.__yycjOpenLamp = id;
@@ -152,12 +173,9 @@
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
       if (!r.ok) return;
       const data = await r.json();
-      const lamp = data.lamp || data;
-      paintApprox(lamp);
-      paintTags(lamp);
-      paintExtras(lamp.extras || data.extras || {});
-      paintReviews(data.reviews || data.approved_reviews || lamp.reviews || [], id);
-      applyCta();
+      if ((window.__yycjOpenLamp || id) !== id) return;
+      last = { id, data };
+      paintAll(data, id);
     } catch (e) {}
   }
   window.__yycjLoadDetailExtras = loadLamp;
@@ -229,6 +247,7 @@
       applyCta();
       const id = document.getElementById("detail")?.getAttribute("data-lamp") || "";
       if (id && document.getElementById("detailReview")) placeShare(id);
+      repaintIfNewCard();
     }).observe(view, { childList: true, subtree: true });
   }
   loadHomeOnce();
