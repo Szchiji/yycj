@@ -60,4 +60,22 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261101h"}
+    assert vs == {"20261101i"}
+
+
+def test_filter_reset_applies_immediately_and_keeps_facets():
+    js = _read("home-ui.js")
+    i = js.index('#areaPanel [data-filt-reset]')
+    block = js[i:i + 400]
+    assert "clearFilt()" in block and "loadFeed(true)" in block and "scrollTop()" in block
+    assert "lastFacets = null" not in block  # 价格 / 标签选项不能在重置后变成「暂无」
+    clr = js[js.index("function clearFilt"):js.index("function clearFilt") + 200]
+    assert 'setSort("")' in clr and 'setArea("")' in clr and "removeItem(filtKey())" in clr
+    assert "place" not in clr  # 不清「我的 · 常用位置」
+
+
+def test_closing_panel_applies_changes():
+    js = _read("home-ui.js")
+    t = js[js.index("async function toggleArea"):js.index("function mountGuide")]
+    assert "appliedSig !== filtSig()" in t and "loadFeed(true)" in t
+    assert "appliedSig = filtSig();" in js

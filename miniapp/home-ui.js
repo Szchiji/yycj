@@ -58,6 +58,9 @@
     } catch (e) {}
   }
   function clearFilt() { try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
+  // 面板里改的选项只在「查看结果」/ 关闭面板 / 重置时生效；appliedSig 记住信息流当前用的是哪一组条件
+  function filtSig() { return JSON.stringify([curCity(), getArea(), getSort(), getFilt()]); }
+  let appliedSig = null;
   function activeFiltCount() {
     const f = getFilt();
     return [getArea(), f.price, f.tags, f.open, f.radius, f.cpn].filter(Boolean).length;
@@ -247,6 +250,7 @@
       if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
       else if (f.at) params.set("at", f.at);
       if (f.np) params.set("place", "0");
+      appliedSig = filtSig();
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -324,6 +328,7 @@
       lastFacets = data; facetsCity = city;
     } catch (e) { lastFacets = lastFacets || { price_bands: [], tags: [], radii: [3, 5, 10], geo_districts: [] }; }
   }
+  function scrollTop() { try { window.scrollTo({ top: 0, behavior: "auto" }); } catch (e) { window.scrollTo(0, 0); } }
   function askLocation() {
     if (locBusy) return;
     locBusy = true;
@@ -350,10 +355,13 @@
     const panel = $("#areaPanel");
     if (!panel) return;
     const on = open == null ? panel.classList.contains("hidden") : open;
+    const wasOpen = !panel.classList.contains("hidden");
     panel.classList.toggle("hidden", !on);
     $("#btnArea")?.setAttribute("aria-expanded", on ? "true" : "false");
     if (on) await ensureFacets();
     paintArea();
+    // closing the panel (tap outside / 筛选 again) applies what was picked, same as 查看结果
+    if (wasOpen && !on && appliedSig !== null && appliedSig !== filtSig()) { scrollTop(); loadFeed(true); }
   }
   function mountGuide() {
     const row = document.querySelector(".search-row");
@@ -469,10 +477,12 @@
       setFilt({ radius: getFilt().radius === r ? "" : r }); paintArea(); return;
     }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-reset]")) {
-      clearFilt(); lastFacets = null; paintArea(); return;
+      // 重置 = 马上恢复默认：排序回「最新」，清地区 / 价格 / 标签 / 营业中 / 有优惠 / 附近（本次定位、半径）。
+      // 不动「我的 · 常用位置」（它就是默认中心），也不清搜索框。价格、标签选项（facets）按城市缓存，不用丢。
+      clearFilt(); paintArea(); scrollTop(); loadFeed(true); return;
     }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-apply]")) {
-      toggleArea(false); loadFeed(true); return;
+      appliedSig = null; toggleArea(false); scrollTop(); loadFeed(true); return;
     }
     if (ev.target.id === "btnTutorial" || (ev.target.closest && ev.target.closest("[data-tutorial]"))) {
       ev.preventDefault(); const sh = $("#guideSheet"); if (sh) { sh.innerHTML = tutorialHtml(); sh.classList.remove("hidden"); }
@@ -493,6 +503,7 @@
       lastAreas = null;
       lastFacets = null;
       facetsCity = "";
+      appliedSig = null;
       toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
