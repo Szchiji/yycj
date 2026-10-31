@@ -1,15 +1,17 @@
-"""审核通过后按模板推送到频道，尽量发相册；带「查看详情」深链按钮，资料变更时同步编辑。
+"""审核通过后按模板推送到频道，尽量发相册；资料变更时同步编辑，下架时标记。
 
-频道里不能用 WebApp 按钮（Telegram 限制），所以用 t.me/<bot>?startapp=… 打开小程序详情。
-相册本身不能挂按钮：多图时先发相册，再发一条带按钮的文字卡；单图/无图则直接挂按钮。
+频道帖不带任何按钮（相册本来就挂不了按钮，单图也统一不挂）：文案末尾放文字链接
+「查看详情 · 查看评价 · 写评价」，都是 t.me/<bot>?start=<s|r|w>_<id>，机器人先查必订，再发打开小程序的按钮。
+模板里的用户内容一律 HTML 转义（花名里有 < & 也能发出去）。
 """
 from __future__ import annotations
 
+import html
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
+from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from bot.services import home_service
 from bot.services.media_urls import enrich_media
@@ -99,36 +101,39 @@ def compact_id(lamp_id: str) -> str:
     return str(lamp_id or "").replace("-", "").lower()
 
 
-def startapp_url(bot_username: str, lamp_id: str, kind: str = "s") -> str:
-    """Channel-safe deep link into the Mini App detail (start_param → deep-open.js).
+LINK_LABELS = (("s", "查看详情"), ("r", "查看评价"), ("w", "写评价"))
 
-    kind: s=详情, r=详情+评价, c=详情+想聊聊. Telegram startapp 只允许 [A-Za-z0-9_-]，最长 64。
-    """
+
+def start_url(bot_username: str, lamp_id: str, kind: str = "s") -> str:
+    """Bot deep link ``t.me/<bot>?start=<kind>_<32hex>`` — the bot runs the follow check, then sends a
+    WebApp button to the right page. kind: s=详情, r=详情+评价, w=写评价. start 参数只允许 [A-Za-z0-9_-]，≤64。"""
     name = (bot_username or "").lstrip("@")
     lid = compact_id(lamp_id)
     if not name or len(lid) != 32:
         return ""
-    prefix = {"s": "s_", "r": "r_", "c": "c_"}.get(kind, "s_")
-    return f"https://t.me/{name}?startapp={prefix}{lid}"
+    prefix = kind if kind in ("s", "r", "w") else "s"
+    return f"https://t.me/{name}?start={prefix}_{lid}"
 
 
-def channel_kb(bot_username: str, lamp_id: str, *, cta: str = "想聊聊") -> Optional[InlineKeyboardMarkup]:
-    """Inline URL buttons for a channel post. WebApp buttons are not allowed in channels."""
-    detail = startapp_url(bot_username, lamp_id, "s")
-    if not detail:
-        return None
-    review = startapp_url(bot_username, lamp_id, "r")
-    chat = startapp_url(bot_username, lamp_id, "c")
-    row1 = [InlineKeyboardButton(text="查看详情", url=detail)]
-    row2 = []
-    if review:
-        row2.append(InlineKeyboardButton(text="看评价", url=review))
-    if chat:
-        row2.append(InlineKeyboardButton(text=(cta or "想聊聊")[:16], url=chat))
-    rows = [row1]
-    if row2:
-        rows.append(row2)
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+# kept for older callers / templates
+startapp_url = start_url
+
+
+def links_html(bot_username: str, lamp_id: str) -> str:
+    parts = []
+    for kind, label in LINK_LABELS:
+        u = start_url(bot_username, lamp_id, kind)
+        if u:
+            parts.append(f'<a href="{html.escape(u, quote=True)}">{label}</a>')
+    return " · ".join(parts)
+
+
+def caption_html(plain: str, links: str = "", *, limit: int = 1024) -> str:
+    """Escape the filled template (user content may contain < & …) and append the HTML links.
+    Telegram counts visible characters, so trim the plain text first, never the markup."""
+    room = limit - (len("查看详情 · 查看评价 · 写评价") + 2 if links else 0)
+    body = html.escape((plain or "").strip()[:max(0, room)], quote=False)
+    return (body + ("\n\n" + links if links else "")).strip()
 
 
 async def resolve_media_chat() -> Optional[str]:
@@ -152,24 +157,28 @@ async def _remember(lamp_id: str, chat: str, mid: int, *, card_mid: Optional[int
         logger.exception("remember broadcast ref failed")
 
 
-async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]]) -> tuple[str, str, str, InlineKeyboardMarkup | None]:
+async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]], *, links: bool = True) -> tuple[str, str, str, None]:
+    """(chat, caption_html, bot_username, None). No inline buttons on channel posts — the links
+    「查看详情 · 查看评价 · 写评价」 sit at the end of the caption instead."""
     from bot.services.home_feed import ops_for_city
     site = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
     chat = normalize_chat(str(site.get("broadcast_channel") or ""))
     from bot.services import bot_info
     ident = await bot_info.get_bot_identity()
     bot_name = ident.get("username") or ""
-    detail = startapp_url(bot_name, str(lamp.get("lamp_id") or ""), "s")
-    link = detail or bot_info.bot_tme_url(bot_name)
+    lid = str(lamp.get("lamp_id") or "")
+    # {链接} is replaced by the 「查看详情 · 查看评价 · 写评价」 line at the end, so drop the bare URL
+    # (falls back to the bot link only when we can't build the deep links)
+    link = "" if (links and start_url(bot_name, lid, "s")) else (start_url(bot_name, lid, "s") or bot_info.bot_tme_url(bot_name))
     merged = {}
     if isinstance(lamp.get("extras"), dict):
         merged.update(lamp.get("extras") or {})
     merged.update(extras or {})
-    cta = site.get("chat_cta_label") or "想聊聊"
-    merged.setdefault("聊天按钮", cta)
-    caption = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
-    kb = channel_kb(bot_name, str(lamp.get("lamp_id") or ""), cta=cta)
-    return chat, caption, bot_name, kb
+    merged.setdefault("聊天按钮", site.get("chat_cta_label") or "想聊聊")
+    plain = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
+    plain = re.sub(r"\n{3,}", "\n\n", plain)
+    caption = caption_html(plain, links_html(bot_name, lid) if links else "")
+    return chat, caption, bot_name, None
 
 
 async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
@@ -182,7 +191,7 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
         # already posted: keep the original, just refresh caption/buttons
         return await update_broadcast(lamp, extras)
 
-    chat, caption, _bot, kb = await _caption(lamp, extras)
+    chat, caption, _bot, _kb = await _caption(lamp, extras)
     if not chat:
         return None
     from bot.main import bot
@@ -191,7 +200,7 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
         msg = None
         card_mid = None
         if len(items) >= 2:
-            # media groups cannot carry a reply_markup — album first, then a text card with buttons
+            # album: the first item's caption carries the links (no extra button card)
             group = []
             for i, (kind, raw) in enumerate(items):
                 cap = caption if i == 0 else None
@@ -201,16 +210,14 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
                     group.append(InputMediaPhoto(media=raw, caption=cap))
             msgs = await bot.send_media_group(chat, media=group)
             msg = msgs[0] if msgs else None
-            card = await bot.send_message(chat, "👆 点击下方打开小程序", reply_markup=kb)
-            card_mid = getattr(card, "message_id", None)
         elif len(items) == 1:
             kind, raw = items[0]
             if kind == "video":
-                msg = await bot.send_video(chat, raw, caption=caption, reply_markup=kb)
+                msg = await bot.send_video(chat, raw, caption=caption)
             else:
-                msg = await bot.send_photo(chat, raw, caption=caption, reply_markup=kb)
+                msg = await bot.send_photo(chat, raw, caption=caption)
         else:
-            msg = await bot.send_message(chat, caption, reply_markup=kb)
+            msg = await bot.send_message(chat, caption, disable_web_page_preview=True)
         mid = getattr(msg, "message_id", None)
         if mid:
             await _remember(lid, chat, int(mid), card_mid=int(card_mid) if card_mid else None)
@@ -229,21 +236,28 @@ async def update_broadcast(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]
     chat, mid = await load_broadcast(lid)
     if not chat or not str(mid).isdigit():
         return None
-    _chat, caption, _bot, kb = await _caption(lamp, extras)
-    card_mid = await _card_mid(lid)
+    _chat, caption, _bot, _kb = await _caption(lamp, extras)
     try:
-        await bot.edit_message_caption(chat_id=chat, message_id=int(mid), caption=caption, reply_markup=kb if not card_mid else None)
-    except Exception:
-        try:
-            await bot.edit_message_text(chat_id=chat, message_id=int(mid), text=caption, reply_markup=kb if not card_mid else None)
-        except Exception:
-            logger.exception("edit original broadcast failed")
-            return None
+        await bot.edit_message_caption(chat_id=chat, message_id=int(mid), caption=caption, reply_markup=None)
+    except Exception as exc:
+        if "not modified" not in str(exc).lower():
+            try:
+                await bot.edit_message_text(chat_id=chat, message_id=int(mid), text=caption, reply_markup=None,
+                                            disable_web_page_preview=True)
+            except Exception as exc2:
+                if "not modified" not in str(exc2).lower():
+                    logger.exception("edit original broadcast failed")
+                    return None
+    # posts made by the button version had a separate card: retire it
+    card_mid = await _card_mid(lid)
     if card_mid:
         try:
-            await bot.edit_message_reply_markup(chat_id=chat, message_id=int(card_mid), reply_markup=kb)
+            await bot.delete_message(chat_id=chat, message_id=int(card_mid))
         except Exception:
-            logger.warning("edit broadcast card buttons failed lamp=%s", lid[:8])
+            try:
+                await bot.edit_message_reply_markup(chat_id=chat, message_id=int(card_mid), reply_markup=None)
+            except Exception:
+                pass
     return album_link(chat, int(mid))
 
 
@@ -266,7 +280,7 @@ async def mark_unlist(lamp_id: str, *, reason: str = "") -> None:
     try:
         from bot.services import search_service
         lamp = await search_service.get_lamp(lamp_id) or {"lamp_id": lamp_id, "title": ""}
-        _, caption, _, _ = await _caption(lamp, None)
+        _, caption, _, _ = await _caption(lamp, None, links=False)
         if "已下架" not in caption:
             caption += f"\n\n——\n⚠️ 已下架（{reason[:20]}）" if reason else UNLIST_MARK
         # photo / album head carries a caption; a text-only post needs edit_message_text
@@ -305,24 +319,17 @@ async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Opti
     bot_name = ident.get("username") or ""
     stars = int(review.get("stars") or 0)
     star = "★" * max(0, min(5, stars)) + "☆" * max(0, 5 - stars)
-    import html as _html
-    title = _html.escape(str(lamp.get("title") or "资料"))
-    loc = _html.escape(" · ".join(x for x in (lamp.get("city"), lamp.get("district")) if x))
-    text = _html.escape((review.get("text") or "").strip()[:400])
+    title = html.escape(str(lamp.get("title") or "资料"))
+    loc = html.escape(" · ".join(x for x in (lamp.get("city"), lamp.get("district")) if x))
+    text = html.escape((review.get("text") or "").strip()[:400])
     body = f"🌟 精选评价 · {title}\n📍 {loc}\n{star}\n{text}".strip()
-    detail = startapp_url(bot_name, str(lamp.get("lamp_id") or ""), "r")
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="看完整评价", url=detail)]]) if detail else None
-    photos = list(review.get("photos") or [])[:3]
+    detail = start_url(bot_name, str(lamp.get("lamp_id") or ""), "r")
+    if detail:
+        body += f'\n\n<a href="{html.escape(detail, quote=True)}">查看完整评价</a>'
     from bot.main import bot
     try:
-        if len(photos) >= 2:
-            group = [InputMediaPhoto(media=p, caption=body if i == 0 else None) for i, p in enumerate(photos)]
-            await bot.send_media_group(chat, media=group)
-            msg = await bot.send_message(chat, "👆 精选评价", reply_markup=kb)
-        elif len(photos) == 1:
-            msg = await bot.send_photo(chat, photos[0], caption=body, reply_markup=kb)
-        else:
-            msg = await bot.send_message(chat, body, reply_markup=kb)
+        # text only: the public photo upload is gone and 约课凭证 never leave the admins
+        msg = await bot.send_message(chat, body, disable_web_page_preview=True)
         mid = getattr(msg, "message_id", None)
         return album_link(chat, int(mid)) if mid else None
     except Exception:

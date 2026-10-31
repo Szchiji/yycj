@@ -44,7 +44,7 @@ def test_directory_render():
     from bot.services.channel_directory import render
     lid = "88618ee0-6c79-49d2-8fc3-9259b6a4f5eb"
     t = render("深圳", [{"lamp_id": lid, "title": "小<南>", "district": "南山区"}, {"lamp_id": lid, "title": "b", "district": ""}], "MoonBot")
-    assert "南山" in t and "其他" in t and "startapp=s_88618ee06c7949d28fc39259b6a4f5eb" in t and "小&lt;南&gt;" in t
+    assert "南山" in t and "其他" in t and "start=s_88618ee06c7949d28fc39259b6a4f5eb" in t and "小&lt;南&gt;" in t
 
 
 def test_net_cache_key_includes_filters():
@@ -53,3 +53,22 @@ def test_net_cache_key_includes_filters():
     line = [l for l in src.splitlines() if '"city", "q", "district"' in l][0]
     for k in ("at", "radius", "price", "tags", "open"):
         assert f'"{k}"' in line
+
+
+def test_start_payload_kinds():
+    from bot.services.share_gate import card_page_url, parse_start_payload
+    lid = "88618ee0-6c79-49d2-8fc3-9259b6a4f5eb"
+    assert parse_start_payload("s_88618ee06c7949d28fc39259b6a4f5eb") == ("s", lid)
+    assert parse_start_payload("r_88618ee06c7949d28fc39259b6a4f5eb") == ("r", lid)
+    assert parse_start_payload("w_" + lid) == ("w", lid)
+    assert parse_start_payload(lid) == ("s", lid)
+    assert parse_start_payload("home") == ("s", None)
+    assert parse_start_payload("x_88618ee06c7949d28fc39259b6a4f5eb")[1] is None
+
+
+def test_caption_html_escapes_and_links():
+    from bot.services.broadcast import caption_html, links_html, start_url
+    lid = "88618ee0-6c79-49d2-8fc3-9259b6a4f5eb"
+    assert start_url("B", lid, "w") == "https://t.me/B?start=w_88618ee06c7949d28fc39259b6a4f5eb"
+    out = caption_html("小<b>&" + "字" * 2000, links_html("B", lid))
+    assert out.startswith("小&lt;b&gt;&amp;") and out.endswith("写评价</a>") and "<b>" not in out

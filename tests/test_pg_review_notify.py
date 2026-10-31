@@ -73,21 +73,26 @@ def test_review_notify():
         m._ready = True
         try:
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=m.app), base_url="http://t") as c:
-                # no photo + audit off → approved, nobody notified
+                # no 约课凭证 → rejected with a clear hint, nobody notified
                 r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 5, "text": "plain"}, headers=tok(7821))
-                assert r.json()["review"]["status"] == "approved"
+                assert r.status_code == 400 and "约课凭证" in r.json()["detail"]
                 await asyncio.sleep(0.3)
                 assert fake.calls == []
-                # 1 photo → pending → photo+caption+buttons to super, 深圳 operator, all-city operator (not 广州)
-                r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 5, "text": "测试<b>", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw"]}, headers=tok(7822))
+                # 1 proof → pending even with audit off → proof photo + text card with buttons to
+                # super, 深圳 operator, all-city operator (not 广州)
+                r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 5, "text": "测试<b>", "proofs": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw"], "photos": ["AgACAgUAAxkBAAIBpub9"]}, headers=tok(7822))
                 rid = r.json()["review"]["review_id"]
                 assert r.status_code == 200 and r.json()["review"]["status"] == "pending"
                 await asyncio.sleep(0.5)
                 photos = [x for x in fake.calls if x[0] == "photo"]
                 assert sorted(x[1] for x in photos) == sorted([SUPER, OP_SZ, OP_ALL]), fake.calls
-                cap = photos[0][2]["caption"]
-                assert "小红" in cap and "★★★★★" in cap and "测试&lt;b&gt;" in cap and "带图" in cap and "@g7822" in cap
-                kb = photos[0][2]["kb"].inline_keyboard
+                assert all("约课凭证" in (x[2]["caption"] or "") and x[2]["kb"] is None for x in photos)
+                cards = [x for x in fake.calls if x[0] == "text" and x[2].get("kb") is not None]
+                assert sorted(x[1] for x in cards) == sorted([SUPER, OP_SZ, OP_ALL]), fake.calls
+                cap = cards[0][2]["text"]
+                assert "小红" in cap and "★★★★★" in cap and "测试&lt;b&gt;" in cap and "带凭证" in cap and "@g7822" in cap
+                assert "公开晒图：0 张" in cap and "约课凭证：1 张" in cap
+                kb = cards[0][2]["kb"].inline_keyboard
                 assert [b.callback_data for b in kb[0]] == [f"admin_rev_ok:{rid}", f"admin_rev_no:{rid}"]
                 # notify is idempotent
                 assert await review_notify.notify_new_review({"review_id": rid, "status": "pending", "lamp_id": "RN-SZ"}) == 0
@@ -96,11 +101,11 @@ def test_review_notify():
                 r = await c.post("/api/admin/reviews/bulk", json={"ids": [rid], "action": "approve"}, headers=tok(SUPER))
                 assert r.json()["done"] == [rid]
                 await asyncio.sleep(0.5)
-                edits = [x for x in fake.calls if x[0] == "edit_caption"]
+                edits = [x for x in fake.calls if x[0] == "edit_text"]
                 assert len(edits) == 3 and all("已通过" in x[2]["text"] and x[2]["kb"] is None for x in edits), fake.calls
-                # 3 photos → album + text card with buttons; then the bot button rejects it
+                # 3 proofs → album + text card with buttons; then the bot button rejects it
                 fake.calls.clear()
-                r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 3, "text": "三张", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQa", "AgACAgUAAxkBAAIBb2Vk1Zq9xQb", "AgACAgUAAxkBAAIBb2Vk1Zq9xQc"]}, headers=tok(7821))
+                r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 3, "text": "三张", "proofs": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQa", "AgACAgUAAxkBAAIBb2Vk1Zq9xQb", "AgACAgUAAxkBAAIBb2Vk1Zq9xQc"]}, headers=tok(7821))
                 rid3 = r.json()["review"]["review_id"]
                 await asyncio.sleep(0.5)
                 assert len([x for x in fake.calls if x[0] == "album" and x[2]["n"] == 3]) == 3
@@ -149,7 +154,7 @@ def test_review_notify():
                 raise RuntimeError("telegram down")
         m.bot = Boom()
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=m.app), base_url="http://t") as c:
-            r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 4, "text": "x", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQz"]}, headers=tok(7823))
+            r = await c.post("/api/reviews", json={"lamp_id": "RN-SZ", "stars": 4, "text": "x", "proofs": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQz"]}, headers=tok(7823))
             assert r.status_code == 200 and r.json()["review"]["status"] == "pending"
             await asyncio.sleep(0.3)
         m.bot = m.bot_real

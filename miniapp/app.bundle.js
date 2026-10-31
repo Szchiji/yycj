@@ -2321,22 +2321,27 @@ try {
   if (window.__yycjDeepOpen) return;
   window.__yycjDeepOpen = true;
   function parseStart(raw) {
-    // s_<uuid> 详情 · r_<uuid> 详情+评价 · c_<uuid> 详情+想聊聊（频道推送按钮）
+    // s_<uuid> 详情 · r_<uuid> 详情+评价区 · w_<uuid> 写评价 · c_<uuid> 详情+想聊聊
     let s = String(raw || "").trim();
     if (!s) return { id: "", kind: "s" };
     let kind = "s";
-    if (/^[src]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
+    if (/^[srwc]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
       return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
     }
-    return { id: String(raw || "").replace(/^[src]_/i, ""), kind };
+    return { id: String(raw || "").replace(/^[srwc]_/i, ""), kind };
   }
   function restore(raw) { return parseStart(raw).id; }
   function lampId() {
     const q = new URLSearchParams(location.search || "");
     const fromQ = q.get("lamp") || q.get("id") || "";
-    if (fromQ) return restore(fromQ) || fromQ;
+    if (fromQ) {
+      // bot deep link (?start=r_/w_…) → WebApp button → go.html?lamp=<id>&open=r|w
+      const open = String(q.get("open") || "").toLowerCase();
+      if (/^[rwc]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
+      return restore(fromQ) || fromQ;
+    }
     const tg = window.Telegram && window.Telegram.WebApp;
     const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
     if (sp) { const p = parseStart(sp); try { sessionStorage.setItem("yycj_open_kind", p.kind); } catch (e) {} return p.id; }
@@ -2359,6 +2364,8 @@ try {
     try { kind = sessionStorage.getItem("yycj_open_kind") || "s"; sessionStorage.removeItem("yycj_open_kind"); } catch (e) {}
     if (kind === "r") {
       setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
+    } else if (kind === "w") {
+      setTimeout(() => { try { document.getElementById("detailReview")?.click(); } catch (e) {} }, 700);
     } else if (kind === "c") {
       setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
     }
@@ -2702,7 +2709,8 @@ body.rev-open #view-review{padding-top:calc(var(--rv-top-h) + 4px);}`;
 /* ---- review-kit.js ---- */
 try {
 (() => {
-  // 写评价（结构化）：人照课表差异 / 优点 / 不足 / 补充 + 星级 + 公开晒图（≤3，可关）+ 约课凭证（1–5，仅管理员可见）。
+  // 写评价（结构化）：人照课表差异 / 优点 / 不足 / 补充 + 星级 + 约课凭证（必填 1–5 张，仅管理员可见）。
+  // 公开晒图已取消（老评价里已有的公开图照常显示）。
   // 提交有加载状态，成功/失败一定有提示。旧的 #revText 保留为隐藏兜底。
   if (window.__yycjReviewKit) return;
   window.__yycjReviewKit = true;
@@ -2721,8 +2729,7 @@ try {
   const token = () => localStorage.getItem("yycj_token") || "";
   const $ = (s) => document.querySelector(s);
   function cfg() {
-    const f = (window.__yycjHomeData && window.__yycjHomeData.review_form) || {};
-    return { publicPhotos: f.public_photos !== false, proofRequired: !!f.proof_required };
+    return { publicPhotos: false, proofRequired: true };
   }
   function report(ev, extra) { try { window.__yycjReport && window.__yycjReport(Object.assign({ ev }, extra || {})); } catch (e) {} }
   function toast(msg, err) {
@@ -2838,7 +2845,7 @@ try {
     }
     const v = parseInt(($("#revStars") || {}).value, 10) || 0;
     if (v < 1) return { msg: "请先点星打分" };
-    if (cfg().proofRequired && !bucket.proof.length) return { msg: "请上传约课凭证（1–5 张，仅管理员可见）" };
+    if (cfg().proofRequired && !bucket.proof.length) return { msg: "请上传约课凭证（1–5 张）：只发给管理员审核，不会公开" };
     return null;
   }
   async function submit(ctx) {
@@ -2913,7 +2920,7 @@ try {
     const pub = $("#rkPubBox");
     if (pub) pub.classList.toggle("hidden", !c.publicPhotos);
     const req = $("#rkProofReq");
-    if (req) req.textContent = c.proofRequired ? "1–5 张（必填），仅管理员可见" : "1–5 张，仅管理员可见";
+    if (req) req.textContent = c.proofRequired ? "必填 1–5 张，仅管理员可见" : "1–5 张，仅管理员可见";
   }
   function mount() {
     const form = $("#reviewForm");

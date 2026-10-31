@@ -2,22 +2,27 @@
   if (window.__yycjDeepOpen) return;
   window.__yycjDeepOpen = true;
   function parseStart(raw) {
-    // s_<uuid> 详情 · r_<uuid> 详情+评价 · c_<uuid> 详情+想聊聊（频道推送按钮）
+    // s_<uuid> 详情 · r_<uuid> 详情+评价区 · w_<uuid> 写评价 · c_<uuid> 详情+想聊聊
     let s = String(raw || "").trim();
     if (!s) return { id: "", kind: "s" };
     let kind = "s";
-    if (/^[src]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
+    if (/^[srwc]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
       return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
     }
-    return { id: String(raw || "").replace(/^[src]_/i, ""), kind };
+    return { id: String(raw || "").replace(/^[srwc]_/i, ""), kind };
   }
   function restore(raw) { return parseStart(raw).id; }
   function lampId() {
     const q = new URLSearchParams(location.search || "");
     const fromQ = q.get("lamp") || q.get("id") || "";
-    if (fromQ) return restore(fromQ) || fromQ;
+    if (fromQ) {
+      // bot deep link (?start=r_/w_…) → WebApp button → go.html?lamp=<id>&open=r|w
+      const open = String(q.get("open") || "").toLowerCase();
+      if (/^[rwc]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
+      return restore(fromQ) || fromQ;
+    }
     const tg = window.Telegram && window.Telegram.WebApp;
     const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
     if (sp) { const p = parseStart(sp); try { sessionStorage.setItem("yycj_open_kind", p.kind); } catch (e) {} return p.id; }
@@ -40,6 +45,8 @@
     try { kind = sessionStorage.getItem("yycj_open_kind") || "s"; sessionStorage.removeItem("yycj_open_kind"); } catch (e) {}
     if (kind === "r") {
       setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
+    } else if (kind === "w") {
+      setTimeout(() => { try { document.getElementById("detailReview")?.click(); } catch (e) {} }, 700);
     } else if (kind === "c") {
       setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
     }

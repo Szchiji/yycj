@@ -21,7 +21,7 @@ MAX_PER_AREA = 30
 
 
 def render(city: str, lamps: List[Dict], bot_name: str) -> str:
-    from bot.services.broadcast import startapp_url
+    from bot.services.broadcast import start_url as startapp_url
     from bot.services.search_service import district_key
     groups: Dict[str, List[Dict]] = {}
     for x in lamps:

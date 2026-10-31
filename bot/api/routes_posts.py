@@ -186,19 +186,16 @@ async def api_create_review(
             proofs.append(_normalize_one_url(s))
     proofs = proofs[:5]
     sections = home_service.clean_sections(body.sections.model_dump() if body.sections else {})
-    from bot.services.home_feed import ops_for_city
-    ops = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
     if body.sections is not None:
         err = home_service.sections_error(sections)
         if err:
             raise HTTPException(status_code=400, detail=err)
-    if ops.get("review_proof_required") and not proofs:
-        raise HTTPException(status_code=400, detail="请上传约课凭证（1–5 张，仅管理员可见）")
-    if ops.get("review_public_photos") is False:
-        photos = []  # 只收私密凭证，不收公开晒图
-    # 评价需审核 (per card city, fallback site-wide, unset = ON): off -> publish directly.
-    # Reviews with photos or 约课凭证 always wait for an admin, whatever the switch says.
-    auto = not photos and not proofs and not await home_service.review_needs_audit(lamp.get("city"))
+    if not proofs:
+        raise HTTPException(status_code=400, detail="请上传约课凭证（1–5 张）：凭证只发给管理员审核，不会公开，敏感信息请自行打码")
+    photos = []  # 公开晒图已取消：新评价只收私密凭证（老评价已有的公开图照常显示）
+    # 约课凭证 are required and exist for the admins to check, so every new review waits for an admin
+    # (评价需审核 switch no longer auto-publishes).
+    auto = False  # every review carries 约课凭证 now → always an admin check
     try:
         rev = await home_service.create_review(
             auto_approve=auto,

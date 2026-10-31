@@ -17,9 +17,21 @@ _UUID_DASH = re.compile(
 )
 
 
+OPEN_KINDS = {"s": "打开资料", "r": "查看评价", "w": "写评价"}
+
+
+def parse_start_payload(arg: str) -> tuple[str, Optional[str]]:
+    """``s_|r_|w_<uuid or 32hex>`` → (kind, lamp_id). s=详情, r=评价区, w=写评价. Bare id = s."""
+    raw = (arg or "").strip()
+    kind = "s"
+    if len(raw) > 2 and raw[1] == "_" and raw[0].lower() in OPEN_KINDS:
+        kind, raw = raw[0].lower(), raw[2:]
+    return kind, parse_share_payload(raw)
+
+
 def parse_share_payload(arg: str) -> Optional[str]:
     raw = (arg or "").strip()
-    if raw.startswith("s_"):
+    if len(raw) > 2 and raw[1] == "_" and raw[0].lower() in "srw":
         raw = raw[2:]
     if _UUID_DASH.match(raw):
         return raw.lower()
@@ -30,13 +42,14 @@ def parse_share_payload(arg: str) -> Optional[str]:
     return None
 
 
-def card_page_url(lamp_id: str) -> str:
+def card_page_url(lamp_id: str, kind: str = "s") -> str:
     webapp = (get_settings().normalized_webapp_url or "").rstrip("/")
     if not webapp:
         return ""
     if webapp.endswith(".html"):
         webapp = webapp.rsplit("/", 1)[0]
-    return f"{webapp}/go.html?lamp={lamp_id}"
+    extra = f"&open={kind}" if kind in ("r", "w") else ""
+    return f"{webapp}/go.html?lamp={lamp_id}{extra}"
 
 
 def _norm_chat(raw: Any) -> Dict[str, Any]:
@@ -114,10 +127,11 @@ def join_kb(chats: List[Dict[str, Any]], lamp_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def open_card_kb(lamp_id: str) -> Optional[InlineKeyboardMarkup]:
-    url = card_page_url(lamp_id)
+def open_card_kb(lamp_id: str, kind: str = "s") -> Optional[InlineKeyboardMarkup]:
+    url = card_page_url(lamp_id, kind)
     if not url:
         return None
+    label = OPEN_KINDS.get(kind, "打开资料")
     return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="打开资料", web_app=WebAppInfo(url=url))]]
+        inline_keyboard=[[InlineKeyboardButton(text=label, web_app=WebAppInfo(url=url))]]
     )

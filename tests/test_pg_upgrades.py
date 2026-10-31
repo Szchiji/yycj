@@ -65,21 +65,28 @@ def test_upgrades():
             items = {x["lamp_id"]: x for x in (await c.get("/api/me/listings", headers=tok(T))).json()["items"]}
             assert items["U-A"]["stats"] == {"views": 3, "views_7d": 3, "favs": 2, "favs_7d": 2, "contacts": 1, "contacts_7d": 1}, items["U-A"]["stats"]
             assert items["U-B"]["stats"]["views"] == 0
-            # #6 photo reviews always pending, even with 评价需审核 off; plain ones follow the switch
+            # #6 every new review needs 约课凭证 and waits for an admin, even with 评价需审核 off;
+            # public photos are no longer accepted, but an old review's photos still show
             await home_service.update_settings(ops_config={"review_require_audit": False})
             r = await c.post("/api/reviews", json={"lamp_id": "U-B", "stars": 5, "text": "plain"}, headers=tok(9493))
-            assert r.json()["review"]["status"] == "approved", r.text
-            r = await c.post("/api/reviews", json={"lamp_id": "U-B", "stars": 4, "text": "pics", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw", "AgACAgUAAxkBAAIBb2Vk4Zq9xQw"]}, headers=tok(9493))
+            assert r.status_code == 400 and "约课凭证" in r.text
+            r = await c.post("/api/reviews", json={"lamp_id": "U-B", "stars": 4, "text": "pics", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw"],
+                                                   "proofs": ["AgACAgUAAxkBAAIBb2Vk1Zq9xP1", "AgACAgUAAxkBAAIBb2Vk1Zq9xP2"]}, headers=tok(9493))
             assert r.status_code == 200, r.text
-            photo_rev = r.json()["review"]
-            assert photo_rev["status"] == "pending" and len(photo_rev["photos"]) == 3, r.text
+            rv = r.json()["review"]
+            assert rv["status"] == "pending" and rv["photos"] == [] and rv["proof_count"] == 2, r.text
             pend = {x["review_id"]: x for x in (await c.get("/api/admin/reviews/pending", headers=tok(SUPER))).json()["items"]}
-            assert pend[photo_rev["review_id"]]["photos"] == ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw"]
+            assert pend[rv["review_id"]]["proofs"] == ["AgACAgUAAxkBAAIBb2Vk1Zq9xP1", "AgACAgUAAxkBAAIBb2Vk1Zq9xP2"]
             await home_service.update_settings(ops_config={"review_require_audit": True})
-            r = await c.post("/api/admin/reviews/bulk", json={"ids": [photo_rev["review_id"]], "action": "approve"}, headers=tok(SUPER))
-            assert r.json()["done"] == [photo_rev["review_id"]]
+            r = await c.post("/api/admin/reviews/bulk", json={"ids": [rv["review_id"]], "action": "approve"}, headers=tok(SUPER))
+            assert r.json()["done"] == [rv["review_id"]]
+            async with session_scope() as s2:
+                from bot.models import Review as _R
+                s2.add(_R(review_id="UR-OLD", lamp_id="U-B", guest_id=9494, stars=5, text="老评价", photos=["AgACAgUAAxkBAAIBOLD1"], status="approved",
+                                  created_at=datetime.utcnow() - timedelta(days=90)))
             det = (await c.get("/api/lamps/U-B", headers=tok(9493))).json()
-            assert any(x.get("photos") == ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw"] for x in det["reviews"])
+            assert any(x.get("photos") == ["AgACAgUAAxkBAAIBOLD1"] for x in det["reviews"])
+            assert "xP1" not in str(det)   # 约课凭证 never reach the public detail
             # #6 bulk
             r = await c.post("/api/admin/reviews/bulk", json={"ids": ["UR3", "UR4", "nope"], "action": "approve"}, headers=tok(SUPER))
             assert r.status_code == 200 and sorted(r.json()["done"]) == ["UR3", "UR4"] and "nope" in r.json()["failed"], r.text
@@ -90,7 +97,7 @@ def test_upgrades():
             # #7 dashboard
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(SUPER))).json()
             assert len(d["days"]) == 7 and d["totals"]["杭州"]["listings"] == 3 and d["totals"]["杭州"]["views"] == 4
-            assert d["totals"]["杭州"]["contacts"] == 1 and d["totals"]["杭州"]["reviews"] == 7, d["totals"]
+            assert d["totals"]["杭州"]["contacts"] == 1 and d["totals"]["杭州"]["reviews"] == 6, d["totals"]  # the no-凭证 review is refused now
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(OP))).json()
             assert set(d["cities"]) <= {"苏州"}
             # #5 expiring list

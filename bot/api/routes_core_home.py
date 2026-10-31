@@ -249,8 +249,8 @@ async def api_home(
         "contacts": contacts,
         "listing_fields": settings.get("listing_fields") or [],
         "review_form": {
-            "public_photos": settings.get("review_public_photos") is not False,
-            "proof_required": bool(settings.get("review_proof_required")),
+            "public_photos": False,
+            "proof_required": True,
         },
     }
 

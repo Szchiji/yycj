@@ -299,7 +299,7 @@ async def set_review_status(review_id: str, status: str, *, note: Optional[str] 
             r.review_note = note[:256]
         await s.flush()
         out = _review_to_dict(r)
-    if status == ReviewStatus.APPROVED.value and out.get("photos"):
+    if status == ReviewStatus.APPROVED.value and int(out.get("stars") or 0) >= 4:
         try:
             import asyncio
             from bot.services.broadcast import broadcast_review

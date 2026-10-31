@@ -1,5 +1,6 @@
 (() => {
-  // 写评价（结构化）：人照课表差异 / 优点 / 不足 / 补充 + 星级 + 公开晒图（≤3，可关）+ 约课凭证（1–5，仅管理员可见）。
+  // 写评价（结构化）：人照课表差异 / 优点 / 不足 / 补充 + 星级 + 约课凭证（必填 1–5 张，仅管理员可见）。
+  // 公开晒图已取消（老评价里已有的公开图照常显示）。
   // 提交有加载状态，成功/失败一定有提示。旧的 #revText 保留为隐藏兜底。
   if (window.__yycjReviewKit) return;
   window.__yycjReviewKit = true;
@@ -18,8 +19,7 @@
   const token = () => localStorage.getItem("yycj_token") || "";
   const $ = (s) => document.querySelector(s);
   function cfg() {
-    const f = (window.__yycjHomeData && window.__yycjHomeData.review_form) || {};
-    return { publicPhotos: f.public_photos !== false, proofRequired: !!f.proof_required };
+    return { publicPhotos: false, proofRequired: true };
   }
   function report(ev, extra) { try { window.__yycjReport && window.__yycjReport(Object.assign({ ev }, extra || {})); } catch (e) {} }
   function toast(msg, err) {
@@ -135,7 +135,7 @@
     }
     const v = parseInt(($("#revStars") || {}).value, 10) || 0;
     if (v < 1) return { msg: "请先点星打分" };
-    if (cfg().proofRequired && !bucket.proof.length) return { msg: "请上传约课凭证（1–5 张，仅管理员可见）" };
+    if (cfg().proofRequired && !bucket.proof.length) return { msg: "请上传约课凭证（1–5 张）：只发给管理员审核，不会公开" };
     return null;
   }
   async function submit(ctx) {
@@ -210,7 +210,7 @@
     const pub = $("#rkPubBox");
     if (pub) pub.classList.toggle("hidden", !c.publicPhotos);
     const req = $("#rkProofReq");
-    if (req) req.textContent = c.proofRequired ? "1–5 张（必填），仅管理员可见" : "1–5 张，仅管理员可见";
+    if (req) req.textContent = c.proofRequired ? "必填 1–5 张，仅管理员可见" : "1–5 张，仅管理员可见";
   }
   function mount() {
     const form = $("#reviewForm");

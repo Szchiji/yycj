@@ -132,31 +132,39 @@ def test_filters_channel_reviews():
                 link = await broadcast.broadcast_listing(lamp)
                 assert link and link.startswith("https://t.me/yy_test/")
                 kind, chat, kw = fake.calls[-1]
-                assert kind == "photo" and chat == "@yy_test"
-                urls = _urls(kw["kb"])
+                assert kind == "photo" and chat == "@yy_test" and kw["kb"] is None      # no buttons at all
                 compact = ids["a"].replace("-", "")
                 bn = (await bot_info.get_bot_identity()).get("username")
-                assert urls == [f"https://t.me/{bn}?startapp=s_{compact}", f"https://t.me/{bn}?startapp=r_{compact}", f"https://t.me/{bn}?startapp=c_{compact}"]
-                assert f"startapp=s_{compact}" in kw["caption"]          # {链接} is the detail link now
+                cap = kw["caption"]
+                for k, label in (("s", "查看详情"), ("r", "查看评价"), ("w", "写评价")):
+                    assert f'<a href="https://t.me/{bn}?start={k}_{compact}">{label}</a>' in cap
+                assert "startapp" not in cap
                 n = len(fake.calls)
                 await broadcast.broadcast_listing(lamp)                   # second call = edit, never a duplicate post
-                assert [k for k, *_ in fake.calls[n:]] == ["edit_caption"]
+                assert [k for k, *_ in fake.calls[n:]] == ["edit_caption"] and fake.calls[-1][2]["kb"] is None
                 lamp["price_text"] = "999P"
                 await broadcast.update_broadcast(lamp)
-                assert "999P" in fake.calls[-1][2]["text"] and _urls(fake.calls[-1][2]["kb"])
+                assert "999P" in fake.calls[-1][2]["text"] and "写评价</a>" in fake.calls[-1][2]["text"]
                 await listing_ops.unlist_lamp(ids["a"], reason="admin")
                 last = fake.calls[-1]
                 assert last[0] == "edit_caption" and "已下架" in last[2]["text"] and last[2]["kb"] is None
-                # album: media group + a separate button card; card buttons are edited on sync
+                assert "<a href" not in last[2]["text"]                     # links removed on takedown
+                # album: caption on the first item carries the links; no extra card message
                 lb = await search_service.get_lamp(ids["b"])
                 lb["media"] = [{"type": "image", "url": "AgACAgUAAxkBAAIBpic2"}, {"type": "image", "url": "AgACAgUAAxkBAAIBpic3"}]
                 n = len(fake.calls)
                 await broadcast.broadcast_listing(lb)
-                kinds = [k for k, *_ in fake.calls[n:]]
-                assert kinds == ["album", "text"] and _urls(fake.calls[-1][2]["kb"])
+                assert [k for k, *_ in fake.calls[n:]] == ["album"]
+                assert f"start=s_{ids['b'].replace('-', '')}" in fake.calls[-1][2]["caps"][0]
                 n = len(fake.calls)
                 await broadcast.update_broadcast(lb)
-                assert [k for k, *_ in fake.calls[n:]] == ["edit_caption", "edit_kb"]
+                assert [k for k, *_ in fake.calls[n:]] == ["edit_caption"]
+                # user content is HTML-escaped (names with < & used to break the send)
+                lc = await search_service.get_lamp(ids["c"])
+                lc["title"] = "A<b>&C"
+                lc["media"] = []
+                await broadcast.broadcast_listing(lc)
+                assert fake.calls[-1][0] == "text" and "A&lt;b&gt;&amp;C" in fake.calls[-1][2]["text"]
                 # 按区目录: off by default; on → one post, then edits the same message
                 from bot.services import channel_directory
                 assert await channel_directory.refresh_city("惠州") is False
@@ -166,7 +174,7 @@ def test_filters_channel_reviews():
                 assert await channel_directory.refresh_city("惠州") is True
                 ks = [(k, kw.get("mid")) for k, _, kw in fake.calls[n:]]
                 assert [k for k, _ in ks] == ["text", "edit_text"] and ks[1][1] == n + 501
-                assert "惠阳" in fake.calls[-1][2]["text"] and "startapp=s_" in fake.calls[-1][2]["text"]
+                assert "惠阳" in fake.calls[-1][2]["text"] and "start=s_" in fake.calls[-1][2]["text"]
                 await home_service.update_settings(ops_config={"channel_directory": False})
 
                 # ---- 结构化评价 + 私密凭证 ----
@@ -192,22 +200,19 @@ def test_filters_channel_reviews():
                 await home_service.set_review_status(rv["review_id"], "approved")
                 d = (await c.get(f"/api/lamps/{ids['b']}", headers=h)).text
                 assert "AgACAgUAAxkBAAIBprf1" not in d and "人照九成像" in d
-                # proof required switch
-                await home_service.update_settings(ops_config={"review_proof_required": True})
+                # 约课凭证 always required
                 body.pop("proofs")
                 r = await c.post("/api/reviews", json=body, headers=h)
-                assert r.status_code == 400 and "凭证" in r.json()["detail"]
-                # public photos off → photos dropped, proofs kept
-                await home_service.update_settings(ops_config={"review_proof_required": False, "review_public_photos": False})
+                assert r.status_code == 400 and "约课凭证" in r.json()["detail"]
+                # public photos are no longer accepted (old reviews keep theirs)
                 body.update(photos=["AgACAgUAAxkBAAIBpub1"], proofs=["AgACAgUAAxkBAAIBprf3"])
                 r = await c.post("/api/reviews", json=body, headers=h)
-                assert r.json()["review"]["photos"] == []
-                # old plain-text review still accepted
-                r = await c.post("/api/reviews", json={"lamp_id": ids["c"], "stars": 5, "text": "老格式"}, headers=h)
-                assert r.status_code == 200
+                assert r.status_code == 200 and r.json()["review"]["photos"] == []
+                hd = (await c.get("/api/home?city=惠州&limit=1", headers=h)).json()["review_form"]
+                assert hd == {"public_photos": False, "proof_required": True}
         finally:
             m.bot = real
-            await home_service.update_settings(ops_config={"broadcast_channel": "", "review_public_photos": True})
+            await home_service.update_settings(ops_config={"broadcast_channel": ""})
             await db.close_db()
 
     asyncio.run(run())

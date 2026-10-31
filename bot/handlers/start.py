@@ -9,9 +9,11 @@ from aiogram.types import CallbackQuery, Message
 from bot.config import get_settings
 from bot.keyboards import admin_webapp_kb, remove_kb
 from bot.services import credit_service, home_service
-from bot.services.share_gate import join_kb, missing_required, open_card_kb, parse_share_payload
+from bot.services.share_gate import join_kb, missing_required, open_card_kb, parse_start_payload
 
 router = Router(name="start")
+
+_OPEN_TEXT = {"s": "点下方打开资料。", "r": "点下方查看这条资料的评价。", "w": "点下方给这条资料写评价。"}
 
 HELP_TEXT = """<b>月影车姬</b>
 点左下角「首页」打开应用。
@@ -46,12 +48,13 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
     if not arg and message.text:
         parts = message.text.split(maxsplit=1)
         arg = parts[1] if len(parts) > 1 else ""
-    lamp_id = parse_share_payload(arg)
-    if await _force_join(message, lamp_id):
+    kind, lamp_id = parse_start_payload(arg)
+    # the "我已关注" callback carries the kind too, so 查看评价 / 写评价 survive the follow check
+    if await _force_join(message, (f"{kind}_{lamp_id}" if lamp_id and kind != "s" else lamp_id)):
         return
     if lamp_id:
-        kb = open_card_kb(lamp_id)
-        await message.answer("点下方打开分享的资料。", reply_markup=kb or remove_kb())
+        kb = open_card_kb(lamp_id, kind)
+        await message.answer(_OPEN_TEXT.get(kind, _OPEN_TEXT["s"]), reply_markup=kb or remove_kb())
         return
     settings = get_settings()
     tip = "点左下角「首页」开始。" if settings.normalized_webapp_url else "请先配置 WEBAPP_URL。"
@@ -72,7 +75,9 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
 @router.callback_query(F.data.startswith("share_go:"))
 async def cb_share_go(query: CallbackQuery) -> None:
     user = query.from_user
-    lamp_id = (query.data or "").split(":", 1)[-1]
+    payload = (query.data or "").split(":", 1)[-1]
+    kind, parsed = parse_start_payload(payload)
+    lamp_id = parsed or payload
     if not user:
         await query.answer()
         return
@@ -80,13 +85,13 @@ async def cb_share_go(query: CallbackQuery) -> None:
     if missing:
         await query.answer("还有频道未加入", show_alert=True)
         if query.message:
-            await query.message.edit_reply_markup(reply_markup=join_kb(missing, lamp_id or "home"))
+            await query.message.edit_reply_markup(reply_markup=join_kb(missing, payload or "home"))
         return
     await query.answer()
-    if lamp_id and lamp_id != "home":
-        kb = open_card_kb(lamp_id)
+    if parsed:
+        kb = open_card_kb(parsed, kind)
         if query.message:
-            await query.message.answer("订阅已完成，点下方打开资料。", reply_markup=kb or remove_kb())
+            await query.message.answer("订阅已完成，" + _OPEN_TEXT.get(kind, _OPEN_TEXT["s"]), reply_markup=kb or remove_kb())
         return
     if query.message:
         await query.message.answer("订阅已完成，点左下角「首页」进入。", reply_markup=remove_kb())

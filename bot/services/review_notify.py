@@ -148,10 +148,13 @@ async def notify_new_review(review: Dict[str, Any], lamp: Optional[Dict[str, Any
                 if proofs:
                     # 凭证 album first (labelled), then the photos/caption card below
                     try:
-                        await bot.send_media_group(uid, media=[
-                            InputMediaPhoto(media=p, caption=("🔒 约课凭证（仅管理员可见）" if i == 0 else None))
-                            for i, p in enumerate(proofs)
-                        ])
+                        if len(proofs) == 1:   # a media group needs 2–10 items
+                            await bot.send_photo(uid, proofs[0], caption="🔒 约课凭证（仅管理员可见）")
+                        else:
+                            await bot.send_media_group(uid, media=[
+                                InputMediaPhoto(media=p, caption=("🔒 约课凭证（仅管理员可见）" if i == 0 else None))
+                                for i, p in enumerate(proofs)
+                            ])
                     except Exception:
                         logger.exception("review proofs to admin %s failed", uid)
                 if len(photos) == 1:

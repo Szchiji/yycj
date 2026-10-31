@@ -36,9 +36,7 @@ DEFAULT_OPS = {
     "media_channel_id": "",
     "broadcast_template": "🌙 月影车姬 · 新上架\n{称呼}\n📍 {地点}\n💰 {价位}\n{标签}\n{简介}\n{链接}",
     "broadcast_reviews": False,  # 精选评价推送到频道（默认关）
-    "review_proof_required": False,  # 约课凭证必传（默认关）
     "channel_directory": False,  # 频道按区目录（每天 12:00 刷新同一条，默认关）
-    "review_public_photos": True,  # 保留公开晒图（≤3）；关 = 只收私密凭证
     "listing_fields": [
         {"key": "称呼", "label": "称呼", "form": True},
         {"key": "城市", "label": "城市", "form": True},
@@ -60,14 +58,10 @@ CITY_KEYS = [
     {"key": "broadcast_channel", "label": "推送频道", "type": "text", "max": 128, "super": True,
      "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
     {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
-    {"key": "review_proof_required", "label": "评价必须上传约课凭证", "type": "bool",
-     "hint": "开 = 客人写评价必须附 1–5 张凭证（仅管理员可见）"},
-    {"key": "review_public_photos", "label": "评价允许公开晒图", "type": "bool",
-     "hint": "关 = 只收私密约课凭证，不再显示公开晒图"},
     {"key": "channel_directory", "label": "频道按区目录", "type": "bool",
      "hint": "开 = 每天 12:00 在推送频道更新一条按区目录，花名直达详情（默认关）"},
     {"key": "broadcast_reviews", "label": "精选评价推送到频道", "type": "bool",
-     "hint": "开 = 带图且审核通过的评价同步发到该城推送频道（默认关）"},
+     "hint": "开 = 审核通过的 4–5 星评价（只发文字，不发凭证）同步到该城推送频道（默认关）"},
     {"key": "approve_promo_text", "label": "上架通过后发给老师的话", "type": "textarea", "max": 2000},
     {"key": "chat_cta_label", "label": "聊天按钮文字", "type": "text", "max": 32},
     {"key": "admin_contact", "label": "管理员联系链接", "type": "text", "max": 128,
@@ -188,9 +182,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["media_channel_id"] = str(out.get("media_channel_id") or "").strip()[:128]
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
     out["broadcast_reviews"] = bool(out.get("broadcast_reviews"))
-    out["review_proof_required"] = bool(out.get("review_proof_required"))
     out["channel_directory"] = bool(out.get("channel_directory"))
-    out["review_public_photos"] = out.get("review_public_photos") is not False
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
     out["review_require_audit"] = audit_on(out.get("review_require_audit"))
