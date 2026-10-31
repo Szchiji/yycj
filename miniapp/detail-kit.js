@@ -160,6 +160,7 @@
       applyCta();
     } catch (e) {}
   }
+  window.__yycjLoadDetailExtras = loadLamp;
   // Coalesce identical concurrent GET /api/home?limit=1 calls (same token, still in flight)
   // so detail-kit and share.js share one request at boot. Each caller still parses the same JSON.
   if (!window.__yycjHomeLite) {

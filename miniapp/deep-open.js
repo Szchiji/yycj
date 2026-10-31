@@ -18,7 +18,9 @@
     const tg = window.Telegram && window.Telegram.WebApp;
     const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
     if (sp) return restore(sp);
-    return localStorage.getItem("yycj_open_lamp") || "";
+    // Only a reload inside the same session reopens it (it used to live in localStorage, so every
+    // later normal open of the app jumped to the last shared listing).
+    try { return sessionStorage.getItem("yycj_open_lamp") || ""; } catch (e) { return ""; }
   }
   function showDetail() {
     document.getElementById("boot")?.classList.add("hidden");
@@ -38,6 +40,7 @@
     box.innerHTML = `<div class="card">
       <h3>${String(lamp.title || "").replace(/[<>]/g, "")}</h3>
       <p class="muted">📍 ${String(loc || "").replace(/[<>]/g, "")}</p>
+      <div class="muted">💰 ${String(lamp.price_text || "面议").replace(/[<>]/g, "")}</div>
       <p>${String(lamp.description || "").replace(/[<>]/g, "")}</p>
       <div class="row">
         <button class="btn primary" id="detailChat" data-lamp="${esc(lamp.lamp_id || "")}" type="button">想聊聊</button>
@@ -47,10 +50,13 @@
     </div>`;
     window.__yycjOpenLamp = lamp.lamp_id || "";
     showDetail();
+    // same extras as a detail opened from a card: photo/video gallery, tags, extras, reviews
+    try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
+    try { window.__yycjLoadDetailExtras && window.__yycjLoadDetailExtras(lamp.lamp_id); } catch (e) {}
   }
   async function openLamp(id) {
     if (!id) return;
-    localStorage.setItem("yycj_open_lamp", id);
+    try { sessionStorage.setItem("yycj_open_lamp", id); localStorage.removeItem("yycj_open_lamp"); } catch (e) {}
     showDetail();
     const token = localStorage.getItem("yycj_token") || "";
     if (!token) return;
@@ -64,11 +70,15 @@
   async function boot() {
     const id = lampId();
     if (!id) return;
-    for (let i = 0; i < 50 && !localStorage.getItem("yycj_token"); i += 1) {
-      await new Promise((r) => setTimeout(r, 120));
-    }
+    // Wait until app.js has logged in and routed to home (it shows #view-home after /api/auth);
+    // opening earlier got overwritten by that route on slow networks.
+    const ready = () => {
+      const app = document.getElementById("app");
+      const home = document.getElementById("view-home");
+      return localStorage.getItem("yycj_token") && app && !app.classList.contains("hidden") && home && !home.classList.contains("hidden");
+    };
+    for (let i = 0; i < 100 && !ready(); i += 1) await new Promise((r) => setTimeout(r, 100));
     await openLamp(id);
-    setTimeout(() => openLamp(id), 900);
   }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);

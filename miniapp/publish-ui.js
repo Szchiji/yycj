@@ -108,8 +108,27 @@
       .map((f) => String(f.key));
     Object.keys(FORM_MAP).forEach((key) => toggleInput(FORM_MAP[key], enabled.includes(key)));
     const extraKeys = enabled.filter((k) => !FORM_MAP[k]);
+    // keep what is already typed / prefilled (改资料 fills these right before this runs)
+    const keep = {};
+    wrap.querySelectorAll("[data-extra]").forEach((inp) => { if (inp.value) keep[inp.getAttribute("data-extra")] = inp.value; });
     wrap.innerHTML = extraKeys.map((k) => `<label>${esc(k)}</label><input data-extra="${esc(k.replace(/"/g, ""))}" maxlength="64" placeholder="${esc(k)}" />`).join("");
+    wrap.querySelectorAll("[data-extra]").forEach((inp) => { const k = inp.getAttribute("data-extra"); if (keep[k] != null) inp.value = keep[k]; });
     hoursBox();
+  }
+  // A real tap on 上架 starts a new listing: leave a half-finished 改资料 (otherwise the next
+  // submit silently edited the old listing). 改资料 itself opens this tab with a script click.
+  function leaveEdit() {
+    const h = document.getElementById("editLampId");
+    if (!h || !h.value) return;
+    h.value = "";
+    const t = document.getElementById("publishTitle");
+    if (t) t.textContent = "上架";
+    form && form.reset();
+    document.querySelectorAll("#pubExtras [data-extra]").forEach((inp) => { inp.value = ""; });
+    const hb = document.getElementById("pubHours");
+    if (hb && window.yycjHours) window.yycjHours.set(hb, []);
+    uploaded = [];
+    previewBox();
   }
   async function uploadOne(file) {
     const fd = new FormData();
@@ -188,6 +207,12 @@
       form.parentNode.insertBefore(done, form.nextSibling);
       $("#pubAgain")?.addEventListener("click", () => { done.remove(); form.classList.remove("hidden"); loadFields(); });
     } catch (e) { toast(e.message || String(e)); }
+  }, true);
+  // capture phase: runs before app.js switches the view, so "coming from another tab" is knowable
+  document.addEventListener("click", (ev) => {
+    if (!ev.isTrusted || !(ev.target.closest && ev.target.closest("[data-nav='publish']"))) return;
+    const pv = document.getElementById("view-publish");
+    if (pv && pv.classList.contains("hidden")) leaveEdit();
   }, true);
   document.addEventListener("click", (ev) => {
     if (ev.target.closest("[data-nav='publish']")) setTimeout(loadFields, 80);

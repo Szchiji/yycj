@@ -524,3 +524,118 @@ async def api_media_file(file_id: str, request: Request):
     if (ok or local.is_file()) and local.is_file():
         return _serve_local(local, mime, rng)
     raise HTTPException(status_code=502, detail="拉取 Telegram 文件失败")
+
+
+# ---- Card thumbnails -----------------------------------------------------------------------
+# Home / carousel / favourites cards are ~120–170 css px wide but used to load the full Telegram
+# photo (up to 1280 px, often 150–300 KB each). /api/media/thumb/<file_id>?w=480 serves a
+# downscaled JPEG, cached on disk next to the originals (same LRU cap). Anything that can't be
+# thumbnailed (video ids, Pillow missing, decode error, already small) falls back to the original.
+_THUMB_WIDTHS = (240, 360, 480, 720)
+_THUMB_LOCKS: Dict[str, asyncio.Lock] = {}
+
+
+def thumb_width(w: int | None) -> int:
+    try:
+        n = int(w or 480)
+    except (TypeError, ValueError):
+        n = 480
+    for cand in _THUMB_WIDTHS:
+        if n <= cand:
+            return cand
+    return _THUMB_WIDTHS[-1]
+
+
+def make_thumb(data: bytes, width: int) -> bytes | None:
+    """Downscale an image to `width` px wide (JPEG). None = keep the original."""
+    try:
+        import io
+
+        from PIL import Image, ImageOps
+    except Exception:
+        return None
+    try:
+        im = Image.open(io.BytesIO(data))
+        if im.width * im.height > 50_000_000:
+            return None
+        if getattr(im, "is_animated", False):
+            return None
+        try:
+            im.draft("RGB", (width, width * 4))  # fast JPEG DCT downscale before the real resize
+        except Exception:
+            pass
+        im = ImageOps.exif_transpose(im)
+        if im.width <= width:
+            return None
+        height = max(1, round(im.height * width / im.width))
+        im = im.convert("RGB").resize((width, height), Image.LANCZOS)
+        out = io.BytesIO()
+        im.save(out, "JPEG", quality=78, optimize=True, progressive=True)
+        body = out.getvalue()
+        return body if len(body) < len(data) else None
+    except Exception:
+        return None
+
+
+def _valid_file_id(fid: str) -> bool:
+    return bool(fid) and len(fid) <= 200 and all(c.isalnum() or c in "-_" for c in fid)
+
+
+async def _ensure_original(file_id: str) -> Path | None:
+    local = _disk_path(file_id)
+    if local.is_file() and local.stat().st_size > 0:
+        return local
+    settings = get_settings()
+    if not settings.bot_token:
+        return None
+    now = time.time()
+    cached = _PATH_CACHE.get(file_id)
+    path = cached[0] if cached and cached[1] > now else ""
+    if not path:
+        from bot.main import bot
+        try:
+            tg_file = await bot.get_file(file_id)
+        except Exception:
+            return None
+        path = tg_file.file_path or ""
+        if not path:
+            return None
+        _PATH_CACHE[file_id] = (path, now + _PATH_TTL)
+    url = f"https://api.telegram.org/file/bot{settings.bot_token}/{path}"
+    ok = await _download(file_id, url, local)
+    return local if ok and local.is_file() else None
+
+
+@router.get("/media/thumb/{file_id:path}")
+async def api_media_thumb(file_id: str, request: Request, w: int = 480):
+    fid = str(file_id or "")
+    fallback = RedirectResponse(url=f"/api/media/file/{fid}", status_code=307)
+    if not _valid_file_id(fid) or fid.startswith(("BAAC", "BQAC")):
+        return fallback
+    width = thumb_width(w)
+    thumb = _disk_path(f"thumb:{width}:{fid}")
+    if thumb.is_file() and thumb.stat().st_size > 0:
+        return _serve_local(thumb, "image/jpeg", request.headers.get("range"))
+    lock = _THUMB_LOCKS.setdefault(f"{width}:{fid}", asyncio.Lock())
+    try:
+        async with lock:
+            if not (thumb.is_file() and thumb.stat().st_size > 0):
+                local = await _ensure_original(fid)
+                if local is None:
+                    return fallback
+                data = await asyncio.to_thread(local.read_bytes)
+                body = await asyncio.to_thread(make_thumb, data, width)
+                if body is None:
+                    # already small / not an image we can shrink: serve the original as-is
+                    return _serve_local(local, _mime_for(fid, str(local)), request.headers.get("range"))
+                tmp = thumb.with_name(thumb.name + f".{os.getpid()}.part")
+                tmp.write_bytes(body)
+                tmp.replace(thumb)
+                _evict()
+    except Exception:
+        logger.warning("thumb failed", exc_info=False)
+        return fallback
+    finally:
+        if not lock.locked():
+            _THUMB_LOCKS.pop(f"{width}:{fid}", None)
+    return _serve_local(thumb, "image/jpeg", request.headers.get("range"))

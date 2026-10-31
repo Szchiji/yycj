@@ -31,10 +31,14 @@
   apply();
   setTimeout(apply, 800);
   // First open: yycj_user is not cached yet, so wait for the auth token and read the real role.
-  let tries = 0;
+  // One request at a time: under a slow network every 500ms tick used to start another /api/me
+  // while the previous one was still in flight (14 calls on one open).
+  let tries = 0, busy = false;
   const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
     tries += 1;
-    if ((await sync()) || tries >= 20) clearInterval(timer);
+    try { if ((await sync()) || tries >= 20) clearInterval(timer); } finally { busy = false; }
   }, 500);
   document.addEventListener("click", (ev) => {
     const t = ev.target;
