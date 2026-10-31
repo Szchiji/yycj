@@ -46,6 +46,9 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS extras JSONB DEFAULT '{}'::jsonb",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS bc_chat VARCHAR(64)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS bc_mid VARCHAR(32)",
+    # Home feed: WHERE status='active' AND city=? ORDER BY feed_pinned DESC, feed_pin_order, created_at DESC.
+    # Additive, IF NOT EXISTS; the lamps table is small so the build lock is brief.
+    "CREATE INDEX IF NOT EXISTS ix_lamps_feed ON lamps (status, city, feed_pinned DESC, feed_pin_order, created_at DESC)",
 ]
 
 

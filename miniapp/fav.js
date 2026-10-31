@@ -15,7 +15,8 @@
     catch (e) { return true; }
   }
   function cover(item) {
-    return window.yycjCoverOf ? window.yycjCoverOf(item) : "";
+    const s = window.yycjCoverOf ? window.yycjCoverOf(item) : "";
+    return window.yycjThumb ? window.yycjThumb(s, 480) : s;
   }
   function showView(id) {
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));

@@ -55,15 +55,9 @@ _startup_error: str | None = None
 MINIAPP_DIR = Path(__file__).resolve().parent.parent / "miniapp"
 
 
-class NoCacheMiniapp(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        resp = await call_next(request)
-        path = request.url.path or ""
-        if path.startswith("/app") and path.endswith((".html", ".js", ".css", "/app", "/app/")):
-            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            resp.headers["Pragma"] = "no-cache"
-            resp.headers["Expires"] = "0"
-        return resp
+# Mini App caching / gzip policy lives in bot/api/static_cache.py (versioned assets are immutable,
+# HTML is never cached). Kept under the old name for anything importing it.
+from bot.api.static_cache import MiniappCache as NoCacheMiniapp, SelectiveGZip  # noqa: E402
 
 
 def _menu_webapp_url(webapp: str) -> str:
@@ -215,6 +209,7 @@ app = FastAPI(title="月影车姬", lifespan=lifespan)
 app.add_middleware(NoCacheMiniapp)
 from bot.api.upload_guard import UploadSizeGuard  # noqa: E402
 app.add_middleware(UploadSizeGuard)
+app.add_middleware(SelectiveGZip, minimum_size=1024)
 app.include_router(api_router)
 
 

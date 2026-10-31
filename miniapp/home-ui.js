@@ -32,14 +32,23 @@
     const view = $("#view-home");
     return view && !view.classList.contains("hidden") && !document.hidden;
   }
+  let pinsSeen = true, touching = false;
+  function stopTimer() { if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; } }
+  // The carousel timer only runs while it can actually be seen: home view shown, page visible,
+  // carousel on screen, not being touched. Otherwise no timer is pending at all.
+  function canRun() { return !paused && !touching && pinsSeen && homeVisible(); }
+  function arm() {
+    if (!canRun()) { stopTimer(); return; }
+    if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
+  }
   function pauseMedia() {
     document.querySelectorAll("video").forEach((v) => { try { v.pause(); } catch (e) {} });
     paused = true;
-    if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; }
+    stopTimer();
   }
   function resumeWork() {
     paused = false;
-    if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
+    arm();
   }
   window.__yycjPauseUi = pauseMedia;
   window.__yycjResumeUi = resumeWork;
@@ -58,13 +67,18 @@
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
-  function cover(item) {
+  function fullCover(item) {
     if (item && item.cover_url) {
       const s = String(item.cover_url);
       if (s.startsWith("http") || s.startsWith("/")) return s;
       return "/api/media/file/" + encodeURIComponent(s);
     }
     return window.yycjCoverOf ? window.yycjCoverOf(item) : "";
+  }
+  // cards are ~120–170 css px wide: ask for a 480 px thumbnail instead of the full photo
+  function cover(item) {
+    const s = fullCover(item);
+    return window.yycjThumb ? window.yycjThumb(s, 480) : s;
   }
   function fillCities(list, current) {
     cities = list && list.length ? list : cities;
@@ -80,7 +94,7 @@
   function imgTag(src, cls, eager) {
     if (!src) return "<div class=\"" + cls + " ph\"></div>";
     const load = eager ? "eager" : "lazy";
-    return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\" />";
+    return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\"" + (eager ? " fetchpriority=\"high\"" : "") + " />";
   }
   // Card hours, compact (full label with 次日 stays on the detail page):
   // "10-22" -> "10–22点", "20:00–次日04:00" -> "20–04点", "9:30~21:00" -> "9:30–21点"; unparsable text is shown as-is.
@@ -151,6 +165,7 @@
   async function loadFeed(reset) {
     if (!token() || document.hidden) return;
     paused = false;
+    arm();
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -230,6 +245,16 @@
       document.body.appendChild(sheet);
     }
   }
+  window.__yycjFeedUrl = function () {
+    const params = new URLSearchParams({ limit: "12", offset: "0" });
+    const qq = ($("#homeQ") && $("#homeQ").value.trim()) || q || "";
+    const city = localStorage.getItem("yycj_city") || "";
+    if (qq) params.set("q", qq);
+    if (city) params.set("city", city);
+    if (getArea()) params.set("district", getArea());
+    return "/api/home?" + params.toString();
+  };
+  window.__yycjCloseArea = function () { toggleArea(false); };
   window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
@@ -273,10 +298,7 @@
   mountGuide();
   function tick() {
     carouselTimer = 0;
-    if (paused || !homeVisible()) {
-      carouselTimer = setTimeout(tick, carouselMs);
-      return;
-    }
+    if (!canRun()) return;
     const pins = $("#pins");
     if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card")) {
       const card = pins.querySelector(".pin-card");
@@ -284,9 +306,24 @@
       if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollLeft = 0;
       else pins.scrollLeft += step;
     }
-    carouselTimer = setTimeout(tick, carouselMs);
+    arm();
   }
-  setTimeout(tick, 4000);
+  (function watchCarousel() {
+    document.addEventListener("visibilitychange", arm);
+    const view = $("#view-home");
+    if (view && window.MutationObserver) new MutationObserver(arm).observe(view, { attributes: true, attributeFilter: ["class"] });
+    const pins = $("#pins");
+    if (pins && window.IntersectionObserver) {
+      new IntersectionObserver((es) => { pinsSeen = es.some((e) => e.isIntersecting); arm(); }).observe(pins);
+    }
+    if (pins) {
+      pins.addEventListener("touchstart", () => { touching = true; stopTimer(); }, { passive: true });
+      const up = () => { touching = false; stopTimer(); arm(); };
+      pins.addEventListener("touchend", up, { passive: true });
+      pins.addEventListener("touchcancel", up, { passive: true });
+    }
+    arm();
+  })();
   async function boot() {
     if (window.__yycjHomeBooted) return;
     window.__yycjHomeBooted = true;

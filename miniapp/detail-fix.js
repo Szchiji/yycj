@@ -115,10 +115,18 @@
   // Inline carousel: one large item per view, swipe horizontally (scroll-snap).
   // Videos show their poster (no download: no <video> yet) and play in place on tap.
   function slideHtml(m, i) {
-    const lazy = i > 1 ? ` loading="lazy"` : "";
+    // slide 1 stays eager (next swipe) but low priority, so the first photo's full download wins
+    const lazy = i > 1 ? ` loading="lazy"` : i === 1 ? ` fetchpriority="low"` : "";
+    // First photo: start with the card thumbnail (already in the browser cache from the home
+    // card), then swap in the full photo once it is downloaded + decoded (upgradeFirst below).
+    const first = i === 0 && m.type !== "video" && window.yycjThumb ? window.yycjThumb(m.src, 480) : "";
+    const src = first && first !== m.src ? first : m.src;
+    // slides after the first get their src once the first photo is in (releaseRest), so on a slow
+    // connection the photo you are looking at downloads first instead of sharing bandwidth
+    const at = i === 0 ? "src" : "data-src";
     const inner = m.type === "video"
-      ? `${m.poster ? `<img src="${esc(m.poster)}" alt=""${lazy} decoding="async" draggable="false" />` : ""}<span class="yc-play">▶</span>`
-      : `<img src="${esc(m.src)}" alt=""${lazy} decoding="async" draggable="false" />`;
+      ? `${m.poster ? `<img ${at}="${esc(m.poster)}" alt=""${lazy} decoding="async" draggable="false" />` : ""}<span class="yc-play">▶</span>`
+      : `<img ${at}="${esc(src)}"${src !== m.src ? ` data-full="${esc(m.src)}"` : ""} alt=""${lazy} decoding="async" draggable="false" />`;
     return `<div class="yc-slide" data-i="${i}" data-type="${m.type}"${m.type === "video" ? ` role="button" tabindex="0" aria-label="播放视频 ${i + 1}"` : ` aria-label="图片 ${i + 1}"`}>${inner}</div>`;
   }
   function setIdx(el, idx, n) {
@@ -165,6 +173,30 @@
     const r = v.play();
     if (r && r.catch) r.catch(() => {});
   }
+  function releaseRest(el) {
+    if (el.dataset.rest === "1") return;
+    el.dataset.rest = "1";
+    el.querySelectorAll(".yc-slide img[data-src]").forEach((im) => { im.src = im.getAttribute("data-src"); im.removeAttribute("data-src"); });
+  }
+  function upgradeFirst(el) {
+    const img = el.querySelector(".yc-slide img[data-full]");
+    el.dataset.rest = "";
+    const first = el.querySelector(".yc-slide img");
+    // the rest follows the first photo (full-res if it is being upgraded), at most 2.5s later
+    const t = setTimeout(() => releaseRest(el), 2500);
+    const go = () => { clearTimeout(t); releaseRest(el); };
+    if (!img) {
+      if (!first || (first.complete && first.naturalWidth)) go();
+      else { first.addEventListener("load", go, { once: true }); first.addEventListener("error", go, { once: true }); }
+      return;
+    }
+    const full = new Image();
+    full.decoding = "async";
+    try { full.fetchPriority = "high"; } catch (e) {}
+    full.src = img.getAttribute("data-full");
+    const swap = () => { if (img.isConnected) { img.src = full.src; img.removeAttribute("data-full"); } go(); };
+    (full.decode ? full.decode() : new Promise((r, j) => { full.onload = r; full.onerror = j; })).then(swap, swap);
+  }
   function render(items, lampId, idx) {
     const el = host();
     if (!el || !items.length) return;
@@ -183,6 +215,7 @@
     const track = el.querySelector(".yc-track");
     let t = 0;
     track.addEventListener("scroll", () => {
+      releaseRest(el);
       clearTimeout(t);
       t = setTimeout(() => {
         const w = track.clientWidth || 1;
@@ -206,6 +239,7 @@
       if (sl && !sl.querySelector("video")) { ev.preventDefault(); const k = Number(sl.getAttribute("data-i") || 0); playInline(sl, items[k]); }
     };
     if (idx) goSlide(el, idx, n);
+    upgradeFirst(el);
     document.querySelectorAll("#detail .media-grid").forEach((x) => { x.style.display = "none"; });
   }
 
@@ -315,6 +349,7 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     }
     let t = 0;
     track.addEventListener("scroll", () => {
+      releaseRest(el);
       clearTimeout(t);
       t = setTimeout(() => {
         const w = track.clientWidth || 1;
@@ -374,14 +409,31 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
         cache: "no-store",
       });
       const data = await r.json();
-      window.__yycjLampCache[id] = data;
+      const cache = window.__yycjLampCache;
+      delete cache[id];
+      cache[id] = data;
+      // keep the last 20 opened listings only (it grew with every detail open)
+      const keys = Object.keys(cache);
+      for (let k = 0; k < keys.length - 20; k += 1) delete cache[keys[k]];
       render(collect(data.lamp || data.item || data), id, 0);
     } catch (e) { console.warn(e); }
   }
+  window.__yycjPaintGallery = paint;
   window.openLamp = function (id) {
     closeViewer();
     stopVideos();
     window.__yycjBack = window.__yycjBack || "home";
+    // Opening another listing: drop the previous one's gallery + text right away. It used to stay
+    // on screen until the new data arrived (and 想聊聊 already targeted the new listing).
+    const box = document.getElementById("detail");
+    if (box && box.getAttribute("data-lamp") !== String(id)) {
+      const gal = document.getElementById("yycjGallery");
+      if (gal) { stopVideos(gal); gal.innerHTML = ""; gal.dataset.lamp = ""; }
+      box.innerHTML = "";
+      box.setAttribute("data-lamp", String(id));
+      const nm = document.querySelector("#xhsTop .xt-name");
+      if (nm) nm.textContent = "";
+    }
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     document.getElementById("view-detail")?.classList.remove("hidden");
     paint(id);

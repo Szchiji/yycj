@@ -15,7 +15,7 @@ from bot.api.routes_core_base import (
 )
 from bot.services import anti_brush, credit_service, home_service, search_service, session_service
 from bot.services import pin_query
-from bot.services.extras_store import load_extras
+from bot.services.extras_store import load_extras, load_extras_bulk
 from bot.services.open_shift import normalize_hours, shop_status
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 
 async def _with_shop(lamp: Dict[str, Any]) -> Dict[str, Any]:
     data = dict(lamp or {})
-    if not data.get("extras") and data.get("lamp_id"):
+    prefilled = bool(data.pop("_extras_bulk", False))
+    if not prefilled and not data.get("extras") and data.get("lamp_id"):
         try:
             data["extras"] = await load_extras(data["lamp_id"])
         except Exception:
@@ -40,6 +41,22 @@ async def _with_shop(lamp: Dict[str, Any]) -> Dict[str, Any]:
         data.setdefault("open_text", "")
         data.setdefault("hours_text", "")
     return data
+
+
+async def _prefill_extras(lamps) -> None:
+    """One SELECT for every lamp's extras instead of one per card (N+1 on /api/home)."""
+    todo = [x for x in lamps if isinstance(x, dict) and x.get("lamp_id") and not x.get("extras")]
+    if not todo:
+        return
+    try:
+        found = await load_extras_bulk([x["lamp_id"] for x in todo])
+    except Exception:
+        logger.exception("bulk extras failed")
+        return
+    for x in todo:
+        if str(x["lamp_id"]) in found:
+            x["extras"] = found[str(x["lamp_id"])]
+            x["_extras_bulk"] = True
 
 
 def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,6 +107,7 @@ async def api_home(
     pins = []
     try:
         pins_raw = await pin_query.list_active_pins()
+        await _prefill_extras([p.get("lamp") for p in pins_raw])
         for p in pins_raw:
             try:
                 lamp = await _with_shop(p.get("lamp") or {})
@@ -139,6 +157,7 @@ async def api_home(
     if isinstance(city_ann, dict) and city_ann.get("enabled") and str(city_ann.get("text") or "").strip():
         announcement = {"text": city_ann["text"], "enabled": True}
 
+    await _prefill_extras(items)
     safe_items = []
     for x in items:
         try:
@@ -222,6 +241,7 @@ async def api_lamps(
     items = await search_service.search_lamps(
         keyword=q, city=city, price_min=price_min, price_max=price_max, limit=limit, lat=lat, lng=lng
     )
+    await _prefill_extras(items)
     out = []
     for x in items:
         out.append(_ser_lamp(await _with_shop(x)))

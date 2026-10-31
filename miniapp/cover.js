@@ -33,6 +33,18 @@
     }
     return "";
   }
+  // Card-sized image: /api/media/file/<photo id> -> /api/media/thumb/<photo id>?w=480 (server
+  // downscales + caches; falls back to the original by itself). Videos / external URLs unchanged.
+  function thumbOf(src, w) {
+    const s = String(src || "");
+    const m = s.match(/^\/api\/media\/file\/([^?#/]+)$/);
+    if (!m) return s;
+    let id = m[1];
+    try { id = decodeURIComponent(id); } catch (e) {}
+    if (isVideo(id) || !/^[A-Za-z0-9_-]{8,200}$/.test(id)) return s;
+    return "/api/media/thumb/" + encodeURIComponent(id) + "?w=" + (w || 480);
+  }
+  window.yycjThumb = thumbOf;
   window.yycjMediaSrc = mediaSrc;
   window.yycjIsVideo = isVideo;
   window.yycjCoverOf = coverOf;

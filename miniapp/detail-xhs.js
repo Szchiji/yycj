@@ -65,7 +65,8 @@ body.xhs-detail #xhsTop{display:grid;}
     return (c && (c.lamp || c.item || c)) || {};
   }
   function avatarSrc(lamp) {
-    try { if (window.yycjCoverOf) { const u = window.yycjCoverOf(lamp); if (u) return u; } } catch (e) {}
+    // 36px avatar: the same 480px thumbnail the card used (usually already in the browser cache)
+    try { if (window.yycjCoverOf) { const u = window.yycjCoverOf(lamp); if (u) return window.yycjThumb ? window.yycjThumb(u, 480) : u; } } catch (e) {}
     if (lamp.cover_url) return lamp.cover_url;
     const img = document.querySelector('#yycjGallery .yc-slide[data-type="image"] img');
     return img ? img.getAttribute("src") : "";

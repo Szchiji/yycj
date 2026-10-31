@@ -140,7 +140,8 @@
     }
   }
   document.addEventListener("click", (ev) => {
-    if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-nav") === "me") setTimeout(load, 200);
+    // closest(): a tap usually lands on the <span> label inside the nav button
+    if (ev.target && ev.target.closest && ev.target.closest("[data-nav='me']")) setTimeout(load, 200);
   });
   if (document.readyState === "complete") { mount(); setTimeout(load, 1200); }
   else window.addEventListener("load", () => { mount(); setTimeout(load, 1200); });
