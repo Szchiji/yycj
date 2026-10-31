@@ -11,6 +11,7 @@ import bot.api.routes_operators  # noqa: F401
 import bot.api.routes_shift  # noqa: F401
 import bot.api.routes_city  # noqa: F401
 import bot.api.routes_client_log  # noqa: F401
+import bot.api.routes_admin_insights  # noqa: F401
 import bot.models_extra  # noqa: F401
 import bot.services.role_lock  # noqa: F401
 import bot.services.admin_acl  # noqa: F401

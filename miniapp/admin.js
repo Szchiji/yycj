@@ -116,6 +116,7 @@
         <div class="muted">${escapeHtml(r.review_id)}</div>
         <div>★${r.stars} · 客人 ${r.guest_id} · 资料 <code>${escapeHtml(r.lamp_id)}</code></div>
         <p>${escapeHtml(r.text || "")}</p>
+        ${(r.photos || []).length ? `<div class="rev-phs">${(r.photos || []).slice(0, 6).map((u) => `<img src="${escapeHtml(mediaSrc(u))}" alt="" />`).join("")}</div>` : ""}
         <div class="row">
           <button class="btn primary" data-admin="rev-ok" data-id="${escapeHtml(r.review_id)}">通过</button>
           <button class="btn danger" data-admin="rev-brush" data-id="${escapeHtml(r.review_id)}">拒绝刷评</button>

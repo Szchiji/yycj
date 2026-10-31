@@ -83,6 +83,14 @@
       catch (e) { sw.checked = !sw.checked; toast(e.message || String(e)); }
     });
   }
+  // 近 7 天 / 累计：浏览（每人每天算一次，自己看不算）· 收藏 · 匿名联系
+  function statsHtml(x) {
+    const s = x && x.stats;
+    if (!s || x.status !== "active") return "";
+    const n = (v) => Number(v || 0);
+    const cell = (k, a, b) => `<span class="ls-cell"><b>${n(a)}</b><i>${k}</i><em>累计 ${n(b)}</em></span>`;
+    return `<div class="ls-stats" aria-label="近7天数据"><span class="ls-k">近 7 天</span>${cell("浏览", s.views_7d, s.views)}${cell("收藏", s.favs_7d, s.favs)}${cell("匿名联系", s.contacts_7d, s.contacts)}</div>`;
+  }
   async function load() {
     mount();
     const box = document.getElementById("myListings");
@@ -100,7 +108,7 @@
         const st = x.status === "active" ? "已上架" : x.status === "hidden" ? "已下架" : x.status;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
-          <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${x.expires_at ? ("到期 " + esc(String(x.expires_at).slice(0,10))) : ""}</div></div>
+          <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${x.expires_at ? ("到期 " + esc(String(x.expires_at).slice(0,10))) : ""}</div>${statsHtml(x)}</div>
           <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">改资料</button>
         </div>${x.status === "active" ? `<div class="shift-box" data-shift="${esc(x.lamp_id)}">${shiftHtml(x.shop || {}, lead)}</div>` : ""}`;
       }).join("");

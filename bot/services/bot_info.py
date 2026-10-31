@@ -79,7 +79,7 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
 async def job_expiry_nudge() -> None:
     try:
         from bot.services.expiry_nudge import nudge_expiring
-        await nudge_expiring(3)
+        await nudge_expiring(3, 1)
     except Exception:
         logger.exception("expiry nudge failed")
 

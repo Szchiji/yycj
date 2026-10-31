@@ -63,7 +63,7 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
     full = _ser_lamp(lamp)
     media = full.get("media") or []
     photos = full.get("photos") or []
-    return {
+    card = {
         "lamp_id": full.get("lamp_id"),
         "title": full.get("title"),
         "city": full.get("city"),
@@ -78,6 +78,9 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
         "open_text": full.get("open_text") or lamp.get("open_text") or "",
         "hours_text": full.get("hours_text") or lamp.get("hours_text") or "",
     }
+    if lamp.get("review_count") is not None:  # only on sort=reviews
+        card["review_count"] = int(lamp.get("review_count") or 0)
+    return card
 
 
 @router.get("/home")
@@ -85,6 +88,7 @@ async def api_home(
     city: Optional[str] = None,
     q: Optional[str] = None,
     district: Optional[str] = Query(default=None, max_length=32),
+    sort: str = Query(default="new", pattern="^(new|reviews)$"),
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     limit: int = Query(default=3, ge=1, le=50),
@@ -139,12 +143,14 @@ async def api_home(
             lat=lat,
             lng=lng,
             district=(district or "").strip() or None,
+            sort=sort,
         )
-        pinned = [x for x in items if x.get("feed_pinned")]
-        fresh = [x for x in items if not x.get("feed_pinned")]
-        pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
-        fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
-        items = pinned + fresh
+        if sort != "reviews":
+            pinned = [x for x in items if x.get("feed_pinned")]
+            fresh = [x for x in items if not x.get("feed_pinned")]
+            pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
+            fresh.sort(key=lambda x: str(x.get("created_at") or x.get("updated_at") or ""), reverse=True)
+            items = pinned + fresh
     except Exception:
         logger.exception("home search failed")
         items = []
@@ -187,6 +193,7 @@ async def api_home(
         "pins": pins,
         "items": safe_items,
         "district": search_service.district_key(district) if district else "",
+        "sort": sort,
         "districts": districts,
         "count": len(safe_items),
         "limit": limit,
@@ -267,6 +274,8 @@ async def api_lamp_detail(
         r["created_at"] = _ser_dt(r.get("created_at"))
         r.pop("guest_id", None)
         r.pop("target_user_id", None)
+    from bot.services.listing_stats import record_view
+    await record_view(lamp_id, user_id, lamp.get("user_id"))
     out = _ser_lamp(lamp)
     if isinstance(out.get("extras"), dict):
         # internal state (_open_today, _remind_*, _bc_*) is not for the public detail page
