@@ -128,7 +128,9 @@
     if (!box) { box = document.createElement("div"); box.id = "yycjReviews"; detail.appendChild(box); }
     const rows = list && list.length ? list.map((t) => {
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
-      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p></div>`;
+      const ph = (Array.isArray(t.photos) ? t.photos : []).slice(0, 3).map((u) => String(u || "")).filter((u) => /^[A-Za-z0-9_\-:./]+$/.test(u))
+        .map((u) => { const src = /^https?:|^\//.test(u) ? u : "/api/media/file/" + encodeURIComponent(u); return `<img class="rv-ph" loading="lazy" src="${src}" alt="" />`; }).join("");
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p>${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
     }).join("") : "<p class='muted'>暂无评价</p>";
     box.innerHTML = `<h3 style="font-size:1rem;margin:12px 0 6px">评价</h3>${rows}`;
     placeShare(id);

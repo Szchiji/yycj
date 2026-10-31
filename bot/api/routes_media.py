@@ -22,6 +22,7 @@ from bot.config import get_settings
 logger = logging.getLogger(__name__)
 
 MAX_FILES = 9
+REVIEW_MAX_FILES = 3
 MAX_BYTES = 20 * 1024 * 1024
 _DISK_MAX = 2 * 1024 * 1024
 _DISK_DIR = Path("/tmp/yycj-media")
@@ -122,16 +123,22 @@ def _disk_path(file_id: str) -> Path:
 @router.post("/media/upload")
 async def api_media_upload(
     files: List[UploadFile] = File(...),
+    purpose: str = "",
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
     if not files:
         raise HTTPException(status_code=400, detail="请选择文件")
-    if len(files) > MAX_FILES:
-        raise HTTPException(status_code=400, detail=f"一次最多上传 {MAX_FILES} 个文件")
-    admin = await _require_uploader(user_id)
+    review = purpose == "review"
+    cap = REVIEW_MAX_FILES if review else MAX_FILES
+    if len(files) > cap:
+        raise HTTPException(status_code=400, detail=f"一次最多上传 {cap} 个文件")
+    # 评价晒图: any signed-in user (guests write reviews), photos only, max 3, normal rate limit.
+    admin = False if review else await _require_uploader(user_id)
     for uf in files:
         if not _allowed_upload(uf.filename or "", uf.content_type):
             raise HTTPException(status_code=400, detail=f"只支持图片或视频：{uf.filename or 'unknown'}")
+        if review and _guess_type(uf.filename or "", uf.content_type) != "image":
+            raise HTTPException(status_code=400, detail="评价只能上传图片")
     if not admin and not _rate_ok(user_id, len(files)):
         raise HTTPException(status_code=429, detail="上传过于频繁，请稍后再试")
     settings = get_settings()

@@ -180,7 +180,8 @@ async def api_create_review(
         if s:
             photos.append(_normalize_one_url(s))
     # 评价需审核 (per card city, fallback site-wide, unset = ON): off -> publish directly.
-    auto = not await home_service.review_needs_audit(lamp.get("city"))
+    # Reviews with photos always wait for an admin, whatever the switch says.
+    auto = not photos and not await home_service.review_needs_audit(lamp.get("city"))
     try:
         rev = await home_service.create_review(
             auto_approve=auto,
@@ -188,7 +189,7 @@ async def api_create_review(
             lamp_id=body.lamp_id,
             stars=body.stars,
             text=body.text,
-            photos=photos[:6],
+            photos=photos[:3],
             session_id=body.session_id,
             target_user_id=int(target) if target else None,
         )

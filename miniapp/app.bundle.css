@@ -407,3 +407,32 @@ html body .area-chip.on{background:linear-gradient(90deg,#C9A45C,#E3C88A);color:
 html body .area-chip.on i{color:#13241F;opacity:.75;}
 html body .area-empty{margin:8px 2px 0;font-size:12px;}
 html body #guideSheet{z-index:90;}
+/* 排序（评价多 / 最新上架）：在地区面板顶部，浮层内，不推动首页 */
+html body .sort-row{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:0 0 10px;border-bottom:1px solid var(--t-line);}
+html body .sort-k{font-size:12px;color:var(--t-muted);margin-right:2px;}
+html body .sort-opt{min-height:30px;padding:4px 12px;border-radius:999px;border:1px solid var(--t-line);background:transparent;color:var(--t-text);font-size:13px;}
+html body .sort-opt.on{border-color:var(--t-accent);color:var(--t-accent);font-weight:600;}
+/* ---- upgrades.css ---- */
+/* 我的上架：近7天数据（3 格一行） */
+html body .ls-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px;}
+html body .ls-k{grid-column:1/-1;font-size:11px;color:var(--t-muted);}
+html body .ls-cell{display:flex;flex-direction:column;align-items:flex-start;padding:6px 8px;border-radius:10px;background:rgba(201,164,92,.08);border:1px solid var(--t-line);min-width:0;}
+html body .ls-cell b{font-size:17px;line-height:1.15;color:var(--t-accent);font-weight:700;}
+html body .ls-cell i{font-style:normal;font-size:12px;color:var(--t-text);}
+html body .ls-cell em{font-style:normal;font-size:10px;color:var(--t-muted);}
+/* 写评价：点星 + 晒图 */
+html body #revStars.rk-hide{display:none!important;}
+html body .rk-stars{display:flex;align-items:center;gap:4px;margin:4px 0 10px;}
+html body .rk-stars [data-star]{width:40px;height:40px;padding:0;border:0;background:transparent;font-size:30px;line-height:40px;color:rgba(255,255,255,.18);cursor:pointer;}
+html body .rk-stars [data-star].on{color:#E3C88A;text-shadow:0 0 8px rgba(227,200,138,.35);}
+html body .rk-lbl{margin-left:8px;font-size:13px;color:var(--t-accent);}
+html body .rk-photos{display:flex;gap:8px;margin:8px 0 12px;}
+html body .rk-ph,html body .rk-add{position:relative;width:76px;height:76px;border-radius:10px;overflow:hidden;flex:0 0 auto;}
+html body .rk-ph img{width:100%;height:100%;object-fit:cover;display:block;}
+html body .rk-x{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:22px;padding:0;}
+html body .rk-add{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px dashed var(--t-accent);color:var(--t-accent);font-size:13px;cursor:pointer;}
+html body .rk-add i{font-style:normal;font-size:10px;color:var(--t-muted);margin-top:2px;}
+html body .rk-add.busy{opacity:.6;}
+/* 详情评价里的晒图 */
+html body .rv-phs{display:flex;gap:6px;margin-top:6px;}
+html body .rv-ph{width:64px;height:64px;object-fit:cover;border-radius:8px;}

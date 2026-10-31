@@ -1,6 +1,7 @@
 """我的上架、改稿、管理员代上架。"""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
@@ -13,6 +14,8 @@ from bot.services import credit_service, listing_flow, listing_notify, search_se
 from bot.services.admin_ops import notify_user_best_effort
 from bot.services.broadcast import update_broadcast
 from bot.services.extras_store import save_extras, save_user_fields
+
+logger = logging.getLogger(__name__)
 
 
 class EditBody(BaseModel):
@@ -60,6 +63,13 @@ async def api_me_listings(user_id: int = Depends(get_current_user_id)) -> Dict[s
         it["hours"] = normalize_hours(extras.get("_hours") or extras.get("hours"))
         it["extras"] = {k: v for k, v in extras.items() if not str(k).startswith("_")}
         it["expires_at"] = _ser_dt(it.get("expires_at"))
+    try:
+        from bot.services.listing_stats import stats_for_lamps
+        stats = await stats_for_lamps([it.get("lamp_id") for it in items])
+        for it in items:
+            it["stats"] = stats.get(str(it.get("lamp_id")), {})
+    except Exception:
+        logger.exception("listing stats failed")
     return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN}
 
 

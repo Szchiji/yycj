@@ -38,7 +38,7 @@
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "offset", "limit", "lat", "lng"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.

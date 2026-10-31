@@ -79,7 +79,7 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
 async def job_expiry_nudge() -> None:
     try:
         from bot.services.expiry_nudge import nudge_expiring
-        await nudge_expiring(3)
+        await nudge_expiring(3, 1)
     except Exception:
         logger.exception("expiry nudge failed")
 
@@ -99,10 +99,12 @@ async def startup_maintenance(scheduler=None) -> None:
         if scheduler is None:
             from bot.main import scheduler
         if getattr(scheduler, "running", False):
-            scheduler.add_job(job_expiry_nudge, "interval", minutes=60, id="expiry_nudge", replace_existing=True)
+            # 每天 10:00（北京时间）发一次：剩 3 天、剩 1 天各一次。部署/重启不会补发（不在启动时跑）。
+            scheduler.add_job(job_expiry_nudge, "cron", hour=10, minute=0, timezone="Asia/Shanghai",
+                              id="expiry_nudge", replace_existing=True, coalesce=True, max_instances=1,
+                              misfire_grace_time=3600)
     except Exception:
         logger.exception("expiry nudge job skipped")
-    await job_expiry_nudge()
 
 
 async def get_bot_identity(bot=None) -> Dict[str, Any]:

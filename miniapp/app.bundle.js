@@ -95,7 +95,7 @@ try {
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "offset", "limit", "lat", "lng"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.
@@ -270,7 +270,7 @@ try {
 ;} catch (e) { try { console.error("resilience.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "resilience.js" }); } catch (x) {} }
 /* ---- app.js ---- */
 try {
-(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor("#0F2420")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],i.scoringRules=n.scoring_rules,n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"} · 兰花令 ${i.user.tier||""}`:"";const c=n.announcement,o=a("#announce");c&&c.text?(o.classList.remove("hidden"),o.innerHTML=`<span>${s(c.text)}</span>`):o.classList.add("hidden");try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:[]})}),c("评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
+(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor("#0F2420")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],i.scoringRules=n.scoring_rules,n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"} · 兰花令 ${i.user.tier||""}`:"";const c=n.announcement,o=a("#announce");c&&c.text?(o.classList.remove("hidden"),o.innerHTML=`<span>${s(c.text)}</span>`):o.classList.add("hidden");try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:window.__yycjRevPhotos?window.__yycjRevPhotos():[]})}),window.__yycjRevReset&&window.__yycjRevReset(),c(window.__yycjRevDoneMsg||"评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
 ;} catch (e) { try { console.error("app.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "app.js" }); } catch (x) {} }
 /* ---- home-ui.js ---- */
 try {
@@ -290,8 +290,11 @@ try {
   function setArea(key) {
     try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
   }
+  // 排序：最新上架（默认）/ 评价多。放在「地区」面板顶部，首页布局不变；本次会话内记住。
+  function getSort() { try { return sessionStorage.getItem("yycj_sort") === "reviews" ? "reviews" : ""; } catch (e) { return ""; } }
+  function setSort(v) { try { if (v === "reviews") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
   function token() { return localStorage.getItem("yycj_token") || ""; }
-  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea(); }
+  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort(); }
   function readCache(city, qq) {
     try {
       const raw = sessionStorage.getItem(cacheKey(city, qq));
@@ -454,6 +457,7 @@ try {
       if (q) params.set("q", q);
       if (city) params.set("city", city);
       if (getArea()) params.set("district", getArea());
+      if (getSort()) params.set("sort", getSort());
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -466,19 +470,23 @@ try {
   function paintArea() {
     const btn = $("#btnArea");
     const k = getArea();
+    const so = getSort();
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
-      if (lbl) lbl.textContent = k ? areaLabel(k) : "地区▾";
-      btn.classList.toggle("on", !!k);
-      btn.classList.toggle("long", k.length > 2);
-      btn.setAttribute("aria-label", k ? "地区：" + k : "地区筛选");
+      if (lbl) lbl.textContent = k ? areaLabel(k) : so ? "评价多" : "地区▾";
+      btn.classList.toggle("on", !!(k || so));
+      btn.classList.toggle("long", k.length > 2 || (!k && !!so));
+      btn.setAttribute("aria-label", (k ? "地区：" + k : "地区筛选") + (so ? "，按评价多排序" : ""));
     }
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
     const chips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
       .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
-    panel.innerHTML = "<div class=\"area-chips\">" + chips.join("") + "</div>" +
+    const sortRow = "<div class=\"sort-row\" role=\"radiogroup\" aria-label=\"排序\"><span class=\"sort-k\">排序</span>" +
+      "<button type=\"button\" class=\"sort-opt" + (so ? "" : " on") + "\" data-sort=\"\">最新上架</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so ? " on" : "") + "\" data-sort=\"reviews\">评价多</button></div>";
+    panel.innerHTML = sortRow + "<div class=\"area-chips\">" + chips.join("") + "</div>" +
       ((d.items || []).length ? "" : "<p class=\"muted area-empty\">这个城市的资料还没填区域</p>");
   }
   function toggleArea(open) {
@@ -528,6 +536,7 @@ try {
     if (qq) params.set("q", qq);
     if (city) params.set("city", city);
     if (getArea()) params.set("district", getArea());
+    if (getSort()) params.set("sort", getSort());
     return "/api/home?" + params.toString();
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
@@ -544,6 +553,12 @@ try {
     else if (!(ev.target.closest && ev.target.closest("#areaPanel")) && $("#areaPanel") && !$("#areaPanel").classList.contains("hidden")) {
       // tap outside just closes the overlay (doesn't also open a card underneath)
       ev.preventDefault(); ev.stopPropagation(); toggleArea(false); return;
+    }
+    const sortBtn = ev.target.closest && ev.target.closest("#areaPanel [data-sort]");
+    if (sortBtn) {
+      setSort(sortBtn.getAttribute("data-sort") || "");
+      toggleArea(false);
+      loadFeed(true);
     }
     const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
     if (chip) {
@@ -1032,6 +1047,14 @@ try {
       catch (e) { sw.checked = !sw.checked; toast(e.message || String(e)); }
     });
   }
+  // 近 7 天 / 累计：浏览（每人每天算一次，自己看不算）· 收藏 · 匿名联系
+  function statsHtml(x) {
+    const s = x && x.stats;
+    if (!s || x.status !== "active") return "";
+    const n = (v) => Number(v || 0);
+    const cell = (k, a, b) => `<span class="ls-cell"><b>${n(a)}</b><i>${k}</i><em>累计 ${n(b)}</em></span>`;
+    return `<div class="ls-stats" aria-label="近7天数据"><span class="ls-k">近 7 天</span>${cell("浏览", s.views_7d, s.views)}${cell("收藏", s.favs_7d, s.favs)}${cell("匿名联系", s.contacts_7d, s.contacts)}</div>`;
+  }
   async function load() {
     mount();
     const box = document.getElementById("myListings");
@@ -1049,7 +1072,7 @@ try {
         const st = x.status === "active" ? "已上架" : x.status === "hidden" ? "已下架" : x.status;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
-          <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${x.expires_at ? ("到期 " + esc(String(x.expires_at).slice(0,10))) : ""}</div></div>
+          <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${x.expires_at ? ("到期 " + esc(String(x.expires_at).slice(0,10))) : ""}</div>${statsHtml(x)}</div>
           <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">改资料</button>
         </div>${x.status === "active" ? `<div class="shift-box" data-shift="${esc(x.lamp_id)}">${shiftHtml(x.shop || {}, lead)}</div>` : ""}`;
       }).join("");
@@ -1679,7 +1702,9 @@ try {
     if (!box) { box = document.createElement("div"); box.id = "yycjReviews"; detail.appendChild(box); }
     const rows = list && list.length ? list.map((t) => {
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
-      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p></div>`;
+      const ph = (Array.isArray(t.photos) ? t.photos : []).slice(0, 3).map((u) => String(u || "")).filter((u) => /^[A-Za-z0-9_\-:./]+$/.test(u))
+        .map((u) => { const src = /^https?:|^\//.test(u) ? u : "/api/media/file/" + encodeURIComponent(u); return `<img class="rv-ph" loading="lazy" src="${src}" alt="" />`; }).join("");
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p>${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
     }).join("") : "<p class='muted'>暂无评价</p>";
     box.innerHTML = `<h3 style="font-size:1rem;margin:12px 0 6px">评价</h3>${rows}`;
     placeShare(id);
@@ -2507,6 +2532,97 @@ body.rev-open #view-review{padding-top:calc(var(--rv-top-h) + 4px);}`;
   sync();
 })();
 ;} catch (e) { try { console.error("review-back.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "review-back.js" }); } catch (x) {} }
+/* ---- review-kit.js ---- */
+try {
+(() => {
+  // 写评价：点星打分（替代数字框，数值仍写回 #revStars）+ 最多 3 张晒图（/api/media/upload?purpose=review）。
+  if (window.__yycjReviewKit) return;
+  window.__yycjReviewKit = true;
+  const MAX = 3;
+  const LABELS = ["", "很差", "一般", "还行", "满意", "超赞"];
+  let photos = [];
+  let busy = 0;
+  const token = () => localStorage.getItem("yycj_token") || "";
+  const $ = (s) => document.querySelector(s);
+  function toast(msg) {
+    const t = document.getElementById("toast");
+    if (t) { t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._rk); t._rk = setTimeout(() => t.classList.add("hidden"), 2200); }
+  }
+  function paintStars() {
+    const box = $("#rkStars");
+    const inp = $("#revStars");
+    if (!box || !inp) return;
+    const v = Math.max(1, Math.min(5, parseInt(inp.value, 10) || 5));
+    box.querySelectorAll("[data-star]").forEach((b) => {
+      const on = Number(b.getAttribute("data-star")) <= v;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-checked", Number(b.getAttribute("data-star")) === v ? "true" : "false");
+    });
+    const l = $("#rkStarLbl");
+    if (l) l.textContent = LABELS[v];
+  }
+  function paintPhotos() {
+    const box = $("#rkPhotos");
+    if (!box) return;
+    const cells = photos.map((p, i) => `<div class="rk-ph"><img src="${p.preview}" alt="" /><button type="button" class="rk-x" data-rk-del="${i}" aria-label="删除">×</button></div>`);
+    if (photos.length + busy < MAX) cells.push(`<label class="rk-add${busy ? " busy" : ""}"><input type="file" accept="image/*" multiple hidden id="rkFile" /><span>${busy ? "上传中…" : "+ 晒图"}</span><i>${photos.length}/${MAX}</i></label>`);
+    else if (busy) cells.push(`<div class="rk-add busy"><span>上传中…</span></div>`);
+    box.innerHTML = cells.join("");
+  }
+  async function upload(files) {
+    const list = [...files].slice(0, MAX - photos.length);
+    if (!list.length) return;
+    busy = list.length;
+    paintPhotos();
+    try {
+      const fd = new FormData();
+      list.forEach((f) => fd.append("files", f));
+      const r = await fetch("/api/media/upload?purpose=review", { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || "上传失败");
+      (d.items || []).forEach((it) => { if (photos.length < MAX) photos.push({ url: it.url || it.file_id, preview: it.preview_url || "" }); });
+    } catch (e) {
+      toast(e.message || "上传失败");
+    } finally {
+      busy = 0;
+      paintPhotos();
+    }
+  }
+  function mount() {
+    const form = $("#reviewForm");
+    const inp = $("#revStars");
+    if (!form || !inp || $("#rkStars")) return;
+    inp.classList.add("rk-hide");
+    inp.setAttribute("aria-hidden", "true");
+    inp.tabIndex = -1;
+    const stars = document.createElement("div");
+    stars.id = "rkStars";
+    stars.className = "rk-stars";
+    stars.setAttribute("role", "radiogroup");
+    stars.setAttribute("aria-label", "打分");
+    stars.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" data-star="${n}" aria-label="${n} 星">★</button>`).join("") + `<span id="rkStarLbl" class="rk-lbl"></span>`;
+    inp.insertAdjacentElement("afterend", stars);
+    const txt = $("#revText");
+    if (txt && !txt.placeholder) txt.placeholder = "说说体验（准时、环境、态度…）";
+    const ph = document.createElement("div");
+    ph.id = "rkPhotos";
+    ph.className = "rk-photos";
+    (txt || stars).insertAdjacentElement("afterend", ph);
+    paintStars();
+    paintPhotos();
+  }
+  document.addEventListener("click", (ev) => {
+    const s = ev.target.closest && ev.target.closest("#rkStars [data-star]");
+    if (s) { const inp = $("#revStars"); if (inp) inp.value = s.getAttribute("data-star"); paintStars(); return; }
+    const del = ev.target.closest && ev.target.closest("[data-rk-del]");
+    if (del) { photos.splice(Number(del.getAttribute("data-rk-del")), 1); paintPhotos(); }
+  });
+  document.addEventListener("change", (ev) => { if (ev.target && ev.target.id === "rkFile") upload(ev.target.files || []); });
+  window.__yycjRevPhotos = () => photos.map((p) => p.url).filter(Boolean);
+  window.__yycjRevReset = () => { window.__yycjRevDoneMsg = photos.length ? "评价已提交，带图评价需管理员审核后展示" : ""; photos = []; const inp = $("#revStars"); if (inp) inp.value = "5"; const t = $("#revText"); if (t) t.value = ""; paintStars(); paintPhotos(); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
+})();
+;} catch (e) { try { console.error("review-kit.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "review-kit.js" }); } catch (x) {} }
 /* ---- detail-guard.js ---- */
 try {
 // Detail page safety net: whenever the detail view is open and its info card is missing, load the

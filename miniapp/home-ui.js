@@ -14,8 +14,11 @@
   function setArea(key) {
     try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
   }
+  // 排序：最新上架（默认）/ 评价多。放在「地区」面板顶部，首页布局不变；本次会话内记住。
+  function getSort() { try { return sessionStorage.getItem("yycj_sort") === "reviews" ? "reviews" : ""; } catch (e) { return ""; } }
+  function setSort(v) { try { if (v === "reviews") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
   function token() { return localStorage.getItem("yycj_token") || ""; }
-  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea(); }
+  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort(); }
   function readCache(city, qq) {
     try {
       const raw = sessionStorage.getItem(cacheKey(city, qq));
@@ -178,6 +181,7 @@
       if (q) params.set("q", q);
       if (city) params.set("city", city);
       if (getArea()) params.set("district", getArea());
+      if (getSort()) params.set("sort", getSort());
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -190,19 +194,23 @@
   function paintArea() {
     const btn = $("#btnArea");
     const k = getArea();
+    const so = getSort();
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
-      if (lbl) lbl.textContent = k ? areaLabel(k) : "地区▾";
-      btn.classList.toggle("on", !!k);
-      btn.classList.toggle("long", k.length > 2);
-      btn.setAttribute("aria-label", k ? "地区：" + k : "地区筛选");
+      if (lbl) lbl.textContent = k ? areaLabel(k) : so ? "评价多" : "地区▾";
+      btn.classList.toggle("on", !!(k || so));
+      btn.classList.toggle("long", k.length > 2 || (!k && !!so));
+      btn.setAttribute("aria-label", (k ? "地区：" + k : "地区筛选") + (so ? "，按评价多排序" : ""));
     }
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
     const chips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
       .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
-    panel.innerHTML = "<div class=\"area-chips\">" + chips.join("") + "</div>" +
+    const sortRow = "<div class=\"sort-row\" role=\"radiogroup\" aria-label=\"排序\"><span class=\"sort-k\">排序</span>" +
+      "<button type=\"button\" class=\"sort-opt" + (so ? "" : " on") + "\" data-sort=\"\">最新上架</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so ? " on" : "") + "\" data-sort=\"reviews\">评价多</button></div>";
+    panel.innerHTML = sortRow + "<div class=\"area-chips\">" + chips.join("") + "</div>" +
       ((d.items || []).length ? "" : "<p class=\"muted area-empty\">这个城市的资料还没填区域</p>");
   }
   function toggleArea(open) {
@@ -252,6 +260,7 @@
     if (qq) params.set("q", qq);
     if (city) params.set("city", city);
     if (getArea()) params.set("district", getArea());
+    if (getSort()) params.set("sort", getSort());
     return "/api/home?" + params.toString();
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
@@ -268,6 +277,12 @@
     else if (!(ev.target.closest && ev.target.closest("#areaPanel")) && $("#areaPanel") && !$("#areaPanel").classList.contains("hidden")) {
       // tap outside just closes the overlay (doesn't also open a card underneath)
       ev.preventDefault(); ev.stopPropagation(); toggleArea(false); return;
+    }
+    const sortBtn = ev.target.closest && ev.target.closest("#areaPanel [data-sort]");
+    if (sortBtn) {
+      setSort(sortBtn.getAttribute("data-sort") || "");
+      toggleArea(false);
+      loadFeed(true);
     }
     const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
     if (chip) {

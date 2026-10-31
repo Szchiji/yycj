@@ -149,7 +149,8 @@ async def district_counts(city: str | None) -> Dict[str, Any]:
     return {"total": total, "items": items[:40]}
 
 
-async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None, district: str | None = None) -> List[Dict[str, Any]]:
+async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None, district: str | None = None, sort: str = "new") -> List[Dict[str, Any]]:
+    by_reviews = sort == "reviews"
     async with session_scope() as s:
         conditions = [Lamp.status == LampStatus.ACTIVE.value]
         if city:
@@ -180,11 +181,27 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                     cast(Lamp.tags, String).ilike(like),
                 ))
         off = max(0, int(offset or 0))
-        stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.created_at.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
-        res = await s.execute(stmt)
-        items = [_lamp_to_dict(x) for x in res.scalars().all()]
+        if by_reviews:
+            # 评价多: approved review count, 置顶 cards stay on top (same as 最新上架)
+            from bot.models import Review, ReviewStatus
+            rc = (select(Review.lamp_id.label("lid"), func.count().label("n"))
+                  .where(Review.status == ReviewStatus.APPROVED.value).group_by(Review.lamp_id).subquery())
+            stmt = (select(Lamp, func.coalesce(rc.c.n, 0)).outerjoin(rc, rc.c.lid == Lamp.lamp_id).where(and_(*conditions))
+                    .order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), func.coalesce(rc.c.n, 0).desc(), Lamp.created_at.desc())
+                    .offset(off).limit(limit))
+            items = []
+            for lamp_row, n in (await s.execute(stmt)).all():
+                d = _lamp_to_dict(lamp_row)
+                d["review_count"] = int(n or 0)
+                items.append(d)
+        else:
+            stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.created_at.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
+            res = await s.execute(stmt)
+            items = [_lamp_to_dict(x) for x in res.scalars().all()]
     enriched = [attach_fuzzy_distance(x, lat, lng) for x in items]
-    if lat is not None and lng is not None:
+    if by_reviews:
+        pass  # SQL order is final
+    elif lat is not None and lng is not None:
         enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, x.get("_distance_km") if x.get("_distance_km") is not None else 1e9))
     else:
         pinned = [x for x in enriched if x.get("feed_pinned")]
