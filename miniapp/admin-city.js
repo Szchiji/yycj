@@ -192,6 +192,42 @@
       if (r.ok) { S.ops = await r.json(); renderCard(); }
     } catch (e) {}
   }
+  // 按区目录 / 精选评价: site-wide default + per-city overview (super admin, 全站默认)
+  async function loadFeat(force) {
+    if (!S.isSuper || (S.feat && !force) || S.featLoading) return;
+    S.featLoading = true;
+    try {
+      const r = await rawFetch("/api/admin/channel-features", { headers: { Authorization: "Bearer " + token() }, cache: "no-store" });
+      if (r.ok) S.feat = await r.json();
+    } catch (e) {}
+    S.featLoading = false;
+    renderCard();
+  }
+  const VIA = { own: "本城频道", city_push: "本城推送频道", site: "全站设的频道", site_push: "全站推送频道" };
+  function featCell(x) {
+    if (!x) return "";
+    const st = x.on ? `<b class="cf-on">开</b>` : `<span class="cf-off">关</span>`;
+    const src = x.own_switch ? `<span class="cc-badge own">本城市</span>` : `<span class="cc-badge">沿用全站</span>`;
+    const ch = x.on ? (x.chat ? `<code>${esc(x.chat)}</code> <span class="muted">${esc(VIA[x.via] || "")}</span>` : `<span class="cf-warn">没有频道</span>`) : "";
+    return `${st} ${src}<div class="cf-ch">${ch}</div>`;
+  }
+  function featHtml() {
+    const f = S.feat;
+    if (!f) { setTimeout(() => loadFeat(), 0); return `<h4 style="margin-top:14px">频道按区目录 · 精选评价</h4><p class="muted">读取中…</p>`; }
+    const g = f.global || {};
+    const push = g.broadcast_channel ? `推送频道 ${g.broadcast_channel}` : "推送频道（未设）";
+    const row = (on, onId, ch, chId, label, hint) => `<div class="cc-f"><label class="row"><input type="checkbox" id="${onId}"${on ? " checked" : ""} /> ${label}</label>
+      <div class="cc-fh"><label for="${chId}">发到的频道</label></div><input id="${chId}" maxlength="128" placeholder="${esc("空 = 用" + push)}" value="${esc(ch || "")}" />
+      <p class="cc-hint">${hint}</p></div>`;
+    const table = (f.cities || []).map((c) => `<tr><td>${tagHtml(c.city)}</td><td>${featCell(c.channel_directory)}</td><td>${featCell(c.broadcast_reviews)}</td>
+      <td><button class="btn cf-edit" type="button" data-cc="city" data-city="${esc(c.city)}">改</button></td></tr>`).join("");
+    return `<h4 style="margin-top:14px">频道按区目录 · 精选评价</h4>
+      <p class="muted cc-lead">全站默认：没单独设的城市都用这里。每个城市的目录只列它自己的区和在架资料。机器人必须是频道管理员，保存时会检查。</p>
+      ${row(g.channel_directory, "cfDirOn", g.directory_channel, "cfDirCh", "频道按区目录", "每天 12:00 更新同一条；关掉或换频道会删掉旧目录。")}
+      ${row(g.broadcast_reviews, "cfRevOn", g.review_channel, "cfRevCh", "精选评价推送到频道", "审核通过的 4–5 星评价，只发文字，不发凭证。")}
+      <button class="btn primary" type="button" data-cc="save-feat">保存这两项</button>
+      ${table ? `<table class="cf-table"><thead><tr><th>城市</th><th>按区目录</th><th>精选评价</th><th></th></tr></thead><tbody>${table}</tbody></table>` : ""}`;
+  }
   // per-city overrides: GET/POST /api/admin/cities/settings
   S.cfg = {};
   async function loadCfg(city) {
@@ -412,6 +448,7 @@
       }
       if (S.isSuper) html += `<p class="muted cc-foot">全站默认值和不分城市的设置在「全站默认」里改。</p>`;
     } else {
+      if (S.isSuper) html += featHtml();
       html += `<h4 style="margin-top:14px">各城市</h4>` + cities.map((c) => {
         const a = anns[c];
         const n = counts[c] || 0;
@@ -475,9 +512,18 @@
           if (String(v) !== String(cur)) overrides[k.key] = v;
         });
         if (!Object.keys(overrides).length) { alert("没有改动"); }
-        else { afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides })); alert(`${S.sel} 设置已保存`); }
+        else { afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides })); S.feat = null; alert(`${S.sel} 设置已保存`); }
       } else if (b.dataset.cc === "clear") {
         afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides: { [b.dataset.k]: null } }));
+        S.feat = null;
+      } else if (b.dataset.cc === "save-feat") {
+        const v = (id) => (document.getElementById(id)?.value || "").trim();
+        const d = await post("/api/admin/channel-features", {
+          channel_directory: !!document.getElementById("cfDirOn")?.checked, directory_channel: v("cfDirCh"),
+          broadcast_reviews: !!document.getElementById("cfRevOn")?.checked, review_channel: v("cfRevCh"),
+        });
+        S.feat = d; S.cfg = {};
+        alert("已保存：频道按区目录 · 精选评价");
       } else if (b.dataset.cc === "save-ops") {
         const map = {};
         document.querySelectorAll("#cityCard [data-op]").forEach((inp) => {

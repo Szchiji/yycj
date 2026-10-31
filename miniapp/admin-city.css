@@ -51,3 +51,13 @@
 #ccGlobal #ccGlobalFields { margin-bottom: 4px; }
 #ccSiteOnly .cc-site-h { margin: 18px 0 10px; font-size: 15px; }
 body.cc-no-sitebar #adSaveBar, body.pane-venue.cc-no-sitebar #adSaveBar.hidden { display: none !important; }
+/* 频道按区目录 · 精选评价 overview (全站默认) */
+#cityCard .cf-table { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 13px; }
+#cityCard .cf-table th { text-align: left; color: var(--ad-mute); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
+#cityCard .cf-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,.05); vertical-align: top; }
+#cityCard .cf-table .cc-badge { display: inline-block; margin-left: 4px; }
+#cityCard .cf-ch { margin-top: 3px; font-size: 12px; }
+#cityCard .cf-on { color: var(--ad-accent); }
+#cityCard .cf-off { color: var(--ad-mute); }
+#cityCard .cf-warn { color: #ff8a80; }
+#cityCard .cf-edit { padding: 4px 10px; min-height: 0; }

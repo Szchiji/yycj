@@ -36,7 +36,9 @@ DEFAULT_OPS = {
     "media_channel_id": "",
     "broadcast_template": "🌙 月影车姬 · 新上架\n{称呼}\n📍 {地点}\n💰 {价位}\n{标签}\n{简介}\n{链接}",
     "broadcast_reviews": False,  # 精选评价推送到频道（默认关）
+    "review_channel": "",  # 精选评价发到哪个频道；空 = 用推送频道
     "channel_directory": False,  # 频道按区目录（每天 12:00 刷新同一条，默认关）
+    "directory_channel": "",  # 按区目录发到哪个频道；空 = 用推送频道
     "listing_fields": [
         {"key": "称呼", "label": "称呼", "form": True},
         {"key": "城市", "label": "城市", "form": True},
@@ -59,9 +61,13 @@ CITY_KEYS = [
      "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
     {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
     {"key": "channel_directory", "label": "频道按区目录", "type": "bool",
-     "hint": "开 = 每天 12:00 在推送频道更新一条按区目录，花名直达详情（默认关）"},
+     "hint": "开 = 每天 12:00 更新一条本城的按区目录（只列本城的区和在架资料），花名直达详情；关掉会删掉旧目录（默认关）"},
+    {"key": "directory_channel", "label": "按区目录发到的频道", "type": "text", "max": 128, "super": True,
+     "hint": "@频道名 或 -100…；空 = 用本城的推送频道。机器人必须是该频道管理员"},
     {"key": "broadcast_reviews", "label": "精选评价推送到频道", "type": "bool",
-     "hint": "开 = 审核通过的 4–5 星评价（只发文字，不发凭证）同步到该城推送频道（默认关）"},
+     "hint": "开 = 审核通过的 4–5 星评价（只发文字，不发凭证）发到下面的频道（默认关）"},
+    {"key": "review_channel", "label": "精选评价发到的频道", "type": "text", "max": 128, "super": True,
+     "hint": "@频道名 或 -100…；空 = 用本城的推送频道。机器人必须是该频道管理员"},
     {"key": "approve_promo_text", "label": "上架通过后发给老师的话", "type": "textarea", "max": 2000},
     {"key": "chat_cta_label", "label": "聊天按钮文字", "type": "text", "max": 32},
     {"key": "admin_contact", "label": "管理员联系链接", "type": "text", "max": 128,
@@ -132,6 +138,16 @@ def clean_city_overrides(raw: Any) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+FEATURE_CHANNEL = {"channel_directory": "directory_channel", "broadcast_reviews": "review_channel"}
+
+
+def feature_chat(site: Dict[str, Any], feature: str) -> str:
+    """Target chat of 按区目录 / 精选评价 for already city-merged settings: own channel, else 推送频道."""
+    from bot.services.broadcast import normalize_chat
+    own = str(site.get(FEATURE_CHANNEL.get(feature, "")) or "").strip()
+    return normalize_chat(own or str(site.get("broadcast_channel") or ""))
+
+
 def ops_for_city(settings: Dict[str, Any], city: Optional[str]) -> Dict[str, Any]:
     """Site settings with that city's overrides applied. No city / unknown city = site-wide."""
     over = (settings.get("city_overrides") or {}).get(str(city or "").strip()) if city else None
@@ -183,6 +199,8 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
     out["broadcast_reviews"] = bool(out.get("broadcast_reviews"))
     out["channel_directory"] = bool(out.get("channel_directory"))
+    out["review_channel"] = str(out.get("review_channel") or "").strip()[:128]
+    out["directory_channel"] = str(out.get("directory_channel") or "").strip()[:128]
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
     out["review_require_audit"] = audit_on(out.get("review_require_audit"))

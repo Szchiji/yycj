@@ -77,7 +77,8 @@ def _proof_ids(review: Dict[str, Any]) -> List[str]:
 _SEC = (("diff", "人照课表差异"), ("pros", "优点"), ("cons", "不足"), ("extra", "补充"))
 
 
-async def _caption(review: Dict[str, Any], lamp: Dict[str, Any]) -> str:
+async def _caption(review: Dict[str, Any], lamp: Dict[str, Any], limit: int = 4000) -> str:
+    """Moderation text. 4000 for a text message (补充 up to 1000 字 fits), 1024 for a photo caption."""
     from bot.services import credit_service
     gid = review.get("guest_id")
     who = f"<code>{gid}</code>"
@@ -97,7 +98,7 @@ async def _caption(review: Dict[str, Any], lamp: Dict[str, Any]) -> str:
     text = str(review.get("text") or "").strip()
     sec = review.get("sections") or {}
     if isinstance(sec, dict) and any(sec.get(k) for k, _ in _SEC):
-        body = "\n".join(f"<b>{lbl}</b>：{_h(str(sec.get(k))[:300])}" for k, lbl in _SEC if sec.get(k))
+        body = "\n".join(f"<b>{lbl}</b>：{_h(str(sec.get(k))[:1000 if k == 'extra' else 300])}" for k, lbl in _SEC if sec.get(k))
     else:
         body = f"内容：{_h(text[:600]) if text else '（无文字）'}"
     return (
@@ -107,7 +108,7 @@ async def _caption(review: Dict[str, Any], lamp: Dict[str, Any]) -> str:
         f"客人：{who}\n"
         f"{body}\n"
         f"公开晒图：{len(photos)} 张 · 🔒约课凭证：{len(proofs)} 张（仅管理员）\n{why}"
-    )[:1024]
+    )[:limit]
 
 
 async def _remember(review_id: str, chat_id: int, message_id: int, kind: str, body: str) -> None:
@@ -135,7 +136,7 @@ async def notify_new_review(review: Dict[str, Any], lamp: Optional[Dict[str, Any
         from aiogram.types import InputMediaPhoto
         from bot.keyboards import admin_review_kb
         bot = _bot()
-        caption = await _caption(review, lamp)
+        caption = await _caption(review, lamp, 1024 if len(_photo_ids(review)) == 1 else 4000)
         kb = admin_review_kb(rid)
         photos = _photo_ids(review)
         proofs = _proof_ids(review)

@@ -140,9 +140,48 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
                 raise HTTPException(status_code=400, detail="管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名")
             v = norm
         if k == "broadcast_channel" and v not in (None, ""):
-            from bot.services.broadcast import normalize_chat
-            if not normalize_chat(str(v)):
+            from bot.services.broadcast import valid_chat
+            if not valid_chat(str(v)):
                 raise HTTPException(status_code=400, detail="推送频道格式不对，示例 @频道名 或 -100…")
         changes[k] = v
+    from bot.services import channel_features
+    if any(k in changes for k in ("channel_directory", "directory_channel", "broadcast_reviews", "review_channel", "broadcast_channel")):
+        try:
+            changes = await channel_features.validate(changes, city=city)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     settings = await home_service.update_city_overrides(city, changes)
+    if any(k in changes for k in ("channel_directory", "directory_channel", "broadcast_channel")):
+        channel_features.resync_soon([city])
     return _city_settings_payload(settings, city, rights)
+
+
+class ChannelFeaturesBody(BaseModel):
+    channel_directory: Optional[bool] = None
+    directory_channel: Optional[str] = None
+    broadcast_reviews: Optional[bool] = None
+    review_channel: Optional[str] = None
+
+
+@router.get("/admin/channel-features")
+async def api_channel_features(_: int = Depends(get_super_user_id)) -> Dict[str, Any]:
+    from bot.services import channel_features
+    return {"ok": True, **channel_features.overview(await home_service.get_or_create_settings())}
+
+
+@router.post("/admin/channel-features")
+async def api_channel_features_save(body: ChannelFeaturesBody, _: int = Depends(get_super_user_id)) -> Dict[str, Any]:
+    """全站默认：按区目录 / 精选评价 的开关和频道（城市单独设的沿用城市的）。"""
+    from bot.services import channel_features
+    changes = {k: v for k, v in body.model_dump().items() if v is not None}
+    for k in ("directory_channel", "review_channel"):
+        if k in changes:
+            changes[k] = str(changes[k] or "").strip()
+    try:
+        changes = await channel_features.validate(changes, city=None)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    settings = await home_service.update_settings(ops_config=changes or None)
+    if any(k in changes for k in ("channel_directory", "directory_channel")):
+        channel_features.resync_soon(None)
+    return {"ok": True, **channel_features.overview(settings)}
