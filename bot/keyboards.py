@@ -88,3 +88,13 @@ def admin_report_kb(report_id: str) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="❌ 驳回", callback_data=f"admin_report_no:{report_id}"),
     )
     return b.as_markup()
+
+
+def admin_review_kb(review_id: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.row(
+        InlineKeyboardButton(text="✅ 通过", callback_data=f"admin_rev_ok:{review_id}"),
+        InlineKeyboardButton(text="❌ 拒绝", callback_data=f"admin_rev_no:{review_id}"),
+    )
+    b.row(InlineKeyboardButton(text="🚫 刷评", callback_data=f"admin_rev_brush:{review_id}"))
+    return b.as_markup()

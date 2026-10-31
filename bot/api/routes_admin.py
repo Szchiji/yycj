@@ -161,6 +161,8 @@ async def api_admin_approve_review(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     rev["created_at"] = _ser_dt(rev.get("created_at"))
     rev["reviewed_at"] = _ser_dt(rev.get("reviewed_at"))
+    from bot.services import review_notify
+    review_notify.sync_soon([review_id], ReviewStatus.APPROVED.value, admin_id)
     return {"ok": True, "review": rev}
 
 @router.post("/admin/reviews/{review_id}/reject")
@@ -177,6 +179,8 @@ async def api_admin_reject_review(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     rev["created_at"] = _ser_dt(rev.get("created_at"))
     rev["reviewed_at"] = _ser_dt(rev.get("reviewed_at"))
+    from bot.services import review_notify
+    review_notify.sync_soon([review_id], ReviewStatus.REJECTED.value, admin_id)
     return {"ok": True, "review": rev}
 
 @router.post("/admin/reviews/{review_id}/brush")
@@ -195,6 +199,8 @@ async def api_admin_brush_review(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     rev["created_at"] = _ser_dt(rev.get("created_at"))
     rev["reviewed_at"] = _ser_dt(rev.get("reviewed_at"))
+    from bot.services import review_notify
+    review_notify.sync_soon([review_id], ReviewStatus.BRUSH.value, admin_id)
     return {"ok": True, "review": rev}
 
 @router.get("/admin/homepage")

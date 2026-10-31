@@ -105,6 +105,12 @@ async def startup_maintenance(scheduler=None) -> None:
                               misfire_grace_time=3600)
     except Exception:
         logger.exception("expiry nudge job skipped")
+    try:
+        # pending reviews from the last day that never reached the bot admins (each sent once)
+        from bot.services.review_notify import backfill_pending
+        await backfill_pending(24)
+    except Exception:
+        logger.exception("review notice backfill skipped")
 
 
 async def get_bot_identity(bot=None) -> Dict[str, Any]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Integer, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, Date, DateTime, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bot.models import Base
@@ -28,3 +28,17 @@ class LampView(Base):
     lamp_id: Mapped[str] = mapped_column(String(36), index=True)
     day: Mapped[date] = mapped_column(Date, index=True)  # Asia/Shanghai calendar day
     views: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class ReviewNotice(Base):
+    """Bot moderation message sent to an admin for a pending review (also the "already notified" mark).
+    Kept so 通过/拒绝 from the bot or the admin backend can update every admin's copy. Additive table."""
+    __tablename__ = "review_notices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    review_id: Mapped[str] = mapped_column(String(36), index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger)
+    message_id: Mapped[int] = mapped_column(Integer, default=0)
+    kind: Mapped[str] = mapped_column(String(8), default="text")  # text | caption | none (nobody reachable)
+    body: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

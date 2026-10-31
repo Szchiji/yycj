@@ -195,6 +195,10 @@ async def api_create_review(
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if rev.get("status") == "pending":
+        # tell the bot admins (fire-and-forget: a Telegram problem never fails the submit)
+        from bot.services import review_notify
+        review_notify.notify_soon(rev, lamp)
     rev["created_at"] = _ser_dt(rev.get("created_at"))
     return {"ok": True, "review": rev}
 

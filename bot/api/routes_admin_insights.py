@@ -55,4 +55,7 @@ async def api_admin_reviews_bulk(body: ReviewBulkBody, admin_id: int = Depends(g
             failed[rid] = "不存在"
         except RuntimeError as exc:
             failed[rid] = str(exc) or "已处理"
+    if done:
+        from bot.services import review_notify
+        review_notify.sync_soon(done, status, admin_id)
     return {"ok": True, "action": body.action, "done": done, "failed": failed}
