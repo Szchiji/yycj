@@ -96,6 +96,7 @@ async def api_home(
     open_now: int = Query(default=0, ge=0, le=1, alias="open"),
     radius: Optional[float] = Query(default=None, ge=0, le=50),
     at: Optional[str] = Query(default=None, max_length=32),
+    place: int = Query(default=1, ge=0, le=1),
     limit: int = Query(default=3, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=500),
     user_id: int = Depends(get_current_user_id),
@@ -115,13 +116,27 @@ async def api_home(
     area_key = search_service.district_key(district) if district else ""
     from bot.services.feed_filters import Filter, distance_label
     # 价格档 / 标签 / 营业中 / 距离: the same rules for the feed and the carousel.
-    if (lat is None or lng is None) and at:
+    near_src = "gps" if (lat is not None and lng is not None) else ""
+    if not near_src and at:
         # no location permission: the user picked a district as the centre
         from bot.services.feed_filters import center_of
         pt = center_of(use_city, at)
         if pt:
             lat, lng = pt
-    flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort)
+            near_src = "at"
+    has_place = False
+    try:
+        from bot.services import places
+        my_place = await places.get_point(user_id)
+        has_place = bool(my_place)
+        if not near_src and my_place and place:
+            # 常用位置 (我的) is the default centre for 附近 / 距我近; never echoed back
+            lat, lng = my_place
+            near_src = "place"
+    except Exception:
+        logger.exception("load place failed")
+    flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort,
+                 exact_center=near_src != "at")
     sort = flt.sort
     pins = []
     try:
@@ -205,7 +220,7 @@ async def api_home(
             card = _ser_card(x if computed else await _with_shop(x))
             if flt.center:
                 # rounded estimate only; listing coordinates never leave the server
-                card["distance"] = distance_label(flt.distance(x))
+                card["distance"] = flt.label(x)
             safe_items.append(card)
         except Exception:
             logger.exception("serialize lamp failed")
@@ -235,7 +250,8 @@ async def api_home(
         "sort": sort,
         "districts": districts,
         "filters": {"price": price or "", "tags": flt.tags, "open": int(flt.open_only),
-                    "radius": flt.radius, "near": bool(flt.center), "active": flt.active_count(area_key)},
+                    "radius": flt.radius, "near": bool(flt.center), "active": flt.active_count(area_key),
+                    "near_src": near_src if flt.center else "", "has_place": has_place},
         "count": len(safe_items),
         "limit": limit,
         "offset": offset,
@@ -298,7 +314,7 @@ async def api_home_facets(city: Optional[str] = None, user_id: int = Depends(get
         "price_bands": ff.price_bands([p for p, _t, _d, _a in rows if p]),
         "unpriced": sum(1 for p, _t, _d, _a in rows if not p),
         "tags": ff.top_tags([t for _p, t, _d, _a in rows], n=12),
-        "radii": list(ff.RADII),
+        "radii": list(ff.RADII_PINNED if any(a is not None for _p, _t, _d, a in rows) else ff.RADII),
         "geo_districts": [{"key": k} for k in geo],
         "located": located,
     }

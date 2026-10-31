@@ -181,6 +181,8 @@
       tags: ($("#pubTags")?.value || "").trim().split(/\s+/).filter(Boolean).slice(0, 5),
       description: ($("#pubDesc")?.value || "").trim(), media, extras,
     };
+    const pin = window.__yycjPubPin ? window.__yycjPubPin() : null;   // 地图选点 (place-pick.js)
+    if (pin) { body.approx_lat = pin.lat; body.approx_lng = pin.lng; }
     const hb = hoursBox();
     if (hb && window.yycjHours) body.hours = window.yycjHours.get(hb);
     const digits = (body.price_text || "").replace(/\D/g, "");
@@ -191,6 +193,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "提交失败");
       uploaded = [];
+      try { window.__yycjPubPinDone && window.__yycjPubPinDone(); } catch (e) {}
       if ($("#editLampId")) $("#editLampId").value = "";
       form.reset();
       if (hb && window.yycjHours) window.yycjHours.set(hb, []);

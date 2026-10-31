@@ -24,7 +24,7 @@
   }
   function setFilt(patch) {
     const o = Object.assign({}, getFilt(), patch || {});
-    ["price", "tags", "open", "radius", "at", "lat", "lng"].forEach((k) => { if (!o[k]) delete o[k]; });
+    ["price", "tags", "open", "radius", "at", "lat", "lng", "np"].forEach((k) => { if (!o[k]) delete o[k]; });
     try {
       if (Object.keys(o).length) sessionStorage.setItem(filtKey(), JSON.stringify(o));
       else sessionStorage.removeItem(filtKey());
@@ -35,12 +35,14 @@
     const f = getFilt();
     return [getArea(), f.price, f.tags, f.open, f.radius].filter(Boolean).length;
   }
-  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false;
+  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, hasPlace = false;
+  // 常用位置 (我的) is the default centre: the server applies it when no lat/lng/区 is sent; np=1 turns it off for this session
+  function placeOn(f) { f = f || getFilt(); return hasPlace && !f.np && !(f.lat && f.lng) && !f.at; }
   function token() { return localStorage.getItem("yycj_token") || ""; }
   function cacheKey(city, qq) {
     const f = getFilt();
     return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort()
-      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "");
+      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "") + "_" + (f.np || "");
   }
   function readCache(city, qq) {
     try {
@@ -177,6 +179,7 @@
     carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
     lastPins = q ? [] : (data.pins || []);
     if (data.districts) lastAreas = data.districts;
+    if (data.filters) hasPlace = !!data.filters.has_place;
     paintArea();
     const batch = data.items || [];
     lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
@@ -213,6 +216,7 @@
       if (f.radius) params.set("radius", String(f.radius));
       if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
       else if (f.at) params.set("at", f.at);
+      if (f.np) params.set("place", "0");
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -258,14 +262,19 @@
       "<button type=\"button\" class=\"area-chip" + (pickedTags.has(t.tag) ? " on" : "") + "\" data-tag=\"" + esc(t.tag) + "\">" + esc(t.tag) + "<i>" + t.count + "</i></button>"
     ).join("") || "<span class=\"muted\">暂无标签</span>";
     const openChip = "<button type=\"button\" class=\"area-chip" + (f.open ? " on" : "") + "\" data-open=\"1\">营业中</button>";
-    const hasLoc = !!(f.lat && f.lng) || !!f.at;
+    const usePlace = placeOn(f);
+    const hasLoc = !!(f.lat && f.lng) || !!f.at || usePlace;
+    const radii = (facets.radii && facets.radii.length) ? facets.radii : [3, 5, 10];
+    const locLbl = f.at ? ("以" + f.at + "为中心") : (f.lat && f.lng) ? "已定位" : usePlace ? "常用位置" : "用我的位置";
     const nearRow = "<div class=\"filt-row\"><span class=\"sort-k\">附近</span>" +
-      "<button type=\"button\" class=\"sort-opt" + (hasLoc ? " on" : "") + "\" data-loc=\"1\">" + (hasLoc ? (f.at ? ("以" + f.at + "为中心") : "已定位") : "用我的位置") + "</button>" +
+      (hasPlace && !usePlace ? "<button type=\"button\" class=\"sort-opt\" data-loc=\"place\">常用位置</button>" : "") +
+      "<button type=\"button\" class=\"sort-opt" + (hasLoc ? " on" : "") + "\" data-loc=\"1\">" + locLbl + "</button>" +
+      (usePlace ? "<button type=\"button\" class=\"sort-opt\" data-loc=\"gps\">用当前定位</button>" : "") +
       (hasLoc ? "<button type=\"button\" class=\"sort-opt\" data-loc=\"0\">清除</button>" : "") + "</div>" +
-      (hasLoc ? "<div class=\"area-chips\">" + [3,5,10].map((r) =>
-        "<button type=\"button\" class=\"area-chip" + (String(f.radius) === String(r) ? " on" : "") + "\" data-radius=\"" + r + "\">" + r + "km</button>"
+      (hasLoc ? "<div class=\"area-chips\">" + radii.map((r) =>
+        "<button type=\"button\" class=\"area-chip" + (String(f.radius) === String(r) ? " on" : "") + "\" data-radius=\"" + r + "\">" + r + "km" + (Number(r) === 1 ? "内" : "") + "</button>"
       ).join("") + "</div>" : (facets.geo_districts && facets.geo_districts.length
-        ? "<div class=\"area-chips near-pick\"><span class=\"muted\" style=\"width:100%\">或选一个区作中心：</span>" +
+        ? "<div class=\"area-chips near-pick\"><span class=\"muted\" style=\"width:100%\">或选一个区作中心" + (hasPlace ? "" : "（也可以在「我的 · 常用位置」设一个）") + "：</span>" +
           facets.geo_districts.map((g) => "<button type=\"button\" class=\"area-chip" + (f.at === g.key ? " on" : "") + "\" data-at=\"" + esc(g.key) + "\">" + esc(g.key) + "</button>").join("") + "</div>"
         : ""));
     panel.innerHTML = sortRow +
@@ -288,7 +297,10 @@
   function askLocation() {
     if (locBusy) return;
     locBusy = true;
-    const done = (lat, lng) => { setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "" }); locBusy = false; paintArea(); };
+    const done = (lat, lng) => {
+      try { const g = window.yycjPlace && window.yycjPlace.wgs2gcj(+lat, +lng); if (g) { lat = g[0]; lng = g[1]; } } catch (e) {}
+      setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "", np: "" }); locBusy = false; paintArea();
+    };
     const fail = () => { locBusy = false; paintArea(); try { window.__yycjToast && window.__yycjToast("定位失败，可选区作中心"); } catch (e) {} };
     try {
       const tg = window.Telegram && window.Telegram.WebApp;
@@ -360,9 +372,11 @@
     if (f.radius) params.set("radius", String(f.radius));
     if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
     else if (f.at) params.set("at", f.at);
+    if (f.np) params.set("place", "0");
     return "/api/home?" + params.toString();
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
+  window.__yycjPlaceChanged = function () { lastFacets = null; offset = 0; setFilt({ np: "" }); };
   window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
@@ -381,7 +395,7 @@
     if (sortBtn) {
       const v = sortBtn.getAttribute("data-sort") || "";
       setSort(v);
-      if (v === "near" && !(getFilt().lat || getFilt().at)) askLocation();
+      if (v === "near" && !(getFilt().lat || getFilt().at || placeOn())) askLocation();
       paintArea();
       return;
     }
@@ -402,13 +416,17 @@
     if (ev.target.closest && ev.target.closest("#areaPanel [data-open]")) {
       setFilt({ open: getFilt().open ? "" : "1" }); paintArea(); return;
     }
-    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { askLocation(); return; }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { if (!placeOn()) askLocation(); return; }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"gps\"]")) { askLocation(); return; }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"place\"]")) {
+      setFilt({ lat: "", lng: "", at: "", np: "" }); paintArea(); return;
+    }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"0\"]")) {
-      setFilt({ lat: "", lng: "", at: "", radius: "" }); if (getSort() === "near") setSort(""); paintArea(); return;
+      setFilt({ lat: "", lng: "", at: "", radius: "", np: hasPlace ? "1" : "" }); if (getSort() === "near") setSort(""); paintArea(); return;
     }
     const atChip = ev.target.closest && ev.target.closest("#areaPanel [data-at]");
     if (atChip) {
-      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", radius: getFilt().radius || "5" });
+      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", np: "", radius: getFilt().radius || "5" });
       paintArea(); return;
     }
     const radChip = ev.target.closest && ev.target.closest("#areaPanel [data-radius]");
