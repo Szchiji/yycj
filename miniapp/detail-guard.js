@@ -62,6 +62,10 @@
   }
   // same markup as app.js (so the xhs layout, tags, extras and share placement apply unchanged)
   function render(data, id) {
+    if (window.__yycjRenderDetail && window.__yycjRenderDetail(data, id)) {
+      try { if (!document.querySelector("#yycjGallery .yc-slide") && window.__yycjPaintGallery) window.__yycjPaintGallery(id); } catch (e) {}
+      return;
+    }
     const l = data.lamp || data.item || {};
     box.innerHTML = `<div class="card"><h3>${esc(l.title || "")}</h3><div class="muted">📍 ${esc(l.city || "")}${l.district ? " · " + esc(l.district) : ""}</div><div class="muted">💰 ${esc(l.price_text || "面议")}</div><p>${esc(l.description || "")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`;
     box.setAttribute("data-lamp", id);
