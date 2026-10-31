@@ -151,9 +151,10 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
     settings = await home_service.update_city_overrides(city, changes)
-    if any(k in changes for k in ("channel_directory", "directory_channel", "broadcast_channel")):
-        channel_features.resync_soon([city])
-    return _city_settings_payload(settings, city, rights)
+    # 按区目录: no post / delete now — the daily 12:00 refresh applies it (posts, moves or retires the message)
+    out = _city_settings_payload(settings, city, rights)
+    out["directory_applies_at"] = channel_features.applies_at()
+    return out
 
 
 class ChannelFeaturesBody(BaseModel):
@@ -166,7 +167,8 @@ class ChannelFeaturesBody(BaseModel):
 @router.get("/admin/channel-features")
 async def api_channel_features(_: int = Depends(get_super_user_id)) -> Dict[str, Any]:
     from bot.services import channel_features
-    return {"ok": True, **channel_features.overview(await home_service.get_or_create_settings())}
+    return {"ok": True, **channel_features.overview(await home_service.get_or_create_settings()),
+            "directory_applies_at": channel_features.applies_at()}
 
 
 @router.post("/admin/channel-features")
@@ -182,6 +184,7 @@ async def api_channel_features_save(body: ChannelFeaturesBody, _: int = Depends(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     settings = await home_service.update_settings(ops_config=changes or None)
-    if any(k in changes for k in ("channel_directory", "directory_channel")):
-        channel_features.resync_soon(None)
-    return {"ok": True, **channel_features.overview(settings)}
+    # applied at the next 12:00 refresh; cities inheriting these values are checked and only warned about
+    warnings = await channel_features.inherited_warnings(settings)
+    return {"ok": True, **channel_features.overview(settings), "warnings": warnings,
+            "directory_applies_at": channel_features.applies_at()}

@@ -61,7 +61,7 @@ CITY_KEYS = [
      "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
     {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
     {"key": "channel_directory", "label": "频道按区目录", "type": "bool",
-     "hint": "开 = 每天 12:00 更新一条本城的按区目录（只列本城的区和在架资料），花名直达详情；关掉会删掉旧目录（默认关）"},
+     "hint": "开 = 每天 12:00 更新一条本城的按区目录（只列本城的区和在架资料），花名直达详情；开关和换频道都在下一次 12:00 生效，关掉会删掉旧目录（默认关）"},
     {"key": "directory_channel", "label": "按区目录发到的频道", "type": "text", "max": 128, "super": True,
      "hint": "@频道名 或 -100…；空 = 用本城的推送频道。机器人必须是该频道管理员"},
     {"key": "broadcast_reviews", "label": "精选评价推送到频道", "type": "bool",

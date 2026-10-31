@@ -92,6 +92,37 @@ def overview(site: Dict[str, Any]) -> Dict[str, Any]:
     return {"global": g, "cities": rows}
 
 
+def applies_at(now=None) -> str:
+    """按区目录 changes are applied by the daily 12:00 (Asia/Shanghai) refresh, not on save."""
+    from datetime import datetime, timedelta, timezone
+    bj = (now or datetime.now(timezone.utc)).astimezone(timezone(timedelta(hours=8)))
+    return "今天 12:00" if bj.hour < 12 else "明天 12:00"
+
+
+async def inherited_warnings(site: Dict[str, Any]) -> List[Dict[str, str]]:
+    """After a 全站默认 save: check every enabled city's effective channel. Warn, never block."""
+    from bot.services.broadcast import check_post_rights
+    seen: Dict[str, str] = {}
+    out: List[Dict[str, str]] = []
+    for city in site.get("enabled_cities") or []:
+        eff = ops_for_city(site, city)
+        for feat in FEATURE_CHANNEL:
+            if not eff.get(feat):
+                continue
+            chat = feature_chat(eff, feat)
+            if not chat:
+                out.append({"city": city, "feature": LABELS[feat], "chat": "", "error": "没有频道"})
+                continue
+            if chat not in seen:
+                try:
+                    seen[chat] = await check_post_rights(chat)
+                except Exception as exc:  # network etc. — still only a warning
+                    seen[chat] = f"检查 {chat} 失败：{exc}"[:120]
+            if seen[chat]:
+                out.append({"city": city, "feature": LABELS[feat], "chat": chat, "error": seen[chat]})
+    return out
+
+
 def resync_soon(cities: Optional[List[str]] = None) -> None:
     """Refresh (or retire) the directory right after a settings change, in the background."""
     async def run():

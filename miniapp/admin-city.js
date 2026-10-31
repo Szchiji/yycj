@@ -211,6 +211,17 @@
     const ch = x.on ? (x.chat ? `<code>${esc(x.chat)}</code> <span class="muted">${esc(VIA[x.via] || "")}</span>` : `<span class="cf-warn">没有频道</span>`) : "";
     return `${st} ${src}<div class="cf-ch">${ch}</div>`;
   }
+  // Asia/Shanghai: before 12:00 → 今天 12:00, else 明天 12:00 (same rule as the server)
+  function nextNoon() {
+    const bj = new Date(Date.now() + 8 * 3600e3);
+    return bj.getUTCHours() < 12 ? "今天 12:00" : "明天 12:00";
+  }
+  window.__yycjNextNoon = nextNoon;
+  function warnHtml(list) {
+    if (!list || !list.length) return "";
+    return `<div class="cf-warns"><b>已保存，但这些城市沿用的频道有问题（不影响保存）：</b><ul>` +
+      list.map((w) => `<li>${tagHtml(w.city)} ${esc(w.feature)}${w.chat ? ` <code>${esc(w.chat)}</code>` : ""}：${esc(w.error)}</li>`).join("") + "</ul></div>";
+  }
   function featHtml() {
     const f = S.feat;
     if (!f) { setTimeout(() => loadFeat(), 0); return `<h4 style="margin-top:14px">频道按区目录 · 精选评价</h4><p class="muted">读取中…</p>`; }
@@ -224,8 +235,10 @@
     return `<h4 style="margin-top:14px">频道按区目录 · 精选评价</h4>
       <p class="muted cc-lead">全站默认：没单独设的城市都用这里。每个城市的目录只列它自己的区和在架资料。机器人必须是频道管理员，保存时会检查。</p>
       ${row(g.channel_directory, "cfDirOn", g.directory_channel, "cfDirCh", "频道按区目录", "每天 12:00 更新同一条；关掉或换频道会删掉旧目录。")}
+      <p class="cf-when">⏱ 按区目录的改动保存后不会马上发到频道，将在${esc(nextNoon())}生效。</p>
       ${row(g.broadcast_reviews, "cfRevOn", g.review_channel, "cfRevCh", "精选评价推送到频道", "审核通过的 4–5 星评价，只发文字，不发凭证。")}
       <button class="btn primary" type="button" data-cc="save-feat">保存这两项</button>
+      ${warnHtml(S.featWarn)}
       ${table ? `<table class="cf-table"><thead><tr><th>城市</th><th>按区目录</th><th>精选评价</th><th></th></tr></thead><tbody>${table}</tbody></table>` : ""}`;
   }
   // per-city overrides: GET/POST /api/admin/cities/settings
@@ -263,7 +276,7 @@
     const badge = has ? `<span class="cc-badge own">本城市</span>` : `<span class="cc-badge">沿用全站</span>`;
     const clear = has && !lock ? `<button class="btn cc-clear" type="button" data-cc="clear" data-k="${k.key}">清除</button>` : "";
     const note = k.super && !cfg.can_edit_super ? `<span class="cc-lock">只有超管能改</span>` : "";
-    return `<div class="cc-f${has ? " own" : ""}"><div class="cc-fh"><label for="${id}">${esc(k.label)}</label>${badge}${note}${clear}</div>${input}${k.hint ? `<p class="cc-hint">${esc(k.hint)}</p>` : ""}</div>`;
+    return `<div class="cc-f${has ? " own" : ""}"><div class="cc-fh"><label for="${id}">${esc(k.label)}</label>${badge}${note}${clear}</div>${input}${k.hint ? `<p class="cc-hint">${esc(k.hint)}</p>` : ""}${k.key === "channel_directory" || k.key === "directory_channel" ? `<p class="cf-when">⏱ 保存后不会马上发到频道，将在${esc(nextNoon())}生效</p>` : ""}</div>`;
   }
   // ---- merged 站点设置 layout -------------------------------------------------------
   // The 12 city-capable settings live in ONE place: the 城市设置 card. Under 全站默认 the card holds the
@@ -522,8 +535,8 @@
           channel_directory: !!document.getElementById("cfDirOn")?.checked, directory_channel: v("cfDirCh"),
           broadcast_reviews: !!document.getElementById("cfRevOn")?.checked, review_channel: v("cfRevCh"),
         });
-        S.feat = d; S.cfg = {};
-        alert("已保存：频道按区目录 · 精选评价");
+        S.feat = d; S.cfg = {}; S.featWarn = d.warnings || [];
+        alert("已保存。按区目录将在" + (d.directory_applies_at || nextNoon()) + "生效" + (S.featWarn.length ? "；有 " + S.featWarn.length + " 个城市的频道需要检查，见下方" : ""));
       } else if (b.dataset.cc === "save-ops") {
         const map = {};
         document.querySelectorAll("#cityCard [data-op]").forEach((inp) => {

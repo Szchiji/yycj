@@ -100,7 +100,12 @@ def test_channel_features():
                 zh = [x for x in r.json()["cities"] if x["city"] == "珠海"][0]
                 assert zh["channel_directory"]["chat"] == "@ok_push" and zh["channel_directory"]["via"] == "site_push"
                 assert zh["broadcast_reviews"]["chat"] == "@ok_rev" and zh["broadcast_reviews"]["via"] == "site"
-                await asyncio.sleep(0.3)   # background resync posted one directory per city
+                assert r.json()["directory_applies_at"] in ("今天 12:00", "明天 12:00")
+                # site-wide save: inherited channels checked per city, only warnings
+                assert r.json()["warnings"] == []
+                await asyncio.sleep(0.2)
+                assert not fake.calls   # nothing posted on save — applied at 12:00
+                await channel_directory.job_refresh_all()
                 posted = {x[1]: x[2] for x in fake.calls if x[0] == "send"}
                 assert "@ok_push" in posted
                 texts = [x[2] for x in fake.calls if x[0] == "send"]
@@ -114,19 +119,29 @@ def test_channel_features():
                 fake.calls.clear()
                 r = await c.post("/api/admin/cities/settings", json={"city": "珠海", "overrides": {"directory_channel": "@ok_zh"}}, headers=h)
                 assert r.status_code == 200, r.text
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.2)
+                assert not fake.calls
+                await channel_directory.job_refresh_all()
                 kinds = [(k, ch) for k, ch, _t, _m in fake.calls]
                 assert ("delete", "@ok_push") in kinds and ("send", "@ok_zh") in kinds
                 # the daily job edits the same message, per city
                 fake.calls.clear()
                 await channel_directory.job_refresh_all()
                 assert sorted((k, ch) for k, ch, _t, _m in fake.calls) == [("edit", "@ok_push"), ("edit", "@ok_zh")]
+                # a city that inherits a broken channel → warning on 全站 save, save still OK
+                await home_service.update_city_overrides("佛山", {"broadcast_channel": "@someone"})
+                r = await cf({"broadcast_reviews": True})
+                assert r.status_code == 200
+                w = r.json()["warnings"]
+                assert w and w[0]["city"] == "佛山" and "不是" in w[0]["error"], w
+                await home_service.update_city_overrides("佛山", {"broadcast_channel": None})
                 # 珠海 switched off → its directory is deleted; 佛山 keeps going
                 fake.calls.clear()
                 r = await c.post("/api/admin/cities/settings", json={"city": "珠海", "overrides": {"channel_directory": False}}, headers=h)
-                assert r.status_code == 200
-                await asyncio.sleep(0.3)
-                assert [(k, ch) for k, ch, _t, _m in fake.calls] == [("delete", "@ok_zh")]
+                assert r.status_code == 200 and r.json()["directory_applies_at"]
+                fake.calls.clear()
+                await channel_directory.job_refresh_all()
+                assert ("delete", "@ok_zh") in [(k, ch) for k, ch, _t, _m in fake.calls]
                 o = (await c.get("/api/admin/channel-features", headers=h)).json()
                 zh = [x for x in o["cities"] if x["city"] == "珠海"][0]
                 assert zh["channel_directory"]["on"] is False and zh["channel_directory"]["own_switch"] is True
@@ -140,7 +155,7 @@ def test_channel_features():
                 fake.calls.clear()
                 r = await cf({"channel_directory": False, "broadcast_reviews": False})
                 assert r.status_code == 200
-                await asyncio.sleep(0.3)
+                await channel_directory.job_refresh_all()
                 assert ("delete", "@ok_push") in [(k, ch) for k, ch, _t, _m in fake.calls]
         finally:
             m.bot = real
