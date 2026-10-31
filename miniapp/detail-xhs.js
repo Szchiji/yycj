@@ -175,12 +175,25 @@ body.xhs-detail #xhsTop{display:grid;}
       if (!view.classList.contains("hidden")) goBack();
     });
   } catch (e) {}
-  let busy = false;
-  new MutationObserver(() => {
-    if (busy) return;
-    busy = true;
-    try { decorate(); syncName(); } finally { Promise.resolve().then(() => { busy = false; }); }
-  }).observe(view, { childList: true, subtree: true });
+  // Re-run on every change; never drop one. The old "busy" flag ignored any mutation that landed in
+  // the same microtask burst as a decorate pass, so when the info card was re-rendered right after
+  // (app.js rendering after another script painted), the new card stayed undecorated: no avatar
+  // row, no bottom bar. decorate() is idempotent, so its own changes cost one no-op pass.
+  let queued = false, passes = 0, since = 0, trail = 0;
+  function run() {
+    queued = false;
+    try { decorate(); syncName(); } catch (e) { try { window.__yycjReport && window.__yycjReport({ ev: "js_error", msg: String(e && e.message || e), src: "detail-xhs.js:decorate" }); } catch (x) {} }
+  }
+  function schedule() {
+    if (queued) return;
+    const now = Date.now();
+    if (now - since > 1000) { since = now; passes = 0; }
+    if (++passes > 25) { clearTimeout(trail); trail = setTimeout(run, 300); return; } // loop safety
+    queued = true;
+    Promise.resolve().then(run);
+  }
+  new MutationObserver(schedule).observe(view, { childList: true, subtree: true });
+  window.__yycjDecorateDetail = run;
   new MutationObserver(syncBody).observe(view, { attributes: true, attributeFilter: ["class"] });
   syncBody();
 })();
