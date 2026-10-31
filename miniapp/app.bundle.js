@@ -270,7 +270,7 @@ try {
 ;} catch (e) { try { console.error("resilience.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "resilience.js" }); } catch (x) {} }
 /* ---- app.js ---- */
 try {
-(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor("#0F2420")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],i.scoringRules=n.scoring_rules,n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"} · 兰花令 ${i.user.tier||""}`:"";const c=n.announcement,o=a("#announce");c&&c.text?(o.classList.remove("hidden"),o.innerHTML=`<span>${s(c.text)}</span>`):o.classList.add("hidden");try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:window.__yycjRevPhotos?window.__yycjRevPhotos():[]})}),window.__yycjRevReset&&window.__yycjRevReset(),c(window.__yycjRevDoneMsg||"评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
+(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor("#0F2420")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],i.scoringRules=n.scoring_rules,n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"} · 兰花令 ${i.user.tier||""}`:"";const c=n.announcement,o=a("#announce");c&&c.text?(o.classList.remove("hidden"),o.innerHTML=`<span>${s(c.text)}</span>`):o.classList.add("hidden");try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();if(window.__yycjSubmitReview)return void window.__yycjSubmitReview({go:g,refresh:S});try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:window.__yycjRevPhotos?window.__yycjRevPhotos():[]})}),window.__yycjRevReset&&window.__yycjRevReset(),c(window.__yycjRevDoneMsg||"评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
 ;} catch (e) { try { console.error("app.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "app.js" }); } catch (x) {} }
 /* ---- home-ui.js ---- */
 try {
@@ -2535,18 +2535,32 @@ body.rev-open #view-review{padding-top:calc(var(--rv-top-h) + 4px);}`;
 /* ---- review-kit.js ---- */
 try {
 (() => {
-  // 写评价：点星打分（替代数字框，数值仍写回 #revStars）+ 最多 3 张晒图（/api/media/upload?purpose=review）。
+  // 写评价：点星打分（数值写回 #revStars）+ 最多 3 张晒图 + 提交（加载状态、成功/失败一定有提示）。
   if (window.__yycjReviewKit) return;
   window.__yycjReviewKit = true;
   const MAX = 3;
   const LABELS = ["", "很差", "一般", "还行", "满意", "超赞"];
   let photos = [];
   let busy = 0;
+  let sending = false;
   const token = () => localStorage.getItem("yycj_token") || "";
   const $ = (s) => document.querySelector(s);
-  function toast(msg) {
+  function report(ev, extra) { try { window.__yycjReport && window.__yycjReport(Object.assign({ ev }, extra || {})); } catch (e) {} }
+  function toast(msg, err) {
     const t = document.getElementById("toast");
-    if (t) { t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._rk); t._rk = setTimeout(() => t.classList.add("hidden"), 2200); }
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.remove("hidden");
+    t.classList.toggle("err", !!err);
+    clearTimeout(t._rk);
+    t._rk = setTimeout(() => t.classList.add("hidden"), err ? 4000 : 2800);
+  }
+  // message line inside the form, right under the submit button: visible even if a toast is missed
+  function say(msg, kind) {
+    const el = $("#rkMsg");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.className = "rk-msg" + (kind ? " " + kind : "");
   }
   function paintStars() {
     const box = $("#rkStars");
@@ -2554,8 +2568,7 @@ try {
     if (!box || !inp) return;
     const v = Math.max(1, Math.min(5, parseInt(inp.value, 10) || 5));
     box.querySelectorAll("[data-star]").forEach((b) => {
-      const on = Number(b.getAttribute("data-star")) <= v;
-      b.classList.toggle("on", on);
+      b.classList.toggle("on", Number(b.getAttribute("data-star")) <= v);
       b.setAttribute("aria-checked", Number(b.getAttribute("data-star")) === v ? "true" : "false");
     });
     const l = $("#rkStarLbl");
@@ -2565,28 +2578,120 @@ try {
     const box = $("#rkPhotos");
     if (!box) return;
     const cells = photos.map((p, i) => `<div class="rk-ph"><img src="${p.preview}" alt="" /><button type="button" class="rk-x" data-rk-del="${i}" aria-label="删除">×</button></div>`);
-    if (photos.length + busy < MAX) cells.push(`<label class="rk-add${busy ? " busy" : ""}"><input type="file" accept="image/*" multiple hidden id="rkFile" /><span>${busy ? "上传中…" : "+ 晒图"}</span><i>${photos.length}/${MAX}</i></label>`);
-    else if (busy) cells.push(`<div class="rk-add busy"><span>上传中…</span></div>`);
+    if (busy) cells.push(`<div class="rk-add busy"><span>上传中…</span></div>`);
+    else if (photos.length < MAX) cells.push(`<label class="rk-add"><input type="file" accept="image/*" multiple hidden id="rkFile" /><span>+ 晒图</span><i>${photos.length}/${MAX}</i></label>`);
     box.innerHTML = cells.join("");
+  }
+  function paintBtn() {
+    const btn = $("#reviewForm button[type=submit]");
+    if (!btn) return;
+    if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+    btn.disabled = sending;
+    btn.classList.toggle("rk-sending", sending);
+    btn.textContent = sending ? "提交中…" : btn.dataset.label;
+  }
+  // iPhone photos are often 3–12 MB: shrink to ≤1600px JPEG before upload (falls back to the original file)
+  async function shrink(file) {
+    try {
+      if (!file || !/^image\//.test(file.type || "image/") || file.size < 600 * 1024) return file;
+      const url = URL.createObjectURL(file);
+      try {
+        const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url; });
+        const k = Math.min(1, 1600 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * k));
+        c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+        if (!blob || blob.size >= file.size) return file;
+        return new File([blob], (file.name || "photo").replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+      } finally { URL.revokeObjectURL(url); }
+    } catch (e) { return file; }
   }
   async function upload(files) {
     const list = [...files].slice(0, MAX - photos.length);
     if (!list.length) return;
     busy = list.length;
     paintPhotos();
+    say("");
     try {
       const fd = new FormData();
-      list.forEach((f) => fd.append("files", f));
-      const r = await fetch("/api/media/upload?purpose=review", { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd });
+      for (const f of list) { const g = await shrink(f); fd.append("files", g, g.name || "photo.jpg"); }
+      const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const tm = setTimeout(() => ctl && ctl.abort(), 60000);
+      let r;
+      try { r = await fetch("/api/media/upload?purpose=review", { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd, signal: ctl ? ctl.signal : undefined }); }
+      finally { clearTimeout(tm); }
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.detail || "上传失败");
+      if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "图片上传失败（" + r.status + "）");
       (d.items || []).forEach((it) => { if (photos.length < MAX) photos.push({ url: it.url || it.file_id, preview: it.preview_url || "" }); });
+      if (!(d.items || []).length) throw new Error("图片上传失败，请换一张试试");
     } catch (e) {
-      toast(e.message || "上传失败");
+      const m = e && e.name === "AbortError" ? "图片上传超时，请检查网络后重试" : (e && e.message) || "图片上传失败";
+      toast(m, true); say(m, "err");
+      report("review_upload_fail", { msg: String(m).slice(0, 120) });
     } finally {
       busy = 0;
       paintPhotos();
     }
+  }
+  function errText(status, detail) {
+    const d = typeof detail === "string" ? detail : "";
+    if (status === 403 && /客人/.test(d)) return "评价需以客人身份提交：请到「我的」切换为「客人」后再评价";
+    if (status === 401) return "登录已过期，请关闭小程序后重新打开";
+    if (status === 429) return "提交太频繁了，请稍后再试";
+    if (status === 404) return "这条资料已下架，无法评价";
+    if (status >= 500) return "服务器开小差了，评价没提交成功，请稍后重试";
+    if (d) return "提交失败：" + d;
+    return "提交失败（" + status + "），请重试";
+  }
+  async function submit(ctx) {
+    if (sending) return;
+    if (busy) { const m = "图片还在上传，请稍等几秒再提交"; toast(m, true); say(m, "err"); return; }
+    const lamp = ($("#revLampId") && $("#revLampId").value) || "";
+    if (!lamp) { const m = "没有找到要评价的资料，请返回重试"; toast(m, true); say(m, "err"); return; }
+    sending = true; paintBtn(); say("");
+    const pics = photos.map((p) => p.url).filter(Boolean);
+    try {
+      const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const tm = setTimeout(() => ctl && ctl.abort(), 20000);
+      let r;
+      try {
+        r = await fetch("/api/reviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
+          body: JSON.stringify({ lamp_id: lamp, stars: parseInt(($("#revStars") || {}).value, 10) || 5, text: (($("#revText") || {}).value || "").trim(), photos: pics }),
+          signal: ctl ? ctl.signal : undefined,
+        });
+      } finally { clearTimeout(tm); }
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const m = errText(r.status, d && d.detail);
+        toast(m, true); say(m, "err");
+        report("review_fail", { status: r.status, msg: String(m).slice(0, 120) });
+        return;
+      }
+      const pending = (d.review && d.review.status) === "pending";
+      const m = pending ? "已提交，需管理员审核后展示" : "评价已提交";
+      reset();
+      sending = false; paintBtn();
+      toast(m);
+      try { ctx && ctx.go && ctx.go("me"); } catch (e) {}
+      try { ctx && ctx.refresh && (await ctx.refresh()); } catch (e) {}
+    } catch (e) {
+      const m = e && e.name === "AbortError" ? "网络超时，评价没提交成功，请重试" : "网络不稳定，评价没提交成功，请重试";
+      toast(m, true); say(m, "err");
+      report("review_fail", { status: 0, msg: String((e && e.message) || e).slice(0, 120) });
+    } finally {
+      sending = false; paintBtn();
+    }
+  }
+  function reset() {
+    photos = [];
+    const inp = $("#revStars"); if (inp) inp.value = "5";
+    const t = $("#revText"); if (t) t.value = "";
+    say("");
+    paintStars(); paintPhotos();
   }
   function mount() {
     const form = $("#reviewForm");
@@ -2608,6 +2713,12 @@ try {
     ph.id = "rkPhotos";
     ph.className = "rk-photos";
     (txt || stars).insertAdjacentElement("afterend", ph);
+    const msg = document.createElement("div");
+    msg.id = "rkMsg";
+    msg.className = "rk-msg";
+    msg.setAttribute("role", "status");
+    msg.setAttribute("aria-live", "polite");
+    form.appendChild(msg);
     paintStars();
     paintPhotos();
   }
@@ -2617,9 +2728,12 @@ try {
     const del = ev.target.closest && ev.target.closest("[data-rk-del]");
     if (del) { photos.splice(Number(del.getAttribute("data-rk-del")), 1); paintPhotos(); }
   });
-  document.addEventListener("change", (ev) => { if (ev.target && ev.target.id === "rkFile") upload(ev.target.files || []); });
+  document.addEventListener("change", (ev) => {
+    if (ev.target && ev.target.id === "rkFile") { const f = [...(ev.target.files || [])]; ev.target.value = ""; upload(f); }
+  });
+  window.__yycjSubmitReview = submit;
   window.__yycjRevPhotos = () => photos.map((p) => p.url).filter(Boolean);
-  window.__yycjRevReset = () => { window.__yycjRevDoneMsg = photos.length ? "评价已提交，带图评价需管理员审核后展示" : ""; photos = []; const inp = $("#revStars"); if (inp) inp.value = "5"; const t = $("#revText"); if (t) t.value = ""; paintStars(); paintPhotos(); };
+  window.__yycjRevReset = reset;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
 })();
 ;} catch (e) { try { console.error("review-kit.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "review-kit.js" }); } catch (x) {} }
