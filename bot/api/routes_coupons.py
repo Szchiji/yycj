@@ -81,7 +81,7 @@ async def api_my_coupon_code(code: str = "", user_id: int = Depends(get_current_
 
 @router.get("/me/claims")
 async def api_my_claims(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
-    return {"ok": True, "items": await coupons.my_claims(user_id)}
+    return {"ok": True, **(await coupons.my_claims(user_id))}
 
 
 @router.get("/lamps/{lamp_id}/coupon")

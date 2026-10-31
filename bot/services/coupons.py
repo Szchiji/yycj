@@ -22,6 +22,10 @@ from bot.models_extra import Coupon, CouponClaim
 PRESET_DAYS = (1, 2, 3, 7)
 MAX_TEXT = 40
 MAX_QUOTA = 200
+# 「我的」里的整理规则（数据库里一直保留，后台统计不受影响）
+DONE_HIDE_DAYS = 7     # 客人：已用 / 已失效的券，过了这么多天就不再显示
+HISTORY_DAYS = 30      # 老师：往期优惠显示最近这么多天内结束的
+HISTORY_MAX = 5        # 老师：往期优惠最多显示几个
 _ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 
@@ -163,11 +167,51 @@ async def mine(user_id: int) -> Dict[str, Any]:
             rows = (await s.execute(select(CouponClaim, User.guest_alias).outerjoin(User, User.user_id == CouponClaim.user_id)
                                     .where(CouponClaim.coupon_id == c.coupon_id).order_by(CouponClaim.id.desc()))).all()
             claims = [{"code": cl.code, "who": alias or "客人", "used": bool(cl.used_at), "valid": code_valid(c, cl),
-                       "at": _iso(cl.created_at)} for cl, alias in rows]
+                       "state": claim_state(c, cl), "at": _iso(cl.created_at)} for cl, alias in rows]
+        history = await _history(s, user_id, c.coupon_id if c else None, _now())
         has_claims = (await s.execute(select(CouponClaim.id).join(Coupon, Coupon.coupon_id == CouponClaim.coupon_id)
                                       .where(Coupon.user_id == user_id).limit(1))).first() is not None
-        return {"current": public(c) if c else None, "claims": claims, "can_issue": has_lamp, "has_claims": has_claims,
+        return {"current": public(c) if c else None, "claims": claims, "history": history, "history_days": HISTORY_DAYS,
+                "can_issue": has_lamp, "has_claims": has_claims,
                 "presets": list(PRESET_DAYS), "max_text": MAX_TEXT, "max_quota": MAX_QUOTA}
+
+
+def claim_state(c: Coupon, cl: CouponClaim, now: Optional[datetime] = None) -> str:
+    """usable / used / void (expired or stopped)."""
+    if cl.used_at:
+        return "used"
+    return "usable" if code_valid(c, cl, now) else "void"
+
+
+def done_at(c: Coupon, cl: CouponClaim) -> Optional[datetime]:
+    """When a code stopped being usable: used_at, else the coupon's own end time (also for 停用)."""
+    return cl.used_at or c.ends_at
+
+
+def _history_status(c: Coupon, now: datetime) -> str:
+    if c.status == "stopped":
+        return "已停用"
+    if c.ends_at > now:
+        return "已提前结束 · 已领的券码" + left_label(c.ends_at, now).replace("还剩", "还能用")
+    return "已过期"
+
+
+async def _history(s, user_id: int, current_id: Optional[str], now: datetime) -> List[Dict[str, Any]]:
+    since = now - timedelta(days=HISTORY_DAYS)
+    q = select(Coupon).where(Coupon.user_id == user_id, Coupon.ends_at >= since)
+    if current_id:
+        q = q.where(Coupon.coupon_id != current_id)
+    olds = (await s.execute(q.order_by(Coupon.id.desc()).limit(HISTORY_MAX))).scalars().all()
+    out: List[Dict[str, Any]] = []
+    for c in olds:
+        rows = (await s.execute(select(CouponClaim, User.guest_alias).outerjoin(User, User.user_id == CouponClaim.user_id)
+                                .where(CouponClaim.coupon_id == c.coupon_id).order_by(CouponClaim.id.desc()))).all()
+        cls = [{"code": cl.code, "who": alias or "客人", "used": bool(cl.used_at), "valid": code_valid(c, cl, now),
+                "state": claim_state(c, cl, now), "can_undo": c.status != "stopped" and c.ends_at > now} for cl, alias in rows]
+        out.append({"coupon_id": c.coupon_id, "text": c.text, "ends_at": _iso(c.ends_at), "status": _history_status(c, now),
+                    "claimed": len(cls), "used": sum(1 for x in cls if x["used"]),
+                    "pending": sum(1 for x in cls if x["state"] == "usable"), "claims": cls})
+    return out
 
 
 async def mark_used(user_id: int, code: str, used: bool = True) -> bool:
@@ -249,17 +293,35 @@ async def claim(user_id: int, coupon_id: str) -> Dict[str, Any]:
     return out
 
 
-async def my_claims(user_id: int) -> List[Dict[str, Any]]:
+async def my_claims(user_id: int) -> Dict[str, Any]:
+    """客人「我的优惠券」: usable codes first; 已用 / 已失效 listed separately and hidden after DONE_HIDE_DAYS
+    (rows stay in the DB)."""
+    now = _now()
+    cut = now - timedelta(days=DONE_HIDE_DAYS)
     async with session_scope() as s:
         rows = (await s.execute(select(CouponClaim, Coupon, Lamp.title).join(Coupon, Coupon.coupon_id == CouponClaim.coupon_id)
                                 .outerjoin(Lamp, Lamp.lamp_id == Coupon.lamp_id)
-                                .where(CouponClaim.user_id == user_id).order_by(CouponClaim.id.desc()).limit(30))).all()
-    out = []
+                                .where(CouponClaim.user_id == user_id).order_by(CouponClaim.id.desc()).limit(100))).all()
+    usable: List[Dict[str, Any]] = []
+    done: List[Dict[str, Any]] = []
+    hidden = 0
     for cl, c, title in rows:
+        st = claim_state(c, cl, now)
         d = public(c, cl)
         d["title"] = title or ""
-        out.append(d)
-    return out
+        d["state"] = st
+        if st == "usable":
+            usable.append(d)
+            continue
+        when = done_at(c, cl)
+        if when and when < cut:
+            hidden += 1
+            continue
+        d["done_at"] = _iso(when)
+        done.append(d)
+    usable.sort(key=lambda x: x.get("ends_at") or "")   # soonest to expire first
+    done.sort(key=lambda x: x.get("done_at") or "", reverse=True)
+    return {"items": usable + done, "usable": len(usable), "done": len(done), "hidden": hidden, "hide_days": DONE_HIDE_DAYS}
 
 
 async def city_list(city: Optional[str], limit: int = 30) -> List[Dict[str, Any]]:
