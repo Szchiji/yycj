@@ -274,8 +274,8 @@ async def api_lamp_detail(
         r["created_at"] = _ser_dt(r.get("created_at"))
         r.pop("guest_id", None)
         r.pop("target_user_id", None)
-    from bot.services.listing_stats import record_view
-    await record_view(lamp_id, user_id, lamp.get("user_id"))
+    from bot.services.listing_stats import record_view_soon
+    record_view_soon(lamp_id, user_id, lamp.get("user_id"))
     out = _ser_lamp(lamp)
     if isinstance(out.get("extras"), dict):
         # internal state (_open_today, _remind_*, _bc_*) is not for the public detail page

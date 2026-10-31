@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 import pytest
 
 PG = os.environ.get("YYCJ_TEST_PG")
-pytestmark = pytest.mark.skipif(not PG, reason="YYCJ_TEST_PG not set")
+needs_pg = pytest.mark.skipif(not PG, reason="YYCJ_TEST_PG not set")
 
 
+@needs_pg
 def test_upgrades():
     os.environ["DATABASE_URL"] = PG
 
@@ -60,8 +61,25 @@ def test_upgrades():
             for uid in (9491, 9491, 9492, T):
                 assert (await c.get("/api/lamps/U-A", headers=tok(uid))).status_code == 200
             items = {x["lamp_id"]: x for x in (await c.get("/api/me/listings", headers=tok(T))).json()["items"]}
-            assert items["U-A"]["stats"] == {"views": 2, "views_7d": 2, "favs": 2, "favs_7d": 2, "contacts": 1, "contacts_7d": 1}, items["U-A"]["stats"]
+            await asyncio.sleep(0.3)  # views are counted fire-and-forget
+            items = {x["lamp_id"]: x for x in (await c.get("/api/me/listings", headers=tok(T))).json()["items"]}
+            assert items["U-A"]["stats"] == {"views": 3, "views_7d": 3, "favs": 2, "favs_7d": 2, "contacts": 1, "contacts_7d": 1}, items["U-A"]["stats"]
             assert items["U-B"]["stats"]["views"] == 0
+            # #6 photo reviews always pending, even with 评价需审核 off; plain ones follow the switch
+            await home_service.update_settings(ops_config={"review_require_audit": False})
+            r = await c.post("/api/reviews", json={"lamp_id": "U-B", "stars": 5, "text": "plain"}, headers=tok(9493))
+            assert r.json()["review"]["status"] == "approved", r.text
+            r = await c.post("/api/reviews", json={"lamp_id": "U-B", "stars": 4, "text": "pics", "photos": ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw", "AgACAgUAAxkBAAIBb2Vk4Zq9xQw"]}, headers=tok(9493))
+            assert r.status_code == 200, r.text
+            photo_rev = r.json()["review"]
+            assert photo_rev["status"] == "pending" and len(photo_rev["photos"]) == 3, r.text
+            pend = {x["review_id"]: x for x in (await c.get("/api/admin/reviews/pending", headers=tok(SUPER))).json()["items"]}
+            assert pend[photo_rev["review_id"]]["photos"] == ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw"]
+            await home_service.update_settings(ops_config={"review_require_audit": True})
+            r = await c.post("/api/admin/reviews/bulk", json={"ids": [photo_rev["review_id"]], "action": "approve"}, headers=tok(SUPER))
+            assert r.json()["done"] == [photo_rev["review_id"]]
+            det = (await c.get("/api/lamps/U-B", headers=tok(9493))).json()
+            assert any(x.get("photos") == ["AgACAgUAAxkBAAIBb2Vk1Zq9xQw", "AgACAgUAAxkBAAIBb2Vk2Zq9xQw", "AgACAgUAAxkBAAIBb2Vk3Zq9xQw"] for x in det["reviews"])
             # #6 bulk
             r = await c.post("/api/admin/reviews/bulk", json={"ids": ["UR3", "UR4", "nope"], "action": "approve"}, headers=tok(SUPER))
             assert r.status_code == 200 and sorted(r.json()["done"]) == ["UR3", "UR4"] and "nope" in r.json()["failed"], r.text
@@ -71,8 +89,8 @@ def test_upgrades():
             assert (await c.post("/api/admin/reviews/bulk", json={"ids": ["UR0"], "action": "approve"}, headers=tok(9491))).status_code in (401, 403)
             # #7 dashboard
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(SUPER))).json()
-            assert len(d["days"]) == 7 and d["totals"]["杭州"]["listings"] == 3 and d["totals"]["杭州"]["views"] == 2
-            assert d["totals"]["杭州"]["contacts"] == 1 and d["totals"]["杭州"]["reviews"] == 5, d["totals"]
+            assert len(d["days"]) == 7 and d["totals"]["杭州"]["listings"] == 3 and d["totals"]["杭州"]["views"] == 4
+            assert d["totals"]["杭州"]["contacts"] == 1 and d["totals"]["杭州"]["reviews"] == 7, d["totals"]
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(OP))).json()
             assert set(d["cities"]) <= {"苏州"}
             # #5 expiring list
@@ -96,7 +114,42 @@ def test_upgrades():
         finally:
             sys.modules["bot.main"] = real
         assert n2 == 0 and n1 >= 2, (n1, n2, sent)
-        assert any("明天就到期" in t and "「c」" in t for _, t in sent) and any("「d」还有约 2 天" in t for _, t in sent), sent
+        assert any(("明天到期" in t or "今天到期" in t) and "「c」" in t for _, t in sent) and any("「d」还有" in t and "天到期" in t for _, t in sent), sent
         await db.close_db()
 
     asyncio.run(run())
+
+
+def test_expiry_stage_and_schedule():
+    from datetime import datetime
+    from bot.services.expiry_nudge import _days_left, _stage
+    now = datetime(2026, 10, 31, 2, 0)  # 10:00 Beijing
+    assert _days_left(datetime(2026, 11, 3, 15, 0), now) == 3 and _stage(3) == "3d"
+    assert _days_left(datetime(2026, 11, 3, 17, 0), now) == 4 and _stage(4) is None   # 01:00 Nov 4 Beijing
+    assert _stage(2) == "3d" and _stage(1) == "1d" and _stage(0) == "1d"
+
+    import asyncio
+    from bot.services import bot_info
+
+    class Sched:
+        running = True
+        jobs = {}
+
+        def add_job(self, fn, trigger, **kw):
+            self.jobs[kw["id"]] = (trigger, kw)
+    sc = Sched()
+    calls = []
+
+    async def fake():
+        calls.append(1)
+    orig = bot_info.job_expiry_nudge
+    bot_info.job_expiry_nudge = fake
+    try:
+        asyncio.run(bot_info.startup_maintenance(sc))
+    except Exception:
+        pass
+    finally:
+        bot_info.job_expiry_nudge = orig
+    trig, kw = sc.jobs["expiry_nudge"]
+    assert trig == "cron" and kw["hour"] == 10 and kw["minute"] == 0 and kw["timezone"] == "Asia/Shanghai"
+    assert calls == []  # not run at startup (a deploy never sends reminders)

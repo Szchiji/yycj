@@ -1,4 +1,7 @@
-"""上架到期提醒：剩 3 天、剩 1 天各提醒老师一次（每个到期日各一次）。"""
+"""上架到期提醒：每天 10:00（北京时间）跑一次；按北京日历天数，剩 3 天、剩 1 天各提醒老师一次。
+
+去重：每个到期日一个标记（extras._expiry_nudge = 3 天档，_expiry_nudge_1d = 1 天档），
+续期后到期日变了才会再提醒。先发过 1 天档就不再补 3 天档。"""
 from __future__ import annotations
 
 from html import escape as _h
@@ -16,18 +19,25 @@ from bot.services.extras_store import load_extras, save_extras
 logger = logging.getLogger(__name__)
 
 
-def _stage(hours_left: float, days: int, last_day: int) -> str | None:
-    """Which reminder is due: "1d" inside the last day, "3d" inside the first window, else None."""
-    if hours_left <= last_day * 24:
+BJ = timedelta(hours=8)
+
+
+def _days_left(exp: datetime, now: datetime) -> int:
+    """Calendar days between today and the expiry date, both in Beijing time (exp/now are naive UTC)."""
+    return ((exp + BJ).date() - (now + BJ).date()).days
+
+
+def _stage(days_left: int, days: int = 3, last_day: int = 1) -> str | None:
+    if days_left <= last_day:
         return "1d"
-    if hours_left <= days * 24:
+    if days_left <= days:
         return "3d"
     return None
 
 
 async def nudge_expiring(days: int = 3, last_day: int = 1) -> int:
     now = datetime.utcnow()
-    until = now + timedelta(days=days)
+    until = now + timedelta(days=days + 1)
     sent = 0
     async with session_scope() as s:
         rows = (
@@ -50,7 +60,8 @@ async def nudge_expiring(days: int = 3, last_day: int = 1) -> int:
     admin_url = ""
     try:
         from bot.services import home_service
-        admin_url = str((await home_service.get_or_create_settings()).get("admin_contact") or "").strip()
+        from bot.services.bot_info import normalize_contact
+        admin_url = normalize_contact(str((await home_service.get_or_create_settings()).get("admin_contact") or ""))
     except Exception:
         admin_url = ""
     markup = None
@@ -61,8 +72,10 @@ async def nudge_expiring(days: int = 3, last_day: int = 1) -> int:
         lid = str(lamp.get("lamp_id") or "")
         uid = lamp.get("user_id")
         exp = lamp.get("expires_at")
-        hours_left = (exp - now).total_seconds() / 3600 if exp else days * 24
-        stage = _stage(hours_left, days, last_day)
+        if not exp or not uid:
+            continue
+        left = _days_left(exp, now)
+        stage = _stage(left, days, last_day)
         if not stage:
             continue
         extras: Dict[str, Any] = await load_extras(lid)
@@ -71,16 +84,25 @@ async def nudge_expiring(days: int = 3, last_day: int = 1) -> int:
         if extras.get(key) == mark:
             continue
         title = _h(str(lamp.get("title") or ""))
+        when = (exp + BJ).strftime("%m-%d %H:%M")
         if stage == "1d":
-            text = f"「{title}」明天就到期了（剩不到 24 小时），到期后会自动下架。联系管理员续期即可继续展示。"
+            day = "今天" if left <= 0 else "明天"
+            text = f"「{title}」{day}到期（{when}），到期后会自动下架。联系管理员续期即可继续展示。"
         else:
-            text = f"「{title}」还有约 {max(1, int(hours_left // 24))} 天到期。联系管理员续费后可以继续展示。"
+            text = f"「{title}」还有 {left} 天到期（{when}）。联系管理员续期后可以继续展示。"
+        # mark first, then send: a crash between the two can at worst skip a reminder, never double-send
+        extras[key] = mark
+        if stage == "1d":
+            extras["_expiry_nudge"] = mark
+        await save_extras(lid, extras)
         try:
-            await bot.send_message(int(uid), text, reply_markup=markup)
-            extras[key] = mark
-            if stage == "1d":
-                extras.setdefault("_expiry_nudge", mark)  # never send the 3-day one after the 1-day one
-            await save_extras(lid, extras)
+            try:
+                await bot.send_message(int(uid), text, reply_markup=markup)
+            except Exception as exc:
+                # a bad button (e.g. tg://user link Telegram refuses) must not cost the reminder itself
+                if markup is None or "button" not in str(exc).lower():
+                    raise
+                await bot.send_message(int(uid), text)
             sent += 1
         except Exception:
             logger.exception("expiry nudge failed %s", lid)

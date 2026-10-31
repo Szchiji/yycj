@@ -1,6 +1,7 @@
 """浏览 / 收藏 / 匿名联系 counts (teacher 我的上架) and the admin per-city daily dashboard.
 
-浏览 is the only new data (table lamp_views: one row per listing+viewer+day, owner excluded).
+浏览 is the only new data (table lamp_views: one counter per listing per Beijing day; every detail
+open counts, the owner's own opens don't).
 收藏 comes from favorites, 匿名联系 from sessions (one session = one 匿名联系 request), 评价 from reviews,
 新上架 from lamps.created_at; nothing existing is altered.
 """
@@ -20,19 +21,37 @@ from bot.models_extra import Favorite, LampView
 logger = logging.getLogger(__name__)
 
 
+BJ = timedelta(hours=8)
+
+
+def bj_today() -> date:
+    return (datetime.utcnow() + BJ).date()
+
+
 async def record_view(lamp_id: str, viewer_id: Optional[int], owner_id: Optional[int]) -> None:
-    """Count a detail open. Same viewer counts once per listing per day; the owner never counts."""
+    """Count a detail open (+1 on today's Beijing-day counter). The owner's own opens never count."""
     if not lamp_id or not viewer_id or (owner_id is not None and int(viewer_id) == int(owner_id)):
         return
     try:
         async with session_scope() as s:
-            await s.execute(
-                pg_insert(LampView)
-                .values(lamp_id=str(lamp_id), user_id=int(viewer_id), day=datetime.utcnow().date())
-                .on_conflict_do_nothing(constraint="uq_lamp_view_day")
-            )
+            stmt = pg_insert(LampView).values(lamp_id=str(lamp_id), day=bj_today(), views=1)
+            await s.execute(stmt.on_conflict_do_update(constraint="uq_lamp_views_day", set_={"views": LampView.views + 1}))
     except Exception:
         logger.exception("record view failed %s", lamp_id)
+
+
+_PENDING: set = set()
+
+
+def record_view_soon(lamp_id: str, viewer_id: Optional[int], owner_id: Optional[int]) -> None:
+    """Fire-and-forget so counting never slows the detail response."""
+    import asyncio
+    try:
+        t = asyncio.get_running_loop().create_task(record_view(lamp_id, viewer_id, owner_id))
+        _PENDING.add(t)
+        t.add_done_callback(_PENDING.discard)
+    except RuntimeError:
+        pass
 
 
 def _since(days: int) -> datetime:
@@ -47,7 +66,7 @@ async def stats_for_lamps(lamp_ids: Iterable[str], days: int = 7) -> Dict[str, D
     if not ids:
         return out
     since = _since(days)
-    since_day = since.date()
+    since_day = bj_today() - timedelta(days=days - 1)
     async with session_scope() as s:
         async def grouped(col_id, stmt_total, stmt_recent, key):
             for lid, n in (await s.execute(stmt_total)).all():
@@ -57,8 +76,8 @@ async def stats_for_lamps(lamp_ids: Iterable[str], days: int = 7) -> Dict[str, D
 
         await grouped(
             LampView.lamp_id,
-            select(LampView.lamp_id, func.count()).where(LampView.lamp_id.in_(ids)).group_by(LampView.lamp_id),
-            select(LampView.lamp_id, func.count()).where(LampView.lamp_id.in_(ids), LampView.day >= since_day).group_by(LampView.lamp_id),
+            select(LampView.lamp_id, func.sum(LampView.views)).where(LampView.lamp_id.in_(ids)).group_by(LampView.lamp_id),
+            select(LampView.lamp_id, func.sum(LampView.views)).where(LampView.lamp_id.in_(ids), LampView.day >= since_day).group_by(LampView.lamp_id),
             "views",
         )
         await grouped(
@@ -97,12 +116,11 @@ async def daily_dashboard(days: int = 14, cities: Optional[List[str]] = None) ->
         q = select(local_day(Lamp.created_at), Lamp.city, func.count()).where(Lamp.created_at >= start_utc).group_by(local_day(Lamp.created_at), Lamp.city)
         for d, c, n in (await s.execute(q)).all():
             bump(d, c, "listings", n)
-        # lamp_views.day is a UTC date; good enough for a daily trend (documented in the PR)
-        q = (select(LampView.day, Lamp.city, func.count()).join(Lamp, Lamp.lamp_id == LampView.lamp_id)
-             .where(LampView.day >= start - timedelta(days=1)).group_by(LampView.day, Lamp.city))
+        # lamp_views.day is already the Beijing calendar day
+        q = (select(LampView.day, Lamp.city, func.sum(LampView.views)).join(Lamp, Lamp.lamp_id == LampView.lamp_id)
+             .where(LampView.day >= start).group_by(LampView.day, Lamp.city))
         for d, c, n in (await s.execute(q)).all():
-            if d >= start:
-                bump(d, c, "views", n)
+            bump(d, c, "views", n)
         q = (select(local_day(Session.created_at), Lamp.city, func.count()).join(Lamp, Lamp.lamp_id == Session.lamp_id)
              .where(Session.created_at >= start_utc).group_by(local_day(Session.created_at), Lamp.city))
         for d, c, n in (await s.execute(q)).all():

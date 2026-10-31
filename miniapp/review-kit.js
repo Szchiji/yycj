@@ -83,6 +83,6 @@
   });
   document.addEventListener("change", (ev) => { if (ev.target && ev.target.id === "rkFile") upload(ev.target.files || []); });
   window.__yycjRevPhotos = () => photos.map((p) => p.url).filter(Boolean);
-  window.__yycjRevReset = () => { photos = []; const inp = $("#revStars"); if (inp) inp.value = "5"; const t = $("#revText"); if (t) t.value = ""; paintStars(); paintPhotos(); };
+  window.__yycjRevReset = () => { window.__yycjRevDoneMsg = photos.length ? "评价已提交，带图评价需管理员审核后展示" : ""; photos = []; const inp = $("#revStars"); if (inp) inp.value = "5"; const t = $("#revText"); if (t) t.value = ""; paintStars(); paintPhotos(); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
 })();
