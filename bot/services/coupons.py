@@ -4,7 +4,8 @@ Rules (kept small on purpose):
   · 一次发布 = 一批优惠，最多 MAX_ITEMS 项（比如「100P 2张 / 200PP 3张 / 500夜课 4张」），整批共用有效期。
   · 每位老师同一时间最多 1 批有效；发新的会自动结束旧的。可以随时提前结束（整批）。
   · 有效期 1 / 2 / 3 / 7 天；每项内容最多 40 字、数量 1–200 张（必填）。
-  · 客人每一项最多领 1 张（同一批不同项可以各领 1 张，每张一个码），某项领满即止；
+  · 每一批每位客人只能领 1 张（选其中一项），领到一个码；某项领满即止。
+    数据库 (batch_id, user_id) 唯一，加上领取时锁住整批，并发也领不到第二张。
     老师看得到谁领了哪一项、可以标记「已用」。
   · 不需要先审核：发出即显示，后台可以按城市查看并停用（整批）。
 """
@@ -422,23 +423,37 @@ async def live_lamp_ids(city: Optional[str]) -> Set[str]:
 
 
 async def claim(user_id: int, coupon_id: str) -> Dict[str, Any]:
-    """Claim one item. Returns the whole batch (with this item's my_code at the top level for one-item batches)."""
+    """Claim one item — at most ONE claim per guest per batch. Returns the whole batch
+    (with this item's my_code at the top level for one-item batches)."""
+    from sqlalchemy.exc import IntegrityError
     async with session_scope() as s:
-        c = (await s.execute(select(Coupon).where(Coupon.coupon_id == coupon_id).with_for_update())).scalar_one_or_none()
+        c = (await s.execute(select(Coupon).where(Coupon.coupon_id == coupon_id))).scalar_one_or_none()
         if not c:
             raise CouponError("优惠不存在")
         if c.user_id == user_id:
             raise CouponError("不能领自己的优惠")
-        had = (await s.execute(select(CouponClaim).where(CouponClaim.coupon_id == coupon_id, CouponClaim.user_id == user_id))).scalar_one_or_none()
+        key = bkey(c)
+        # lock every item of the batch (same order everywhere → no deadlock), then check this guest's claim in the batch
+        await s.execute(select(Coupon.id).where(_in_batch(key)).order_by(Coupon.id).with_for_update())
+        c = (await s.execute(select(Coupon).where(Coupon.coupon_id == coupon_id).execution_options(populate_existing=True))).scalar_one()
+        items_ids = [x for (x,) in (await s.execute(select(Coupon.coupon_id).where(_in_batch(key)))).all()]
+        had_any = (await s.execute(select(CouponClaim).where(CouponClaim.user_id == user_id, or_(
+            CouponClaim.batch_id == key, CouponClaim.coupon_id.in_(items_ids))).order_by(CouponClaim.id).limit(1))).scalar_one_or_none()
+        if had_any and had_any.coupon_id != coupon_id:
+            raise CouponError("本批优惠每人限领 1 张，你已经领过了")
+        had = had_any
         full = False
         if not had:
             if c.status != "active" or c.ends_at <= _now():
                 raise CouponError("这个优惠已结束")
             if sold_out(c):
                 raise CouponError("已经领完了")
-            s.add(CouponClaim(coupon_id=coupon_id, user_id=user_id, code="".join(secrets.choice(_ALPHA) for _ in range(6))))
+            s.add(CouponClaim(coupon_id=coupon_id, batch_id=key, user_id=user_id, code="".join(secrets.choice(_ALPHA) for _ in range(6))))
             c.claimed = int(c.claimed or 0) + 1
-            await s.flush()
+            try:
+                await s.flush()
+            except IntegrityError:   # a parallel request won the (batch_id, user_id) unique index
+                raise CouponError("本批优惠每人限领 1 张，你已经领过了")
             full = sold_out(c)
         items = await _batch_rows(s, bkey(c))
         mine_by = await _viewer_claims(s, user_id, [x.coupon_id for x in items])

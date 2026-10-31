@@ -1,4 +1,4 @@
-"""一次发多项优惠：整批共用有效期 / 每项数量 / 客人每项各领 1 张 / 频道一帖多项（某项领完改帖）/ 约课带全部券码 /
+"""一次发多项优惠：整批共用有效期 / 每项数量 / 每批每人限领 1 张（并发也只成功 1 张）/ 频道一帖多项（某项领完改帖）/ 约课带全部券码 /
 后台一批一行、整批停用 / 往期按项 / 旧数据迁移成一项一批（YYCJ_TEST_PG）。"""
 import asyncio
 import os
@@ -58,11 +58,15 @@ def test_coupon_batches():
             # a coupon written before batches existed (batch_id NULL) → migration makes it a one-item batch
             s.add(Coupon(coupon_id="LEGACY-9902", user_id=T2, lamp_id=l2, city="苏州", text="老优惠", quota=0, claimed=0,
                          status="active", ends_at=datetime.utcnow() + timedelta(days=1)))
+            s.add(CouponClaim(coupon_id="LEGACY-9902", user_id=G3, code="LEG001"))
         async with db._engine.begin() as conn:
             await conn.execute(sql("UPDATE coupons SET batch_id = NULL WHERE coupon_id = 'LEGACY-9902'"))
+            await conn.execute(sql("UPDATE coupon_claims SET batch_id = NULL WHERE coupon_id = 'LEGACY-9902'"))
         await db._ensure_columns(db._engine)
         async with session_scope() as s:
             assert (await s.execute(select(Coupon.batch_id).where(Coupon.coupon_id == "LEGACY-9902"))).scalar_one() == "LEGACY-9902"
+            leg = (await s.execute(select(CouponClaim).where(CouponClaim.coupon_id == "LEGACY-9902"))).scalar_one()
+            assert leg.batch_id == "LEGACY-9902" and leg.code == "LEG001" and leg.user_id == G3   # existing claim intact
         prev = await home_service.get_or_create_settings()
         prev_cities = list(prev.get("enabled_cities") or [])
         await home_service.update_settings(enabled_cities=list(dict.fromkeys(prev_cities + ["苏州"])),
@@ -100,16 +104,17 @@ def test_coupon_batches():
                 assert {x["title"]: x.get("coupon", {}).get("text") for x in h.json()["items"]}["多多"] == "100P / 200PP / 500夜课"
                 lst = (await c.get("/api/coupons?city=苏州", headers=tok(G1))).json()["items"]
                 assert [x["title"] for x in lst].count("多多") == 1
-                # guest: one per item, each its own code
+                # guest: ONE claim per batch (pick one item)
                 a1 = (await post(G1, f"/api/coupons/{i1}/claim")).json()["coupon"]
-                a2 = (await post(G1, f"/api/coupons/{i2}/claim")).json()["coupon"]
+                r = await post(G1, f"/api/coupons/{i2}/claim")
+                assert r.status_code == 400 and "限领 1 张" in r.json()["detail"]
                 again = (await post(G1, f"/api/coupons/{i1}/claim")).json()["coupon"]
-                codes = {x["coupon_id"]: x["code"] for x in a2["my_codes"]}
-                assert set(codes) == {i1, i2} and len(set(codes.values())) == 2 and all(len(v) == 6 for v in codes.values())
-                assert again["claimed_code"] == codes[i1] and again["claimed"] == 2
+                codes = {x["coupon_id"]: x["code"] for x in a1["my_codes"]}
+                assert set(codes) == {i1} and len(codes[i1]) == 6
+                assert again["claimed_code"] == codes[i1] and again["claimed"] == 1
                 d = (await c.get(f"/api/lamps/{l1}/coupon", headers=tok(G1))).json()["coupon"]
                 st = {x["text"]: (x.get("my_code"), x["remain"], x["live"]) for x in d["items"]}
-                assert st["100P"] == (codes[i1], 1, True) and st["200PP"] == (codes[i2], 2, True) and st["500夜课"] == (None, 4, True)
+                assert st["100P"] == (codes[i1], 1, True) and st["200PP"] == (None, 3, True) and st["500夜课"] == (None, 4, True)
                 # 100P runs out → post edited: that item 已领完, the rest still open (links kept)
                 fake.calls.clear()
                 await post(G2, f"/api/coupons/{i1}/claim")
@@ -118,29 +123,29 @@ def test_coupon_batches():
                 r = await post(G3, f"/api/coupons/{i1}/claim")
                 assert r.status_code == 400 and "领完" in r.json()["detail"]
                 assert (await post(G3, f"/api/coupons/{i3}/claim")).status_code == 200    # other items still open
-                # 想聊聊: the teacher's notice carries every code the guest holds
+                # 想聊聊: the teacher's notice carries the guest's single code for this batch
                 fake.calls.clear()
                 r = await post(G1, "/api/sessions/request", {"lamp_id": l1})
                 assert r.status_code == 200, r.text
-                assert set(r.json()["coupon_codes"]) == {codes[i1], codes[i2]}
+                assert r.json()["coupon_codes"] == [codes[i1]] and r.json()["coupon_code"] == codes[i1]
                 note = [x for x in fake.calls if x[0] == "send" and x[1] == T][0][2]
-                assert codes[i1] in note and codes[i2] in note and "100P" in note and "200PP" in note
+                assert codes[i1] in note and "100P" in note
                 # teacher: per-item claims, summaries across items, 核销 one code
                 t = (await c.get("/api/me/coupon", headers=tok(T))).json()
-                assert t["current"]["claimed"] == 4 and t["current"]["pending"] == 4 and t["max_items"] == 5
+                assert t["current"]["claimed"] == 3 and t["current"]["pending"] == 3 and t["max_items"] == 5
                 per = {x["text"]: (x["claimed"], x["pending"]) for x in t["current"]["items"]}
-                assert per == {"100P": (2, 2), "200PP": (1, 1), "500夜课": (1, 1)}
-                assert {x["item"] for x in t["claims"] if x["code"] == codes[i2]} == {"200PP"}
-                t = (await post(T, "/api/me/coupon/use", {"code": codes[i2]})).json()
-                assert {x["text"]: x["used"] for x in t["current"]["items"]}["200PP"] == 1 and t["current"]["used"] == 1
+                assert per == {"100P": (2, 2), "200PP": (0, 0), "500夜课": (1, 1)}
+                assert {x["item"] for x in t["claims"] if x["code"] == codes[i1]} == {"100P"}
                 hit = (await c.get("/api/me/coupon/code?code=" + codes[i1], headers=tok(T))).json()["claim"]
                 assert hit["text"] == "100P" and hit["valid"]
+                t = (await post(T, "/api/me/coupon/use", {"code": codes[i1]})).json()
+                assert {x["text"]: x["used"] for x in t["current"]["items"]}["100P"] == 1 and t["current"]["used"] == 1
                 mine = (await c.get("/api/me/claims", headers=tok(G1))).json()
-                assert sorted(x["text"] for x in mine["items"]) == ["100P", "200PP"] and mine["usable"] == 1
+                assert [x["text"] for x in mine["items"]] == ["100P"] and mine["usable"] == 0
                 # admin: one row per batch with its items; 停用 stops the whole batch
                 adm = (await c.get("/api/admin/coupons?city=苏州", headers=tok(1))).json()["items"]
                 row = [x for x in adm if x["title"] == "多多"][0]
-                assert [i["text"] for i in row["items"]] == ["100P", "200PP", "500夜课"] and row["claimed"] == 4
+                assert [i["text"] for i in row["items"]] == ["100P", "200PP", "500夜课"] and row["claimed"] == 3
                 assert [x["text"] for x in adm if x["title"] == "旧旧"] == ["老优惠"]    # migrated legacy = one-item batch
                 # end early → whole batch 已结束 on the channel, history per item
                 fake.calls.clear()
@@ -149,14 +154,20 @@ def test_coupon_batches():
                 edits = [x for x in fake.calls if x[0] == "edit"]
                 assert len(edits) == 1 and "已结束" in edits[0][2] and "start=" not in edits[0][2]
                 hb = t["history"][0]
-                assert [i["text"] for i in hb["items"]] == ["100P", "200PP", "500夜课"] and hb["claimed"] == 4 and hb["used"] == 1
-                assert {i["text"]: i["pending"] for i in hb["items"]} == {"100P": 2, "200PP": 0, "500夜课": 1}
+                assert [i["text"] for i in hb["items"]] == ["100P", "200PP", "500夜课"] and hb["claimed"] == 3 and hb["used"] == 1
+                assert {i["text"]: i["pending"] for i in hb["items"]} == {"100P": 1, "200PP": 0, "500夜课": 1}
                 # claimed codes stay valid until the batch end time (ended early)
-                d = (await c.get(f"/api/lamps/{l1}/coupon", headers=tok(G1))).json()["coupon"]
+                d = (await c.get(f"/api/lamps/{l1}/coupon", headers=tok(G2))).json()["coupon"]
                 assert d and {x["text"]: x.get("my_valid") for x in d["items"]}["100P"] is True and not d["live"]
                 # a new batch replaces; admin stop hits every item
                 r = await new([{"text": "A套餐", "quota": 1}, {"text": "B套餐", "quota": 1}])
                 nb = r.json()["current"]
+                # race: the same guest grabs both items at once → exactly one succeeds
+                rs = await asyncio.gather(*(post(G3, f"/api/coupons/{x['coupon_id']}/claim") for x in nb["items"]))
+                assert sorted(x.status_code for x in rs) == [200, 400]
+                async with session_scope() as s:
+                    n = len((await s.execute(select(CouponClaim).where(CouponClaim.batch_id == nb["batch_id"], CouponClaim.user_id == G3))).scalars().all())
+                assert n == 1
                 assert (await post(1, f"/api/admin/coupons/{nb['items'][1]['coupon_id']}/stop")).status_code == 200
                 async with session_scope() as s:
                     sts = {x.status for x in (await s.execute(select(Coupon).where(Coupon.batch_id == nb["batch_id"]))).scalars()}

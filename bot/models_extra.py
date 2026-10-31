@@ -82,13 +82,16 @@ class Coupon(Base):
 
 
 class CouponClaim(Base):
-    """客人领取：每一项一人一张（同一批可以每项各领一张），每张一个 6 位码，到店出示给老师。"""
+    """客人领取：每一批优惠每人只能领 1 张（选其中一项），领到一个 6 位码，到店出示给老师。
+    (batch_id, user_id) 唯一 → 并发也领不到第二张。"""
 
     __tablename__ = "coupon_claims"
-    __table_args__ = (UniqueConstraint("coupon_id", "user_id", name="uq_coupon_claim_user"),)
+    __table_args__ = (UniqueConstraint("coupon_id", "user_id", name="uq_coupon_claim_user"),
+                      UniqueConstraint("batch_id", "user_id", name="uq_coupon_claim_batch_user"))
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     coupon_id: Mapped[str] = mapped_column(String(36), index=True)
+    batch_id: Mapped[str] = mapped_column(String(36), nullable=True, index=True)  # = 所属优惠的 batch_id
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     code: Mapped[str] = mapped_column(String(12), index=True)
     used_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)

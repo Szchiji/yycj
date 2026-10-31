@@ -60,7 +60,7 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261101k"}
+    assert vs == {"20261101m"}
 
 
 def test_filter_reset_applies_immediately_and_keeps_facets():
@@ -94,3 +94,10 @@ def test_coupon_multi_item_form_and_strip():
     assert "JSON.stringify({ days: draft.days, items })" in js and "整批共用" in js
     # 详情页每项一行，各自领取；想聊聊带上全部券码
     assert "cpn-its" in js and "remainTxt" in js and "bookTextAll(held.codes)" in js
+    # 每批每人限领 1 张
+    assert "每人限领1张，选一种领取" in js and "本批已领 · 每人限领1张" in js and "cpn-claim\" disabled" in js
+
+
+def test_coupon_strip_sits_above_reviews():
+    js = _read("coupons.js")
+    assert 'rv.before(el)' in js and ':scope > #yycjReviews' in js and 'price.after(el)' not in js

@@ -67,6 +67,11 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS batch_id VARCHAR(36)",
     "UPDATE coupons SET batch_id = coupon_id WHERE batch_id IS NULL",
     "CREATE INDEX IF NOT EXISTS ix_coupons_batch_id ON coupons (batch_id)",
+    # 每批每人限领 1 张：领取记录带上 batch_id，(batch_id, user_id) 唯一（旧数据一项一批，不会冲突）
+    "ALTER TABLE coupon_claims ADD COLUMN IF NOT EXISTS batch_id VARCHAR(36)",
+    "UPDATE coupon_claims cc SET batch_id = COALESCE(c.batch_id, c.coupon_id) FROM coupons c WHERE c.coupon_id = cc.coupon_id AND cc.batch_id IS NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_coupon_claim_batch_user ON coupon_claims (batch_id, user_id)",
+    "CREATE INDEX IF NOT EXISTS ix_coupon_claims_batch_id ON coupon_claims (batch_id)",
 ]
 
 

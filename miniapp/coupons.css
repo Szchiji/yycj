@@ -93,3 +93,9 @@
 .cpn-item .cpn-claims li:first-child{border-top:0;}
 .cpn-empty{margin:4px 0 0;font-size:12px;}
 .cpn-hist .cpn-item{margin-top:6px;}
+/* 每批每人限领 1 张 */
+.cpn-note{margin:0;font-size:12px;color:var(--t-link,#E5CC8E);}
+.cpn-note.got{color:var(--t-muted,#B4BCAF);}
+.cpn-its li.dim b{opacity:.55;}
+.cpn-its .cpn-claim[disabled]{opacity:.45;background:transparent;border:1px solid var(--t-line,#2A4A42);color:var(--t-muted,#B4BCAF);}
+.cpn-its li.mine b{color:var(--t-price,#F0C987);}

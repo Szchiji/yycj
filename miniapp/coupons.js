@@ -1,5 +1,5 @@
 // 优惠券 (inspired by 繁花's 优惠): 老师在「我的 · 我的优惠」发限时优惠（一批最多 5 项，各自有数量，共用有效期）；
-// 客人在详情页每一项各「领取」一张，每张一个 6 位码，到店出示。
+// 客人在详情页选其中一项「领取」（每批每人限领 1 张），拿到 6 位码，到店出示。
 // Where guests see coupons is a site setting (coupon_display): badge = 卡片称呼前小「惠」字,
 // filter = 筛选面板「有优惠」, list = 「我的 · 本城优惠」. The detail-page block is always on. Card size/grid unchanged.
 (() => {
@@ -52,31 +52,43 @@
   async function paintDetail() {
     const box = $("#detail"); if (!box) return;
     const id = box.getAttribute("data-lamp") || ""; if (!id) return;
-    const card = box.querySelector(".card") || box;
-    let el = card.querySelector(".cpn-block");
-    if (el && el.dataset.lamp === id && el.dataset.ok) return;
+    // 优惠条放在「评价」正上方：#detail 里资料卡片之后、#yycjReviews 之前（评价后加载时也在它前面）
+    const card = box.querySelector(":scope > .card") || box.querySelector(".card") || box;
+    let el = box.querySelector(".cpn-block");
+    if (el && el.dataset.lamp === id && el.dataset.ok) { placeBlock(box, card, el); return; }
     let c = null;
     try { c = (await api("/api/lamps/" + encodeURIComponent(id) + "/coupon")).coupon; } catch (e) { return; }
     if ((box.getAttribute("data-lamp") || "") !== id) return;
-    el = card.querySelector(".cpn-block");
+    el = box.querySelector(".cpn-block");
     if (!c) { held = null; prefillLinks(); if (el) el.remove(); return; }
     if (!el) {
       el = document.createElement("div"); el.className = "cpn-block";
-      const price = card.querySelector(".xhs-price"); if (price) price.after(el); else card.prepend(el);
     }
+    placeBlock(box, card, el);
     el.dataset.lamp = id; el.dataset.ok = "1";
     const its = itemsOf(c);
     const codes = c.own ? [] : its.filter((x) => x.my_code && x.my_valid).map((x) => ({ code: x.my_code, text: x.text }));
     held = codes.length ? { lamp: id, codes } : null;
     prefillLinks();
+    // 每批每人限领 1 张：领过一项后，其他项的「领取」变灰
+    const got = its.some((x) => x.my_code);
     const act = (x) => c.own ? ""
-      : x.my_code ? `<div class="cpn-code"><b>${esc(x.my_code)}</b>${x.my_used ? "<i>已用</i>" : (x.my_valid ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(x.my_code)}" data-cpn-t="${esc(x.text)}">复制</button>` : "<i>已失效</i>")}</div>`
+      : x.my_code ? `<div class="cpn-code"><b>${esc(x.my_code)}</b>${x.my_used ? "<i>已用</i>" : (x.my_valid ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(x.my_code)}" data-cpn-t="${esc(x.text)}">复制券码</button>` : "<i>已失效</i>")}</div>`
+      : got && x.live ? `<button type="button" class="btn cpn-claim" disabled>领取</button>`
       : x.live ? `<button type="button" class="btn primary cpn-claim" data-cpn-claim="${esc(x.coupon_id)}">领取</button>`
       : `<span class="cpn-off">${esc(STATUS[x.status] || "已结束")}</span>`;
+    const note = c.own ? "" : got ? (its.length > 1 ? "本批已领 · 每人限领1张" : "") : its.length > 1 ? "每人限领1张，选一种领取" : "";
     el.classList.add("multi");
-    el.innerHTML = `<div class="cpn-l"><span class="cpn-tag">惠</span><div><b>限时优惠${its.length > 1 ? ` · ${its.length} 项` : ""}</b><small>${esc(c.left)}${c.own ? " · 你发的优惠" : " · 每项限领 1 张"}</small></div></div>
-      <ul class="cpn-its">${its.map((x) => `<li class="${x.live || x.my_code ? "" : "off"}"><div><b>${esc(x.text)}</b><small>${esc(remainTxt(x))}</small></div>${act(x)}</li>`).join("")}</ul>
-      ${codes.length ? `<p class="cpn-tip">约课时把券码发给老师（点「${esc(ctaLabel())}」会自动复制好${codes.length > 1 ? "全部 " + codes.length + " 个券码" : ""}）。有效至优惠结束：${esc(c.left)}。</p>` : ""}`;
+    el.innerHTML = `<div class="cpn-l"><span class="cpn-tag">惠</span><div><b>限时优惠${its.length > 1 ? ` · ${its.length} 项` : ""}</b><small>${esc(c.left)}${c.own ? " · 你发的优惠" : ""}</small></div></div>
+      ${note ? `<p class="cpn-note${got ? " got" : ""}">${esc(note)}</p>` : ""}
+      <ul class="cpn-its">${its.map((x) => `<li class="${x.my_code ? "mine" : x.live && !got ? "" : x.live ? "dim" : "off"}"><div><b>${esc(x.text)}</b><small>${esc(remainTxt(x))}</small></div>${act(x)}</li>`).join("")}</ul>
+      ${codes.length ? `<p class="cpn-tip">约课时把券码发给老师（点「${esc(ctaLabel())}」会自动复制好）。有效至优惠结束：${esc(c.left)}。</p>` : ""}`;
+  }
+  function placeBlock(box, card, el) {
+    const rv = box.querySelector(":scope > #yycjReviews");
+    if (rv) { if (el.nextElementSibling !== rv) rv.before(el); }
+    else if (card !== box) { if (card.nextElementSibling !== el) card.after(el); }
+    else if (!el.parentNode) box.appendChild(el);
   }
   function ctaLabel() { return String((window.__yycjHome || {}).chat_cta_label || "想聊聊").slice(0, 12); }
   const watchDetail = () => {
@@ -135,7 +147,7 @@
       <input id="cpnText" maxlength="${d.max_text}" placeholder="优惠内容，比如 100P" value="${esc(draft.text)}" />
       <div class="cpn-row"><span>数量</span><input id="cpnQty" type="number" min="1" max="${d.max_quota}" inputmode="numeric" placeholder="1–${d.max_quota}" value="${esc(draft.qty)}" /><em>张</em></div></div>`;
     const total = n + (!editing && draft.text.trim() ? 1 : 0);
-    return `<p class="muted cpn-lead">一次可以发几项优惠（最多 ${max} 项），每项写好数量；客人每项各领 1 张，到店出示券码。同一时间只能有 1 批。</p>
+    return `<p class="muted cpn-lead">一次可以发几项优惠（最多 ${max} 项），每项写好数量；客人每人限领其中 1 张，到店出示券码。同一时间只能有 1 批。</p>
       <div class="cpn-step"><i>1</i><span>选有效期</span><small>整批共用</small></div>
       <div class="cpn-row cpn-days">${d.presets.map((k) => `<button type="button" class="area-chip${draft.days === k ? " on" : ""}" data-cpn-days="${k}">${k}天</button>`).join("")}</div>
       <div class="cpn-step"><i>2</i><span>添加优惠</span><small>已添加 ${n}/${max}</small></div>
