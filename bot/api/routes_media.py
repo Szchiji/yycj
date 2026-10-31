@@ -128,8 +128,8 @@ async def api_media_upload(
 ) -> Dict[str, Any]:
     if not files:
         raise HTTPException(status_code=400, detail="请选择文件")
-    review = purpose == "review"
-    cap = REVIEW_MAX_FILES if review else MAX_FILES
+    review = purpose in ("review", "review_proof")
+    cap = (5 if purpose == "review_proof" else REVIEW_MAX_FILES) if review else MAX_FILES
     if len(files) > cap:
         raise HTTPException(status_code=400, detail=f"一次最多上传 {cap} 个文件")
     # 评价晒图: any signed-in user (guests write reviews), photos only, max 3, normal rate limit.

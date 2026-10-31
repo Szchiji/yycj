@@ -42,3 +42,15 @@ class ReviewNotice(Base):
     kind: Mapped[str] = mapped_column(String(8), default="text")  # text | caption | none (nobody reachable)
     body: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ChannelDirectory(Base):
+    """按区目录: one pinned-style message per city channel, edited in place on every refresh."""
+
+    __tablename__ = "channel_directories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    city: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    chat: Mapped[str] = mapped_column(String(64))
+    message_id: Mapped[int] = mapped_column(Integer)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -106,11 +106,24 @@ async def startup_maintenance(scheduler=None) -> None:
     except Exception:
         logger.exception("expiry nudge job skipped")
     try:
+        if scheduler is not None and getattr(scheduler, "running", False):
+            from bot.services.channel_directory import job_refresh_all
+            scheduler.add_job(job_refresh_all, "cron", hour=12, minute=0, timezone="Asia/Shanghai",
+                              id="channel_directory", replace_existing=True, coalesce=True, max_instances=1,
+                              misfire_grace_time=3600)
+    except Exception:
+        logger.exception("channel directory job skipped")
+    try:
         # pending reviews from the last day that never reached the bot admins (each sent once)
         from bot.services.review_notify import backfill_pending
         await backfill_pending(24)
     except Exception:
         logger.exception("review notice backfill skipped")
+    try:
+        from bot.services.search_service import backfill_prices
+        await backfill_prices()
+    except Exception:
+        logger.exception("price backfill skipped")
 
 
 async def get_bot_identity(bot=None) -> Dict[str, Any]:

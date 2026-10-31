@@ -19,3 +19,13 @@ html body .sort-row{display:flex;align-items:center;gap:8px;margin:0 0 10px;padd
 html body .sort-k{font-size:12px;color:var(--t-muted);margin-right:2px;}
 html body .sort-opt{min-height:30px;padding:4px 12px;border-radius:999px;border:1px solid var(--t-line);background:transparent;color:var(--t-text);font-size:13px;}
 html body .sort-opt.on{border-color:var(--t-accent);color:var(--t-accent);font-weight:600;}
+/* 多层筛选：面板分区 / 操作栏 / 距离角标（不改卡片尺寸） */
+html body .filt-sec{margin:10px 0 0;}
+html body .filt-sec > .sort-k{display:block;margin:0 0 6px;font-size:12px;color:var(--t-muted);}
+html body .filt-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 6px;}
+html body .filt-actions{display:flex;gap:8px;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--t-line);}
+html body .filt-actions .btn{flex:1;}
+html body .near-pick{margin-top:6px;}
+
+html body .area-panel{max-height:calc(100vh - 210px);}
+html body .area-panel .filt-actions{position:sticky;bottom:-10px;margin:10px -10px -10px;padding:10px;background:var(--t-card);border-top:1px solid var(--t-line);}

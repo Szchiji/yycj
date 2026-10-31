@@ -29,3 +29,26 @@ html body #reviewForm button.rk-sending{opacity:.7;}
 /* toast 永远在最上层；有固定顶栏（评价/详情）时落在顶栏下面，不再被挡住 */
 html body #toast{z-index:1000!important;}
 html body.rev-open #toast,html body.xhs-detail #toast{top:calc(56px + max(env(safe-area-inset-top,0px),calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))))!important;}
+/* 结构化评价表单（墨绿金） */
+html body #revText.rk-hide{display:none!important;}
+html body .rk-fields{display:flex;flex-direction:column;gap:12px;margin:4px 0 12px;}
+html body .rk-fh{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px;}
+html body .rk-fh label{font-weight:600;font-size:15px;color:var(--t-text);margin:0;}
+html body .rk-cnt{font-size:12px;color:var(--t-muted);}
+html body .rk-field textarea{width:100%;margin:0;resize:vertical;min-height:46px;}
+html body .rk-star-row{display:flex;align-items:center;gap:10px;margin:4px 0 8px;}
+html body .rk-star-row .rk-k{font-weight:600;font-size:15px;}
+html body .rk-star-row .rk-stars{margin:0;}
+html body .rk-box{border:1px solid var(--t-line);border-radius:12px;padding:10px 12px;margin:10px 0;background:rgba(255,255,255,.02);}
+html body .rk-box.rk-proof{border-color:rgba(201,164,92,.55);border-style:dashed;}
+html body .rk-bh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+html body .rk-bh b{font-size:14px;}
+html body .rk-bh .muted{font-size:12px;}
+html body .rk-box .rk-photos{margin:8px 0 4px;}
+html body .rk-cnt2{font-size:12px;color:var(--t-accent);}
+html body .rk-note{font-size:12px;color:var(--t-muted);text-align:center;margin:10px 4px 0;line-height:1.5;}
+html body .rk-box.hidden{display:none;}
+/* 详情页结构化评价 */
+html body .rv-sec{margin:6px 0 0;}
+html body .rv-sec dt{font-size:12px;color:var(--t-accent);margin:8px 0 2px;font-weight:600;}
+html body .rv-sec dd{margin:0;line-height:1.55;white-space:pre-wrap;word-break:break-word;}

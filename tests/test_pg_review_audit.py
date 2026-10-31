@@ -47,7 +47,7 @@ def test_review_audit_switch():
         t = httpx.ASGITransport(app=m.app)
         async with httpx.AsyncClient(transport=t, base_url="http://t") as c:
             async def review(guest, lamp):
-                r = await c.post("/api/reviews", json={"lamp_id": lamp, "stars": 4, "text": "ok"}, headers=tok(guest))
+                r = await c.post("/api/reviews", json={"lamp_id": lamp, "stars": 4, "text": "ok", "proofs": ["AgACAgUAAxkBAAIBprfA"]}, headers=tok(guest))
                 assert r.status_code == 200, r.text
                 return r.json()["review"]
             # ON (today): pending queue
@@ -55,18 +55,13 @@ def test_review_audit_switch():
             assert r1["status"] == "pending"
             ids = [x["review_id"] for x in (await c.get("/api/admin/reviews/pending", headers=tok(SUPER))).json()["items"]]
             assert r1["review_id"] in ids
-            # site-wide OFF: published directly, same state as an approval, not queued
+            # site-wide OFF: every review now carries 约课凭证 for the admins, so it still waits
             await home_service.update_settings(ops_config={"review_require_audit": False})
             r2 = await review(82, "RA-GZ")
-            assert r2["status"] == "approved" and r2["reviewed_at"]
+            assert r2["status"] == "pending"
             ids = [x["review_id"] for x in (await c.get("/api/admin/reviews/pending", headers=tok(SUPER))).json()["items"]]
-            assert r2["review_id"] not in ids
-            visible = [x["review_id"] for x in await home_service.list_reviews_for_lamp("RA-GZ")]
-            assert r2["review_id"] in visible
-            rep = await home_service.reputation_for_lamp("RA-GZ")
-            assert rep  # computed from approved reviews, includes r2
-            # a card with no city follows the site-wide value
-            assert (await review(83, "RA-NC"))["status"] == "approved"
+            assert r2["review_id"] in ids
+            assert (await review(83, "RA-NC"))["status"] == "pending"
             # per-city override: 深圳 forces audit ON while site-wide is OFF
             r = await c.post("/api/admin/cities/settings", json={"city": "深圳", "overrides": {"review_require_audit": True}}, headers=tok(SUPER))
             assert r.status_code == 200 and r.json()["overrides"]["review_require_audit"] is True, r.text
@@ -75,7 +70,7 @@ def test_review_audit_switch():
             await home_service.update_settings(ops_config={"review_require_audit": True})
             r = await c.post("/api/admin/cities/settings", json={"city": "广州", "overrides": {"review_require_audit": False}}, headers=tok(OP))
             assert r.status_code == 200, r.text
-            assert (await review(85, "RA-GZ"))["status"] == "approved"
+            assert (await review(85, "RA-GZ"))["status"] == "pending"
             assert (await review(86, "RA-SZ"))["status"] == "pending"
             # operator can't touch another city's switch
             r = await c.post("/api/admin/cities/settings", json={"city": "深圳", "overrides": {"review_require_audit": False}}, headers=tok(OP))

@@ -257,7 +257,11 @@ async def api_broadcast_preview(
             "extras": {"微信": "demo_wx", "联系": "demo_wx"},
         }
     extras = dict((lamp.get("extras") if isinstance(lamp.get("extras"), dict) else {}) or {})
+    from bot.services.broadcast import start_url
     ident = await bot_info.get_bot_identity()
-    link = bot_info.bot_tme_url(ident.get("username") or "")
+    name = ident.get("username") or ""
+    link = "" if start_url(name, str(lamp.get("lamp_id") or ""), "s") else bot_info.bot_tme_url(name)
     text = fill_template(tpl, lamp, extras, link)
+    # the real post ends with these three text links (no buttons)
+    text = (text + "\n\n查看详情 · 查看评价 · 写评价").strip()
     return {"ok": True, "text": text, "title": lamp.get("title"), "lamp_id": lamp.get("lamp_id")}

@@ -115,8 +115,14 @@
       <div class="card">
         <div class="muted">${escapeHtml(r.review_id)}</div>
         <div>★${r.stars} · 客人 ${r.guest_id} · 资料 <code>${escapeHtml(r.lamp_id)}</code></div>
-        <p>${escapeHtml(r.text || "")}</p>
-        ${(r.photos || []).length ? `<div class="rev-phs">${(r.photos || []).slice(0, 6).map((u) => `<img src="${escapeHtml(mediaSrc(u))}" alt="" />`).join("")}</div>` : ""}
+        ${(() => {
+          const sec = r.sections || {};
+          const L = [["diff", "人照课表差异"], ["pros", "优点"], ["cons", "不足"], ["extra", "补充"]];
+          if (L.some(([k]) => sec[k])) return `<dl class="rev-sec">${L.filter(([k]) => sec[k]).map(([k, l]) => `<dt>${l}</dt><dd>${escapeHtml(sec[k])}</dd>`).join("")}</dl>`;
+          return `<p>${escapeHtml(r.text || "")}</p>`;
+        })()}
+        ${(r.photos || []).length ? `<div class="muted">公开晒图</div><div class="rev-phs">${(r.photos || []).slice(0, 6).map((u) => `<img src="${escapeHtml(mediaSrc(u))}" alt="" />`).join("")}</div>` : ""}
+        ${(r.proofs || []).length ? `<div class="rev-proof"><div class="muted">🔒 约课凭证 ${(r.proofs || []).length} 张 · 仅管理员可见</div><div class="rev-phs">${(r.proofs || []).slice(0, 5).map((u) => `<img src="${escapeHtml(mediaSrc(u))}" alt="" />`).join("")}</div></div>` : ""}
         <div class="row">
           <button class="btn primary" data-admin="rev-ok" data-id="${escapeHtml(r.review_id)}">通过</button>
           <button class="btn danger" data-admin="rev-brush" data-id="${escapeHtml(r.review_id)}">拒绝刷评</button>

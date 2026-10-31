@@ -269,6 +269,10 @@ class Review(Base):
     stars: Mapped[int] = mapped_column(Integer, default=5)
     text: Mapped[str] = mapped_column(Text, default="")
     photos: Mapped[list] = mapped_column(JSONB, default=list)
+    # 结构化评价 {diff, pros, cons, extra}; empty for old plain-text reviews
+    sections: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # 约课凭证: admin-only images, never serialized to public endpoints
+    proofs: Mapped[list] = mapped_column(JSONB, default=list)
     status: Mapped[str] = mapped_column(
         String(16), default=ReviewStatus.PENDING.value, index=True
     )

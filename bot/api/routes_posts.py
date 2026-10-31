@@ -179,9 +179,23 @@ async def api_create_review(
         s = (p or "").strip()
         if s:
             photos.append(_normalize_one_url(s))
-    # 评价需审核 (per card city, fallback site-wide, unset = ON): off -> publish directly.
-    # Reviews with photos always wait for an admin, whatever the switch says.
-    auto = not photos and not await home_service.review_needs_audit(lamp.get("city"))
+    proofs = []
+    for p in body.proofs or []:
+        s = (p or "").strip()
+        if s:
+            proofs.append(_normalize_one_url(s))
+    proofs = proofs[:5]
+    sections = home_service.clean_sections(body.sections.model_dump() if body.sections else {})
+    if body.sections is not None:
+        err = home_service.sections_error(sections)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+    if not proofs:
+        raise HTTPException(status_code=400, detail="请上传约课凭证（1–5 张）：凭证只发给管理员审核，不会公开，敏感信息请自行打码")
+    photos = []  # 公开晒图已取消：新评价只收私密凭证（老评价已有的公开图照常显示）
+    # 约课凭证 are required and exist for the admins to check, so every new review waits for an admin
+    # (评价需审核 switch no longer auto-publishes).
+    auto = False  # every review carries 约课凭证 now → always an admin check
     try:
         rev = await home_service.create_review(
             auto_approve=auto,
@@ -190,6 +204,8 @@ async def api_create_review(
             stars=body.stars,
             text=body.text,
             photos=photos[:3],
+            sections=sections,
+            proofs=proofs,
             session_id=body.session_id,
             target_user_id=int(target) if target else None,
         )
@@ -198,8 +214,9 @@ async def api_create_review(
     if rev.get("status") == "pending":
         # tell the bot admins (fire-and-forget: a Telegram problem never fails the submit)
         from bot.services import review_notify
-        review_notify.notify_soon(rev, lamp)
+        review_notify.notify_soon(dict(rev), lamp)
     rev["created_at"] = _ser_dt(rev.get("created_at"))
+    rev["proof_count"] = len(rev.pop("proofs", None) or [])  # never echo 凭证 back
     return {"ok": True, "review": rev}
 
 

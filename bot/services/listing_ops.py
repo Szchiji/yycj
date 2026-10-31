@@ -56,7 +56,13 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
         for pin in pin_res.scalars().all():
             s.delete(pin)
         await s.flush()
-        return {"lamp_id": lamp.lamp_id, "status": lamp.status, "reason": lamp.unlist_reason}
+        out = {"lamp_id": lamp.lamp_id, "status": lamp.status, "reason": lamp.unlist_reason}
+    try:
+        from bot.services.broadcast import mark_unlist
+        await mark_unlist(lamp_id, reason=reason)
+    except Exception:
+        pass
+    return out
 
 
 async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
@@ -98,6 +104,12 @@ async def expire_due_lamps() -> int:
             for pin in pin_res.scalars().all():
                 s.delete(pin)
         await s.flush()
+    for lid in ids:
+        try:
+            from bot.services.broadcast import mark_unlist
+            await mark_unlist(lid, reason="expired")
+        except Exception:
+            pass
     try:
         from bot.services import listing_flow
         r = await listing_flow.remind_expiring(3)

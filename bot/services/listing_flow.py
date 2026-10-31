@@ -56,8 +56,9 @@ async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin
         lamp.city = (data.get("city") or lamp.city)[:32]
         lamp.title = (data.get("title") or lamp.title)[:128]
         lamp.tags = list(data.get("tags") or lamp.tags or [])[:5]
-        lamp.price = data.get("price", lamp.price)
         lamp.price_text = (data.get("price_text") or lamp.price_text or "")[:32] or None
+        from bot.services.search_service import clean_price
+        lamp.price = clean_price(data.get("price", lamp.price), lamp.price_text)
         lamp.description = (data.get("description") or "")[:2000]
         lamp.district = (data.get("district") or None)
         lamp.approx_label = (data.get("approx_label") or None)

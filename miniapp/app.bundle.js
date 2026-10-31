@@ -95,7 +95,7 @@ try {
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.
@@ -291,10 +291,33 @@ try {
     try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
   }
   // 排序：最新上架（默认）/ 评价多。放在「地区」面板顶部，首页布局不变；本次会话内记住。
-  function getSort() { try { return sessionStorage.getItem("yycj_sort") === "reviews" ? "reviews" : ""; } catch (e) { return ""; } }
-  function setSort(v) { try { if (v === "reviews") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
+  function getSort() { try { const v = sessionStorage.getItem("yycj_sort") || ""; return (v === "reviews" || v === "near") ? v : ""; } catch (e) { return ""; } }
+  function setSort(v) { try { if (v === "reviews" || v === "near") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
+  // 价格档 / 标签 / 营业中 / 距离：跟地区一样，按城市记在本次会话里
+  function filtKey() { return "yycj_filt_" + curCity(); }
+  function getFilt() {
+    try { return JSON.parse(sessionStorage.getItem(filtKey()) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function setFilt(patch) {
+    const o = Object.assign({}, getFilt(), patch || {});
+    ["price", "tags", "open", "radius", "at", "lat", "lng"].forEach((k) => { if (!o[k]) delete o[k]; });
+    try {
+      if (Object.keys(o).length) sessionStorage.setItem(filtKey(), JSON.stringify(o));
+      else sessionStorage.removeItem(filtKey());
+    } catch (e) {}
+  }
+  function clearFilt() { try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
+  function activeFiltCount() {
+    const f = getFilt();
+    return [getArea(), f.price, f.tags, f.open, f.radius].filter(Boolean).length;
+  }
+  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false;
   function token() { return localStorage.getItem("yycj_token") || ""; }
-  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort(); }
+  function cacheKey(city, qq) {
+    const f = getFilt();
+    return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort()
+      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "");
+  }
   function readCache(city, qq) {
     try {
       const raw = sessionStorage.getItem(cacheKey(city, qq));
@@ -388,7 +411,8 @@ try {
   }
   function cardHtml(t, idx) {
     const img = cover(t);
-    const loc = [t.city, t.district].filter(Boolean).join("·");
+    // 按距离时，右上角地区标签换成「区 · 约Nkm」（只显示取整后的距离，不暴露坐标）
+    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join(" · ") : [t.city, t.district].filter(Boolean).join("·");
     const tag = String((t.tags && t.tags[0]) || "").replace(/^#+/, "");
     const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
@@ -413,7 +437,7 @@ try {
     const feed = $("#feed");
     if (feed) {
       feed.classList.add("has-cover");
-      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (getArea() ? "这个区域暂无上架" : "暂无上架") + "</p>";
+      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (activeFiltCount() ? "没有符合筛选的上架" : "暂无上架") + "</p>";
     }
     const pins = $("#pins");
     if (pins) {
@@ -458,6 +482,13 @@ try {
       if (city) params.set("city", city);
       if (getArea()) params.set("district", getArea());
       if (getSort()) params.set("sort", getSort());
+      const f = getFilt();
+      if (f.price) params.set("price", f.price);
+      if (f.tags) params.set("tags", f.tags);
+      if (f.open) params.set("open", "1");
+      if (f.radius) params.set("radius", String(f.radius));
+      if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
+      else if (f.at) params.set("at", f.at);
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -471,30 +502,91 @@ try {
     const btn = $("#btnArea");
     const k = getArea();
     const so = getSort();
+    const f = getFilt();
+    const nAct = activeFiltCount();
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
-      if (lbl) lbl.textContent = k ? areaLabel(k) : so ? "评价多" : "地区▾";
-      btn.classList.toggle("on", !!(k || so));
-      btn.classList.toggle("long", k.length > 2 || (!k && !!so));
-      btn.setAttribute("aria-label", (k ? "地区：" + k : "地区筛选") + (so ? "，按评价多排序" : ""));
+      if (lbl) {
+        if (nAct) lbl.textContent = "筛选·" + nAct;
+        else if (so === "near") lbl.textContent = "附近";
+        else if (so === "reviews") lbl.textContent = "评价多";
+        else lbl.textContent = k ? areaLabel(k) : "筛选▾";
+      }
+      btn.classList.toggle("on", !!(nAct || so));
+      btn.classList.toggle("long", true);
+      btn.setAttribute("aria-label", "筛选" + (nAct ? "，已选" + nAct + "项" : ""));
     }
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
-    const chips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
-      .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
+    const facets = lastFacets || { price_bands: [], tags: [], radii: [3, 5, 10], geo_districts: [], located: 0 };
+    const pickedTags = new Set(String(f.tags || "").split(",").filter(Boolean));
     const sortRow = "<div class=\"sort-row\" role=\"radiogroup\" aria-label=\"排序\"><span class=\"sort-k\">排序</span>" +
-      "<button type=\"button\" class=\"sort-opt" + (so ? "" : " on") + "\" data-sort=\"\">最新上架</button>" +
-      "<button type=\"button\" class=\"sort-opt" + (so ? " on" : "") + "\" data-sort=\"reviews\">评价多</button></div>";
-    panel.innerHTML = sortRow + "<div class=\"area-chips\">" + chips.join("") + "</div>" +
-      ((d.items || []).length ? "" : "<p class=\"muted area-empty\">这个城市的资料还没填区域</p>");
+      "<button type=\"button\" class=\"sort-opt" + (!so ? " on" : "") + "\" data-sort=\"\">最新</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so === "reviews" ? " on" : "") + "\" data-sort=\"reviews\">评价多</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so === "near" ? " on" : "") + "\" data-sort=\"near\">距我近</button></div>";
+    const areaChips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
+      .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
+    const priceChips = (facets.price_bands || []).map((b) =>
+      "<button type=\"button\" class=\"area-chip" + (f.price === b.key ? " on" : "") + "\" data-price=\"" + esc(b.key) + "\">" + esc(b.label) + "<i>" + b.count + "</i></button>"
+    ).join("") || "<span class=\"muted\">暂无标价</span>";
+    const tagChips = (facets.tags || []).map((t) =>
+      "<button type=\"button\" class=\"area-chip" + (pickedTags.has(t.tag) ? " on" : "") + "\" data-tag=\"" + esc(t.tag) + "\">" + esc(t.tag) + "<i>" + t.count + "</i></button>"
+    ).join("") || "<span class=\"muted\">暂无标签</span>";
+    const openChip = "<button type=\"button\" class=\"area-chip" + (f.open ? " on" : "") + "\" data-open=\"1\">营业中</button>";
+    const hasLoc = !!(f.lat && f.lng) || !!f.at;
+    const nearRow = "<div class=\"filt-row\"><span class=\"sort-k\">附近</span>" +
+      "<button type=\"button\" class=\"sort-opt" + (hasLoc ? " on" : "") + "\" data-loc=\"1\">" + (hasLoc ? (f.at ? ("以" + f.at + "为中心") : "已定位") : "用我的位置") + "</button>" +
+      (hasLoc ? "<button type=\"button\" class=\"sort-opt\" data-loc=\"0\">清除</button>" : "") + "</div>" +
+      (hasLoc ? "<div class=\"area-chips\">" + [3,5,10].map((r) =>
+        "<button type=\"button\" class=\"area-chip" + (String(f.radius) === String(r) ? " on" : "") + "\" data-radius=\"" + r + "\">" + r + "km</button>"
+      ).join("") + "</div>" : (facets.geo_districts && facets.geo_districts.length
+        ? "<div class=\"area-chips near-pick\"><span class=\"muted\" style=\"width:100%\">或选一个区作中心：</span>" +
+          facets.geo_districts.map((g) => "<button type=\"button\" class=\"area-chip" + (f.at === g.key ? " on" : "") + "\" data-at=\"" + esc(g.key) + "\">" + esc(g.key) + "</button>").join("") + "</div>"
+        : ""));
+    panel.innerHTML = sortRow +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">地区</div><div class=\"area-chips\">" + areaChips.join("") + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">价格</div><div class=\"area-chips\">" + priceChips + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">标签</div><div class=\"area-chips\">" + tagChips + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">状态</div><div class=\"area-chips\">" + openChip + "</div></div>" +
+      "<div class=\"filt-sec\">" + nearRow + "</div>" +
+      "<div class=\"filt-actions\"><button type=\"button\" class=\"btn\" data-filt-reset=\"1\">重置</button>" +
+      "<button type=\"button\" class=\"btn primary\" data-filt-apply=\"1\">查看结果</button></div>";
   }
-  function toggleArea(open) {
+  async function ensureFacets() {
+    const city = curCity();
+    if (lastFacets && facetsCity === city) return;
+    try {
+      const data = await api("/api/home/facets?city=" + encodeURIComponent(city));
+      lastFacets = data; facetsCity = city;
+    } catch (e) { lastFacets = lastFacets || { price_bands: [], tags: [], radii: [3, 5, 10], geo_districts: [] }; }
+  }
+  function askLocation() {
+    if (locBusy) return;
+    locBusy = true;
+    const done = (lat, lng) => { setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "" }); locBusy = false; paintArea(); };
+    const fail = () => { locBusy = false; paintArea(); try { window.__yycjToast && window.__yycjToast("定位失败，可选区作中心"); } catch (e) {} };
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
+        tg.LocationManager.init(() => {
+          try { tg.LocationManager.getLocation((loc) => loc && loc.latitude != null ? done(loc.latitude, loc.longitude) : fail()); }
+          catch (e) { fail(); }
+        });
+        return;
+      }
+    } catch (e) {}
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+    } else fail();
+  }
+  async function toggleArea(open) {
     const panel = $("#areaPanel");
     if (!panel) return;
     const on = open == null ? panel.classList.contains("hidden") : open;
     panel.classList.toggle("hidden", !on);
     $("#btnArea")?.setAttribute("aria-expanded", on ? "true" : "false");
+    if (on) await ensureFacets();
     paintArea();
   }
   function mountGuide() {
@@ -537,6 +629,13 @@ try {
     if (city) params.set("city", city);
     if (getArea()) params.set("district", getArea());
     if (getSort()) params.set("sort", getSort());
+    const f = getFilt();
+    if (f.price) params.set("price", f.price);
+    if (f.tags) params.set("tags", f.tags);
+    if (f.open) params.set("open", "1");
+    if (f.radius) params.set("radius", String(f.radius));
+    if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
+    else if (f.at) params.set("at", f.at);
     return "/api/home?" + params.toString();
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
@@ -556,15 +655,48 @@ try {
     }
     const sortBtn = ev.target.closest && ev.target.closest("#areaPanel [data-sort]");
     if (sortBtn) {
-      setSort(sortBtn.getAttribute("data-sort") || "");
-      toggleArea(false);
-      loadFeed(true);
+      const v = sortBtn.getAttribute("data-sort") || "";
+      setSort(v);
+      if (v === "near" && !(getFilt().lat || getFilt().at)) askLocation();
+      paintArea();
+      return;
     }
     const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
-    if (chip) {
-      setArea(chip.getAttribute("data-area") || "");
-      toggleArea(false);
-      loadFeed(true);
+    if (chip) { setArea(chip.getAttribute("data-area") || ""); paintArea(); return; }
+    const priceChip = ev.target.closest && ev.target.closest("#areaPanel [data-price]");
+    if (priceChip) {
+      const key = priceChip.getAttribute("data-price") || "";
+      setFilt({ price: getFilt().price === key ? "" : key }); paintArea(); return;
+    }
+    const tagChip = ev.target.closest && ev.target.closest("#areaPanel [data-tag]");
+    if (tagChip) {
+      const t = tagChip.getAttribute("data-tag") || "";
+      const cur = new Set(String(getFilt().tags || "").split(",").filter(Boolean));
+      if (cur.has(t)) cur.delete(t); else if (cur.size < 5) cur.add(t);
+      setFilt({ tags: [...cur].join(",") }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-open]")) {
+      setFilt({ open: getFilt().open ? "" : "1" }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { askLocation(); return; }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"0\"]")) {
+      setFilt({ lat: "", lng: "", at: "", radius: "" }); if (getSort() === "near") setSort(""); paintArea(); return;
+    }
+    const atChip = ev.target.closest && ev.target.closest("#areaPanel [data-at]");
+    if (atChip) {
+      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", radius: getFilt().radius || "5" });
+      paintArea(); return;
+    }
+    const radChip = ev.target.closest && ev.target.closest("#areaPanel [data-radius]");
+    if (radChip) {
+      const r = radChip.getAttribute("data-radius") || "";
+      setFilt({ radius: getFilt().radius === r ? "" : r }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-reset]")) {
+      clearFilt(); lastFacets = null; paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-apply]")) {
+      toggleArea(false); loadFeed(true); return;
     }
     if (ev.target.id === "btnTutorial") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
@@ -579,7 +711,10 @@ try {
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
       setArea("");
+      clearFilt();
       lastAreas = null;
+      lastFacets = null;
+      facetsCity = "";
       toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
@@ -587,6 +722,17 @@ try {
     }
   }, true);
   mountGuide();
+  const qInput = $("#homeQ");
+  if (qInput && !qInput.dataset.debounced) {
+    qInput.dataset.debounced = "1";
+    qInput.addEventListener("input", () => {
+      clearTimeout(qTimer);
+      qTimer = setTimeout(() => { q = (qInput.value || "").trim(); loadFeed(true); }, 320);
+    });
+    qInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); clearTimeout(qTimer); q = (qInput.value || "").trim(); loadFeed(true); }
+    });
+  }
   function tick() {
     carouselTimer = 0;
     if (!canRun()) return;
@@ -1704,7 +1850,14 @@ try {
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
       const ph = (Array.isArray(t.photos) ? t.photos : []).slice(0, 3).map((u) => String(u || "")).filter((u) => /^[A-Za-z0-9_\-:./]+$/.test(u))
         .map((u) => { const src = /^https?:|^\//.test(u) ? u : "/api/media/file/" + encodeURIComponent(u); return `<img class="rv-ph" loading="lazy" src="${src}" alt="" />`; }).join("");
-      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p>${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
+      const sec = (t.sections && typeof t.sections === "object") ? t.sections : {};
+      const L = [["diff", "人照课表差异"], ["pros", "优点"], ["cons", "不足"], ["extra", "补充"]];
+      const clean = (x) => String(x || "").replace(/[<>]/g, "");
+      // structured reviews get section headers; old plain-text reviews render as before
+      const body = L.some(([k]) => sec[k])
+        ? `<dl class="rv-sec">${L.filter(([k]) => sec[k]).map(([k, l]) => `<dt>${l}</dt><dd>${clean(sec[k])}</dd>`).join("")}</dl>`
+        : `<p>${clean(t.text)}</p>`;
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div>${body}${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
     }).join("") : "<p class='muted'>暂无评价</p>";
     box.innerHTML = `<h3 style="font-size:1rem;margin:12px 0 6px">评价</h3>${rows}`;
     placeShare(id);
@@ -2167,23 +2320,31 @@ try {
 (() => {
   if (window.__yycjDeepOpen) return;
   window.__yycjDeepOpen = true;
-  function restore(raw) {
+  function parseStart(raw) {
+    // s_<uuid> 详情 · r_<uuid> 详情+评价区 · w_<uuid> 写评价 · c_<uuid> 详情+想聊聊
     let s = String(raw || "").trim();
-    if (!s) return "";
-    if (s.startsWith("s_")) s = s.slice(2);
+    if (!s) return { id: "", kind: "s" };
+    let kind = "s";
+    if (/^[srwc]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
-      return s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20);
+      return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
     }
-    return String(raw || "").replace(/^s_/, "");
+    return { id: String(raw || "").replace(/^[srwc]_/i, ""), kind };
   }
+  function restore(raw) { return parseStart(raw).id; }
   function lampId() {
     const q = new URLSearchParams(location.search || "");
     const fromQ = q.get("lamp") || q.get("id") || "";
-    if (fromQ) return restore(fromQ) || fromQ;
+    if (fromQ) {
+      // bot deep link (?start=r_/w_…) → WebApp button → go.html?lamp=<id>&open=r|w
+      const open = String(q.get("open") || "").toLowerCase();
+      if (/^[rwc]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
+      return restore(fromQ) || fromQ;
+    }
     const tg = window.Telegram && window.Telegram.WebApp;
     const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
-    if (sp) return restore(sp);
+    if (sp) { const p = parseStart(sp); try { sessionStorage.setItem("yycj_open_kind", p.kind); } catch (e) {} return p.id; }
     // Only a reload inside the same session reopens it (it used to live in localStorage, so every
     // later normal open of the app jumped to the last shared listing).
     try { return sessionStorage.getItem("yycj_open_lamp") || ""; } catch (e) { return ""; }
@@ -2198,12 +2359,24 @@ try {
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
+  function afterOpen(id) {
+    let kind = "s";
+    try { kind = sessionStorage.getItem("yycj_open_kind") || "s"; sessionStorage.removeItem("yycj_open_kind"); } catch (e) {}
+    if (kind === "r") {
+      setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
+    } else if (kind === "w") {
+      setTimeout(() => { try { document.getElementById("detailReview")?.click(); } catch (e) {} }, 700);
+    } else if (kind === "c") {
+      setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
+    }
+  }
   function paint(lamp, data) {
     const box = document.getElementById("detail");
     if (!box || !lamp) return;
     if (window.__yycjRenderDetail && window.__yycjRenderDetail(data || { lamp }, lamp.lamp_id)) {
       showDetail();
       try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
+      afterOpen(lamp.lamp_id);
       return;
     }
     box.setAttribute("data-lamp", lamp.lamp_id || "");
@@ -2224,6 +2397,7 @@ try {
     // same extras as a detail opened from a card: photo/video gallery, tags, extras, reviews
     try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
     try { window.__yycjLoadDetailExtras && window.__yycjLoadDetailExtras(lamp.lamp_id); } catch (e) {}
+    afterOpen(lamp.lamp_id);
   }
   async function openLamp(id) {
     if (!id) return;
@@ -2535,16 +2709,28 @@ body.rev-open #view-review{padding-top:calc(var(--rv-top-h) + 4px);}`;
 /* ---- review-kit.js ---- */
 try {
 (() => {
-  // 写评价：点星打分（数值写回 #revStars）+ 最多 3 张晒图 + 提交（加载状态、成功/失败一定有提示）。
+  // 写评价（结构化）：人照课表差异 / 优点 / 不足 / 补充 + 星级 + 约课凭证（必填 1–5 张，仅管理员可见）。
+  // 公开晒图已取消（老评价里已有的公开图照常显示）。
+  // 提交有加载状态，成功/失败一定有提示。旧的 #revText 保留为隐藏兜底。
   if (window.__yycjReviewKit) return;
   window.__yycjReviewKit = true;
-  const MAX = 3;
+  const MAX = { photo: 3, proof: 5 };
   const LABELS = ["", "很差", "一般", "还行", "满意", "超赞"];
-  let photos = [];
-  let busy = 0;
+  const MIN = 5;
+  const FIELDS = [
+    { k: "diff", label: "人照课表差异", max: 200, ph: "人照几成像，服务与课表描述是否有差异", req: true },
+    { k: "pros", label: "优点", max: 200, ph: "颜值、皮肤、身材、性格、态度、服务或环境", req: true },
+    { k: "cons", label: "不足", max: 200, ph: "客观说明体验中不满意或需要注意的地方", req: true },
+    { k: "extra", label: "补充", max: 1000, ph: "其他想补充的细节（选填）", req: false },
+  ];
+  const bucket = { photo: [], proof: [] };
+  const busy = { photo: 0, proof: 0 };
   let sending = false;
   const token = () => localStorage.getItem("yycj_token") || "";
   const $ = (s) => document.querySelector(s);
+  function cfg() {
+    return { publicPhotos: false, proofRequired: true };
+  }
   function report(ev, extra) { try { window.__yycjReport && window.__yycjReport(Object.assign({ ev }, extra || {})); } catch (e) {} }
   function toast(msg, err) {
     const t = document.getElementById("toast");
@@ -2555,7 +2741,6 @@ try {
     clearTimeout(t._rk);
     t._rk = setTimeout(() => t.classList.add("hidden"), err ? 4000 : 2800);
   }
-  // message line inside the form, right under the submit button: visible even if a toast is missed
   function say(msg, kind) {
     const el = $("#rkMsg");
     if (!el) return;
@@ -2566,31 +2751,34 @@ try {
     const box = $("#rkStars");
     const inp = $("#revStars");
     if (!box || !inp) return;
-    const v = Math.max(1, Math.min(5, parseInt(inp.value, 10) || 5));
+    const raw = parseInt(inp.value, 10) || 0;
+    const v = Math.max(0, Math.min(5, raw));
     box.querySelectorAll("[data-star]").forEach((b) => {
       b.classList.toggle("on", Number(b.getAttribute("data-star")) <= v);
       b.setAttribute("aria-checked", Number(b.getAttribute("data-star")) === v ? "true" : "false");
     });
     const l = $("#rkStarLbl");
-    if (l) l.textContent = LABELS[v];
+    if (l) l.textContent = v ? LABELS[v] : "请选择";
   }
-  function paintPhotos() {
-    const box = $("#rkPhotos");
+  function paintBucket(kind) {
+    const box = document.getElementById(kind === "proof" ? "rkProofs" : "rkPhotos");
     if (!box) return;
-    const cells = photos.map((p, i) => `<div class="rk-ph"><img src="${p.preview}" alt="" /><button type="button" class="rk-x" data-rk-del="${i}" aria-label="删除">×</button></div>`);
-    if (busy) cells.push(`<div class="rk-add busy"><span>上传中…</span></div>`);
-    else if (photos.length < MAX) cells.push(`<label class="rk-add"><input type="file" accept="image/*" multiple hidden id="rkFile" /><span>+ 晒图</span><i>${photos.length}/${MAX}</i></label>`);
+    const list = bucket[kind];
+    const cells = list.map((p, i) => `<div class="rk-ph"><img src="${p.preview}" alt="" /><button type="button" class="rk-x" data-rk-del="${kind}:${i}" aria-label="删除">×</button></div>`);
+    if (busy[kind]) cells.push(`<div class="rk-add busy"><span>上传中…</span></div>`);
+    else if (list.length < MAX[kind]) cells.push(`<label class="rk-add"><input type="file" accept="image/*" multiple hidden data-rk-file="${kind}" /><span>${kind === "proof" ? "+ 凭证" : "+ 晒图"}</span><i>${list.length}/${MAX[kind]}</i></label>`);
     box.innerHTML = cells.join("");
+    const cnt = document.getElementById(kind === "proof" ? "rkProofCnt" : "rkPhotoCnt");
+    if (cnt) cnt.textContent = `已选择 ${list.length}/${MAX[kind]} 张`;
   }
   function paintBtn() {
     const btn = $("#reviewForm button[type=submit]");
     if (!btn) return;
-    if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+    if (!btn.dataset.label) btn.dataset.label = "提交";
     btn.disabled = sending;
     btn.classList.toggle("rk-sending", sending);
     btn.textContent = sending ? "提交中…" : btn.dataset.label;
   }
-  // iPhone photos are often 3–12 MB: shrink to ≤1600px JPEG before upload (falls back to the original file)
   async function shrink(file) {
     try {
       if (!file || !/^image\//.test(file.type || "image/") || file.size < 600 * 1024) return file;
@@ -2608,11 +2796,11 @@ try {
       } finally { URL.revokeObjectURL(url); }
     } catch (e) { return file; }
   }
-  async function upload(files) {
-    const list = [...files].slice(0, MAX - photos.length);
+  async function upload(kind, files) {
+    const list = [...files].slice(0, MAX[kind] - bucket[kind].length);
     if (!list.length) return;
-    busy = list.length;
-    paintPhotos();
+    busy[kind] = list.length;
+    paintBucket(kind);
     say("");
     try {
       const fd = new FormData();
@@ -2620,19 +2808,19 @@ try {
       const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
       const tm = setTimeout(() => ctl && ctl.abort(), 60000);
       let r;
-      try { r = await fetch("/api/media/upload?purpose=review", { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd, signal: ctl ? ctl.signal : undefined }); }
+      try { r = await fetch("/api/media/upload?purpose=" + (kind === "proof" ? "review_proof" : "review"), { method: "POST", headers: { Authorization: "Bearer " + token() }, body: fd, signal: ctl ? ctl.signal : undefined }); }
       finally { clearTimeout(tm); }
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "图片上传失败（" + r.status + "）");
-      (d.items || []).forEach((it) => { if (photos.length < MAX) photos.push({ url: it.url || it.file_id, preview: it.preview_url || "" }); });
+      (d.items || []).forEach((it) => { if (bucket[kind].length < MAX[kind]) bucket[kind].push({ url: it.url || it.file_id, preview: it.preview_url || "" }); });
       if (!(d.items || []).length) throw new Error("图片上传失败，请换一张试试");
     } catch (e) {
       const m = e && e.name === "AbortError" ? "图片上传超时，请检查网络后重试" : (e && e.message) || "图片上传失败";
       toast(m, true); say(m, "err");
-      report("review_upload_fail", { msg: String(m).slice(0, 120) });
+      report("review_upload_fail", { msg: String(m).slice(0, 120), kind });
     } finally {
-      busy = 0;
-      paintPhotos();
+      busy[kind] = 0;
+      paintBucket(kind);
     }
   }
   function errText(status, detail) {
@@ -2645,13 +2833,38 @@ try {
     if (d) return "提交失败：" + d;
     return "提交失败（" + status + "），请重试";
   }
+  function sections() {
+    const o = {};
+    FIELDS.forEach((f) => { const el = document.getElementById("rk_" + f.k); o[f.k] = el ? el.value.trim() : ""; });
+    return o;
+  }
+  function validate() {
+    const sec = sections();
+    for (const f of FIELDS) {
+      if (f.req && sec[f.k].length < MIN) return { msg: `「${f.label}」至少写 ${MIN} 个字`, focus: "rk_" + f.k };
+    }
+    const v = parseInt(($("#revStars") || {}).value, 10) || 0;
+    if (v < 1) return { msg: "请先点星打分" };
+    if (cfg().proofRequired && !bucket.proof.length) return { msg: "请上传约课凭证（1–5 张）：只发给管理员审核，不会公开" };
+    return null;
+  }
   async function submit(ctx) {
     if (sending) return;
-    if (busy) { const m = "图片还在上传，请稍等几秒再提交"; toast(m, true); say(m, "err"); return; }
+    if (busy.photo || busy.proof) { const m = "图片还在上传，请稍等几秒再提交"; toast(m, true); say(m, "err"); return; }
     const lamp = ($("#revLampId") && $("#revLampId").value) || "";
     if (!lamp) { const m = "没有找到要评价的资料，请返回重试"; toast(m, true); say(m, "err"); return; }
+    const bad = validate();
+    if (bad) { toast(bad.msg, true); say(bad.msg, "err"); if (bad.focus) try { document.getElementById(bad.focus).focus(); } catch (e) {} return; }
     sending = true; paintBtn(); say("");
-    const pics = photos.map((p) => p.url).filter(Boolean);
+    const sec = sections();
+    const body = {
+      lamp_id: lamp,
+      stars: parseInt(($("#revStars") || {}).value, 10) || 5,
+      text: "",
+      sections: sec,
+      photos: cfg().publicPhotos ? bucket.photo.map((p) => p.url).filter(Boolean) : [],
+      proofs: bucket.proof.map((p) => p.url).filter(Boolean),
+    };
     try {
       const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
       const tm = setTimeout(() => ctl && ctl.abort(), 20000);
@@ -2660,7 +2873,7 @@ try {
         r = await fetch("/api/reviews", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
-          body: JSON.stringify({ lamp_id: lamp, stars: parseInt(($("#revStars") || {}).value, 10) || 5, text: (($("#revText") || {}).value || "").trim(), photos: pics }),
+          body: JSON.stringify(body),
           signal: ctl ? ctl.signal : undefined,
         });
       } finally { clearTimeout(tm); }
@@ -2687,54 +2900,97 @@ try {
     }
   }
   function reset() {
-    photos = [];
-    const inp = $("#revStars"); if (inp) inp.value = "5";
+    bucket.photo = []; bucket.proof = [];
+    const inp = $("#revStars"); if (inp) inp.value = "0";
+    FIELDS.forEach((f) => { const el = document.getElementById("rk_" + f.k); if (el) { el.value = ""; } });
     const t = $("#revText"); if (t) t.value = "";
+    paintCounts();
     say("");
-    paintStars(); paintPhotos();
+    paintStars(); paintBucket("photo"); paintBucket("proof");
+  }
+  function paintCounts() {
+    FIELDS.forEach((f) => {
+      const el = document.getElementById("rk_" + f.k);
+      const c = document.getElementById("rkc_" + f.k);
+      if (el && c) c.textContent = `${el.value.length}/${f.max}`;
+    });
+  }
+  function applyCfg() {
+    const c = cfg();
+    const pub = $("#rkPubBox");
+    if (pub) pub.classList.toggle("hidden", !c.publicPhotos);
+    const req = $("#rkProofReq");
+    if (req) req.textContent = c.proofRequired ? "必填 1–5 张，仅管理员可见" : "1–5 张，仅管理员可见";
   }
   function mount() {
     const form = $("#reviewForm");
     const inp = $("#revStars");
     if (!form || !inp || $("#rkStars")) return;
+    form.classList.add("rk-form");
+    const h = form.querySelector("h3"); if (h) h.textContent = "写评价";
     inp.classList.add("rk-hide");
     inp.setAttribute("aria-hidden", "true");
     inp.tabIndex = -1;
-    const stars = document.createElement("div");
-    stars.id = "rkStars";
-    stars.className = "rk-stars";
-    stars.setAttribute("role", "radiogroup");
-    stars.setAttribute("aria-label", "打分");
-    stars.innerHTML = [1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" data-star="${n}" aria-label="${n} 星">★</button>`).join("") + `<span id="rkStarLbl" class="rk-lbl"></span>`;
-    inp.insertAdjacentElement("afterend", stars);
+    inp.value = "0";
+    inp.removeAttribute("min");
     const txt = $("#revText");
-    if (txt && !txt.placeholder) txt.placeholder = "说说体验（准时、环境、态度…）";
-    const ph = document.createElement("div");
-    ph.id = "rkPhotos";
-    ph.className = "rk-photos";
-    (txt || stars).insertAdjacentElement("afterend", ph);
+    if (txt) { txt.classList.add("rk-hide"); txt.setAttribute("aria-hidden", "true"); txt.tabIndex = -1; }
+    const fields = document.createElement("div");
+    fields.className = "rk-fields";
+    fields.innerHTML = FIELDS.map((f) => `
+      <div class="rk-field">
+        <div class="rk-fh"><label for="rk_${f.k}">${f.label}${f.req ? "" : ""}</label><span class="rk-cnt" id="rkc_${f.k}">0/${f.max}</span></div>
+        <textarea id="rk_${f.k}" maxlength="${f.max}" rows="${f.k === "extra" ? 3 : 2}" placeholder="${f.ph}"></textarea>
+      </div>`).join("");
+    (h || form.firstChild) && (h ? h.insertAdjacentElement("afterend", fields) : form.prepend(fields));
+    const starRow = document.createElement("div");
+    starRow.className = "rk-star-row";
+    starRow.innerHTML = `<span class="rk-k">评分</span><div id="rkStars" class="rk-stars" role="radiogroup" aria-label="打分">${[1, 2, 3, 4, 5].map((n) => `<button type="button" role="radio" data-star="${n}" aria-label="${n} 星">★</button>`).join("")}<span id="rkStarLbl" class="rk-lbl"></span></div>`;
+    fields.insertAdjacentElement("afterend", starRow);
+    const pub = document.createElement("div");
+    pub.id = "rkPubBox";
+    pub.className = "rk-box";
+    pub.innerHTML = `<div class="rk-bh"><b>公开晒图</b><span class="muted">选填，最多 3 张，审核后公开</span></div><div id="rkPhotos" class="rk-photos"></div>`;
+    starRow.insertAdjacentElement("afterend", pub);
+    const proof = document.createElement("div");
+    proof.id = "rkProofBox";
+    proof.className = "rk-box rk-proof";
+    proof.innerHTML = `<div class="rk-bh"><b>🔒 约课凭证</b><span class="muted" id="rkProofReq">1–5 张，仅管理员可见</span></div><div id="rkProofs" class="rk-photos"></div><div class="rk-cnt2" id="rkProofCnt">已选择 0/5 张</div>`;
+    pub.insertAdjacentElement("afterend", proof);
+    const btn = form.querySelector("button[type=submit]");
+    if (btn) { btn.textContent = "提交"; btn.dataset.label = "提交"; }
+    const note = document.createElement("p");
+    note.className = "rk-note";
+    note.textContent = "凭证只发送给管理员审核，不会显示在公开评价中，敏感信息请自行打码。";
     const msg = document.createElement("div");
     msg.id = "rkMsg";
     msg.className = "rk-msg";
     msg.setAttribute("role", "status");
     msg.setAttribute("aria-live", "polite");
     form.appendChild(msg);
+    form.appendChild(note);
+    applyCfg();
     paintStars();
-    paintPhotos();
+    paintBucket("photo");
+    paintBucket("proof");
   }
+  document.addEventListener("input", (ev) => { if (ev.target && /^rk_/.test(ev.target.id || "")) paintCounts(); });
   document.addEventListener("click", (ev) => {
     const s = ev.target.closest && ev.target.closest("#rkStars [data-star]");
     if (s) { const inp = $("#revStars"); if (inp) inp.value = s.getAttribute("data-star"); paintStars(); return; }
     const del = ev.target.closest && ev.target.closest("[data-rk-del]");
-    if (del) { photos.splice(Number(del.getAttribute("data-rk-del")), 1); paintPhotos(); }
+    if (del) { const [kind, i] = String(del.getAttribute("data-rk-del")).split(":"); bucket[kind].splice(Number(i), 1); paintBucket(kind); }
   });
   document.addEventListener("change", (ev) => {
-    if (ev.target && ev.target.id === "rkFile") { const f = [...(ev.target.files || [])]; ev.target.value = ""; upload(f); }
+    const kind = ev.target && ev.target.getAttribute && ev.target.getAttribute("data-rk-file");
+    if (kind) { const f = [...(ev.target.files || [])]; ev.target.value = ""; upload(kind, f); }
   });
+  // show the right variant whenever the form opens
+  const obs = () => { const v = document.getElementById("view-review"); if (v && window.MutationObserver) new MutationObserver(applyCfg).observe(v, { attributes: true, attributeFilter: ["class"] }); };
   window.__yycjSubmitReview = submit;
-  window.__yycjRevPhotos = () => photos.map((p) => p.url).filter(Boolean);
+  window.__yycjRevPhotos = () => bucket.photo.map((p) => p.url).filter(Boolean);
   window.__yycjRevReset = reset;
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount); else mount();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { mount(); obs(); }); else { mount(); obs(); }
 })();
 ;} catch (e) { try { console.error("review-kit.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "review-kit.js" }); } catch (x) {} }
 /* ---- detail-guard.js ---- */
