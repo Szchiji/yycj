@@ -88,6 +88,24 @@
     return card;
   }
   let draft = { days: 2 };
+  // 折叠状态（已核销 / 往期优惠 / 已用·已失效），重画时保持
+  const openFolds = new Set();
+  const fold = (key, label, n, body) => !n ? "" : `<div class="cpn-fold${openFolds.has(key) ? " open" : ""}" data-cpn-fold="${esc(key)}">
+    <button type="button" class="cpn-fold-h" data-cpn-fold-t="${esc(key)}"><span>${label}</span><b>${n}</b><i>›</i></button><div class="cpn-fold-b">${body}</div></div>`;
+  const claimRow = (x) => `<li class="${x.used ? "done" : ""}"><b>${esc(x.code)}</b><span>${esc(x.who)}${x.state === "void" ? " · 已失效" : ""}</span>
+    ${x.used ? (x.can_undo === false ? "<em class='cpn-done'>已用</em>" : `<button type="button" class="btn cpn-use" data-cpn-use="${esc(x.code)}" data-used="0">撤销</button>`)
+      : x.state === "usable" ? `<button type="button" class="btn primary cpn-use" data-cpn-use="${esc(x.code)}" data-used="1">标记已用</button>` : ""}</li>`;
+  function historyHtml(d) {
+    const h = d.history || [];
+    const body = h.map((c) => {
+      const act = (c.claims || []).filter((x) => x.state === "usable");
+      const used = (c.claims || []).filter((x) => x.used);
+      return `<div class="cpn-hist"><div class="cpn-hist-h"><b>${esc(c.text)}</b><small>${esc(c.status)} · 领 ${c.claimed} · 核销 ${c.used}</small></div>
+        ${act.length ? `<div class="cpn-sub">待使用</div><ul class="cpn-claims">${act.map(claimRow).join("")}</ul>` : ""}
+        ${fold("hu_" + c.coupon_id, "已核销", used.length, `<ul class="cpn-claims">${used.map(claimRow).join("")}</ul>`)}</div>`;
+    }).join("");
+    return fold("hist", `往期优惠 <small>近 ${d.history_days || 30} 天</small>`, h.length, body);
+  }
   async function paintTeacher() {
     const card = ensureCard("myCoupon"); if (!card) return;
     let d;
@@ -95,14 +113,17 @@
     if (!d.enabled) { card.remove(); return; }
     if (d.current) {
       const c = d.current;
-      const rows = (d.claims || []).map((x) => `<li><b>${esc(x.code)}</b><span>${esc(x.who)}</span>
-        <button type="button" class="btn${x.used ? "" : " primary"} cpn-use" data-cpn-use="${esc(x.code)}" data-used="${x.used ? 0 : 1}">${x.used ? "已用 ↺" : "标记已用"}</button></li>`).join("");
+      const all = d.claims || [];
+      const pend = all.filter((x) => !x.used), used = all.filter((x) => x.used);
+      const rows = pend.map(claimRow).join("");
       card.innerHTML = `<h3>我的优惠</h3>
         <div class="cpn-block mine"><div class="cpn-l"><span class="cpn-tag">惠</span><div><b>${esc(c.text)}</b><small>${esc(c.left)} · 已领 ${c.claimed}${c.quota ? "/" + c.quota : ""}</small></div></div>
         <button type="button" class="btn" data-cpn-end="1">提前结束</button></div>
         ${findHtml()}
-        <div class="cpn-sub">谁领了（客人约课时会把券码发给你）</div>
-        ${rows ? `<ul class="cpn-claims">${rows}</ul>` : "<p class='muted'>还没有人领取</p>"}`;
+        <div class="cpn-sub">待使用 ${pend.length}（客人约课时会把券码发给你）</div>
+        ${rows ? `<ul class="cpn-claims">${rows}</ul>` : `<p class='muted'>${all.length ? "领的券都核销完了" : "还没有人领取"}</p>`}
+        ${fold("used", "已核销", used.length, `<ul class="cpn-claims">${used.map(claimRow).join("")}</ul>`)}
+        ${historyHtml(d)}`;
       return;
     }
     if (!d.can_issue) { card.innerHTML = "<h3>我的优惠</h3><p class='muted'>资料上架后，可以在这里发限时优惠，比如「P100 PP200 两天有效」。</p>"; return; }
@@ -112,26 +133,33 @@
       <div class="cpn-row"><span>有效期</span>${d.presets.map((n) => `<button type="button" class="area-chip${draft.days === n ? " on" : ""}" data-cpn-days="${n}">${n}天</button>`).join("")}</div>
       <div class="cpn-row"><span>限量</span><input id="cpnQuota" type="number" min="1" max="${d.max_quota}" inputmode="numeric" placeholder="不填 = 不限" value="${esc(draft.quota || "")}" /><em>张</em></div>
       <button type="button" class="btn primary block" data-cpn-new="1">发布优惠</button>
-      <p class="muted cpn-tip">发出后立即显示；违规内容后台会停用。</p>`;
+      <p class="muted cpn-tip">发出后立即显示；违规内容后台会停用。</p>${historyHtml(d)}`;
   }
   let found = null;
   function findHtml() {
     const r = found;
     const res = !r ? "" : r.err ? `<p class="cpn-find-r muted">${esc(r.err)}</p>`
       : `<div class="cpn-find-r"><b>${esc(r.code)}</b><span>${esc(r.who)} · ${esc(r.text)} · ${r.used ? "已用" : r.valid ? "有效" : "已失效"}</span>
-        ${r.valid || r.used ? `<button type="button" class="btn${r.used ? "" : " primary"}" data-cpn-use="${esc(r.code)}" data-used="${r.used ? 0 : 1}">${r.used ? "已用 ↺" : "标记已用"}</button>` : ""}</div>`;
+        ${r.valid || r.used ? `<button type="button" class="btn${r.used ? "" : " primary"}" data-cpn-use="${esc(r.code)}" data-used="${r.used ? 0 : 1}">${r.used ? "撤销" : "标记已用"}</button>` : ""}</div>`;
     return `<div class="cpn-find"><input id="cpnFind" maxlength="12" placeholder="输入客人发来的券码" value="${esc((r && r.q) || "")}" autocapitalize="characters" /><button type="button" class="btn" data-cpn-find="1">核对</button></div>${res}`;
   }
   async function paintGuest() {
-    let items = [];
-    try { items = (await api("/api/me/claims")).items || []; } catch (e) {}
+    let d = { items: [] };
+    try { d = await api("/api/me/claims"); } catch (e) {}
+    const items = d.items || [];
     const card = ensureCard("myClaims");
     if (!card) return;
-    if (!items.length) { card.innerHTML = "<h3>我的优惠券</h3><p class='muted'>在老师详情页领取的优惠会在这里，到店出示券码即可。</p>"; }
-    else card.innerHTML = "<h3>我的优惠券</h3><ul class='cpn-mine'>" + items.map((c) => `<li data-cpn-open="${esc(c.lamp_id)}">
-      <div><b>${esc(c.title)}</b><span>${esc(c.text)}</span><small>${c.my_used ? "已用" : c.my_valid ? "有效 · " + esc(c.left) : "已失效"}</small></div>
-      <div class="cpn-mc"><code class="${c.my_valid ? "" : "used"}">${esc(c.my_code)}</code>${c.my_valid ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(c.my_code)}" data-cpn-t="${esc(c.text)}">复制券码</button>` : ""}</div></li>`).join("") + "</ul>" +
-      "<p class='muted cpn-tip'>约课时把券码发给老师，老师在「我的优惠」里核销。券码在优惠结束时间前有效。</p>";
+    const li = (c) => `<li data-cpn-open="${esc(c.lamp_id)}" class="${c.state === "usable" ? "" : "done"}">
+      <div><b>${esc(c.title)}</b><span>${esc(c.text)}</span><small>${c.state === "used" ? "已用" : c.state === "usable" ? "有效 · " + esc(c.left) : "已失效"}</small></div>
+      <div class="cpn-mc"><code class="${c.state === "usable" ? "" : "used"}">${esc(c.my_code)}</code>${c.state === "usable" ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(c.my_code)}" data-cpn-t="${esc(c.text)}">复制券码</button>` : ""}</div></li>`;
+    const use = items.filter((c) => c.state === "usable"), done = items.filter((c) => c.state !== "usable");
+    const days = d.hide_days || 7;
+    if (!items.length && !d.hidden) { card.innerHTML = "<h3>我的优惠券</h3><p class='muted'>在老师详情页领取的优惠会在这里，约课时把券码发给老师即可。</p>"; return; }
+    card.innerHTML = "<h3>我的优惠券</h3>" +
+      (use.length ? "<ul class='cpn-mine'>" + use.map(li).join("") + "</ul>" : "<p class='muted'>暂时没有可用的券。</p>") +
+      fold("gdone", "已用 / 已失效", done.length, "<ul class='cpn-mine'>" + done.map(li).join("") + "</ul>" +
+        `<p class='muted cpn-tip'>已用、已失效的券 ${days} 天后自动不再显示。</p>`) +
+      (use.length ? "<p class='muted cpn-tip'>约课时把券码发给老师，老师在「我的优惠」里核销。券码在优惠结束时间前有效。</p>" : "");
   }
   async function paintCityList() {
     const card = ensureCard("cityCoupons", "#myClaims");
@@ -157,6 +185,9 @@
 
   document.addEventListener("click", async (ev) => {
     const t = ev.target;
+    const ft = t.closest && t.closest("[data-cpn-fold-t]");
+    if (ft) { const k = ft.getAttribute("data-cpn-fold-t"); const box = ft.parentElement; const on = !box.classList.contains("open");
+      box.classList.toggle("open", on); if (on) openFolds.add(k); else openFolds.delete(k); return; }
     const cl = t.closest && t.closest("[data-cpn-claim]");
     if (cl) {
       cl.disabled = true;
