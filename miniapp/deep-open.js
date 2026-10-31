@@ -80,6 +80,7 @@
     try { window.__yycjLoadDetailExtras && window.__yycjLoadDetailExtras(lamp.lamp_id); } catch (e) {}
     afterOpen(lamp.lamp_id);
   }
+  window.__yycjOpenLampById = (id) => openLamp(id);  // used by 「本城优惠」 / 「我的优惠券」 (coupons.js)
   async function openLamp(id) {
     if (!id) return;
     try { sessionStorage.setItem("yycj_open_lamp", id); localStorage.removeItem("yycj_open_lamp"); } catch (e) {}

@@ -99,3 +99,10 @@ body.side-open .side-mask {
   #btnMenu { display: none; }
   .pick-item { grid-template-columns: 1fr auto; align-items: center; }
 }
+/* 优惠券 (admin-coupons.js) */
+.cpn-admin .cpn-a-wrap{overflow-x:auto;}
+.cpn-admin .cpn-a-table{width:100%;border-collapse:collapse;font-size:13px;}
+.cpn-admin .cpn-a-table th,.cpn-admin .cpn-a-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;vertical-align:top;}
+.cpn-admin .cpn-a-text{color:#E5CC8E;font-weight:600;}
+.cpn-admin .cpn-a-all{display:inline-flex!important;align-items:center;gap:6px;margin:4px 0 8px;font-size:13px;width:auto!important;}
+.cpn-admin .cpn-a-all input{width:auto!important;margin:0;}

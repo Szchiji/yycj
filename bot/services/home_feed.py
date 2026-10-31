@@ -37,6 +37,8 @@ DEFAULT_OPS = {
     "broadcast_template": "🌙 月影车姬 · 新上架\n{称呼}\n📍 {地点}\n💰 {价位}\n{标签}\n{简介}\n{链接}",
     "broadcast_reviews": False,  # 精选评价推送到频道（默认关）
     "channel_directory": False,  # 频道按区目录（每天 12:00 刷新同一条，默认关）
+    "coupons_enabled": True,  # 老师在「我的」发限时优惠
+    "coupon_display": "badge",  # 首页入口: badge = 卡片「惠」字 / filter = 筛选里「有优惠」 / list = 「我的 · 本城优惠」; 可多选逗号分隔
     "listing_fields": [
         {"key": "称呼", "label": "称呼", "form": True},
         {"key": "城市", "label": "城市", "form": True},
@@ -183,6 +185,9 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_template"] = str(out.get("broadcast_template") or DEFAULT_OPS["broadcast_template"])[:2000]
     out["broadcast_reviews"] = bool(out.get("broadcast_reviews"))
     out["channel_directory"] = bool(out.get("channel_directory"))
+    out["coupons_enabled"] = bool(out.get("coupons_enabled", True))
+    disp = [x for x in str(out.get("coupon_display") or "").replace(" ", "").split(",") if x in ("badge", "filter", "list")]
+    out["coupon_display"] = ",".join(dict.fromkeys(disp)) or "badge"
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
     out["review_require_audit"] = audit_on(out.get("review_require_audit"))

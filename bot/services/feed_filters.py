@@ -213,6 +213,7 @@ class Filter:
                  lat: Optional[float] = None, lng: Optional[float] = None, radius: Optional[float] = None,
                  sort: str = "new") -> None:
         self.band = parse_band(price)
+        self.coupon_ids = None  # set of lamp_ids with a live coupon when 「有优惠」 is on
         self.tags = parse_tags(tags)
         self.open_only = bool(open_only)
         self.center = round_center(lat, lng)
@@ -233,10 +234,11 @@ class Filter:
     @property
     def needs_python(self) -> bool:
         """营业中 / 距离 are computed per listing, not in SQL."""
-        return self.open_only or self.radius is not None or self.sort == "near"
+        return self.open_only or self.radius is not None or self.sort == "near" or self.coupon_ids is not None
 
     def active_count(self, district: Optional[str] = None) -> int:
-        return sum([bool(district), self.has_price, bool(self.tags), self.open_only, self.radius is not None])
+        return sum([bool(district), self.has_price, bool(self.tags), self.open_only, self.radius is not None,
+                    self.coupon_ids is not None])
 
     def match_sql_side(self, lamp: Dict[str, Any]) -> bool:
         """Price + tags, for lists that did not come from SQL (the carousel)."""
@@ -264,6 +266,8 @@ class Filter:
     def match_python_side(self, lamp: Dict[str, Any]) -> bool:
         """营业中 / 半径. `lamp` already went through _with_shop (open_code)."""
         if self.open_only and lamp.get("open_code") != "open":
+            return False
+        if self.coupon_ids is not None and lamp.get("lamp_id") not in self.coupon_ids:
             return False
         if self.radius is not None:
             km = self.distance(lamp)

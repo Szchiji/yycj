@@ -96,6 +96,7 @@ async def api_home(
     open_now: int = Query(default=0, ge=0, le=1, alias="open"),
     radius: Optional[float] = Query(default=None, ge=0, le=50),
     at: Optional[str] = Query(default=None, max_length=32),
+    coupon: int = Query(default=0, ge=0, le=1),
     limit: int = Query(default=3, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=500),
     user_id: int = Depends(get_current_user_id),
@@ -123,6 +124,11 @@ async def api_home(
             lat, lng = pt
     flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort)
     sort = flt.sort
+    coupons_on = bool(settings.get("coupons_enabled", True))
+    if coupon and coupons_on:
+        # 「有优惠」 filter: only listings with a live coupon (computed per listing, like 营业中)
+        from bot.services import coupons as coupon_svc
+        flt.coupon_ids = await coupon_svc.live_lamp_ids(use_city)
     pins = []
     try:
         pins_raw = await pin_query.list_active_pins()
@@ -210,6 +216,16 @@ async def api_home(
         except Exception:
             logger.exception("serialize lamp failed")
 
+    if coupons_on and safe_items:
+        try:
+            from bot.services import coupons as coupon_svc
+            live = await coupon_svc.live_by_lamp([c.get("lamp_id") for c in safe_items])
+            for c in safe_items:
+                if c.get("lamp_id") in live:
+                    c["coupon"] = live[c["lamp_id"]]
+        except Exception:
+            logger.exception("coupon badges failed")
+
     # 地区筛选：当前城市各区在架数（仅首屏返回）。轮播不受筛选影响。
     districts = None
     if offset == 0:
@@ -246,6 +262,7 @@ async def api_home(
         "media_max_count": int(settings.get("media_max_count") or 6),
         "page_size": int(settings.get("home_feed_page_size") or 3),
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
+        "coupon_display": (settings.get("coupon_display") or "badge") if coupons_on else "",
         "contacts": contacts,
         "listing_fields": settings.get("listing_fields") or [],
         "review_form": {
