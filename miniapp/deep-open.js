@@ -32,9 +32,14 @@
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
-  function paint(lamp) {
+  function paint(lamp, data) {
     const box = document.getElementById("detail");
     if (!box || !lamp) return;
+    if (window.__yycjRenderDetail && window.__yycjRenderDetail(data || { lamp }, lamp.lamp_id)) {
+      showDetail();
+      try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
+      return;
+    }
     box.setAttribute("data-lamp", lamp.lamp_id || "");
     const loc = [lamp.city, lamp.district, lamp.approx_label].filter(Boolean).join(" · ");
     box.innerHTML = `<div class="card">
@@ -68,7 +73,7 @@
       const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token } });
       if (!r.ok) return;
       const data = await r.json();
-      paint(data.lamp || data);
+      paint(data.lamp || data, data);
     } catch (e) {}
   }
   async function boot() {

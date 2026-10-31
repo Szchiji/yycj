@@ -76,7 +76,9 @@ def test_every_local_asset_is_versioned_and_consistent():
             versions.add(q)
             assert (MINI / name).is_file(), f"{page}: {name} missing"
         assert len(versions) == 1, f"{page}: mixed cache-bust strings {versions}"
-        assert "swipe-back.js" in html and "net-cache.js" in html
+        assert "app.bundle.js" in html
+        bundle = (MINI / "app.bundle.js").read_text("utf-8")
+        assert "swipe-back.js ----" in bundle and "net-cache.js ----" in bundle
         # all local scripts deferred, in the original order
         assert not re.search(r'<script src="\./[^"]+"></script>', html)
 

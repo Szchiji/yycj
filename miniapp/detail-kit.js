@@ -175,16 +175,71 @@
       const data = await r.json();
       if ((window.__yycjOpenLamp || id) !== id) return;
       last = { id, data };
+      const card = document.querySelector("#detail > .card");
+      if (card && rendered.card === card && rendered.id === id && rendered.sig === sigOf(data)) return;
       paintAll(data, id);
     } catch (e) {}
   }
   window.__yycjLoadDetailExtras = loadLamp;
+  // The one detail renderer. app.js, deep-open.js and detail-guard.js all hand their response here,
+  // and it builds the whole page in a single synchronous pass: info card (same markup app.js used),
+  // approx / tags / contacts / reviews / share, then the XHS layout (detail-xhs.js). The same
+  // listing data is rendered once; a second copy of the same response is a no-op.
+  let rendered = { id: "", sig: "", card: null };
+  function sigOf(data) { try { return JSON.stringify([data.lamp || data.item || data, data.reviews || null]); } catch (e) { return String(Math.random()); } }
+  function showView(name) {
+    document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+    document.getElementById("view-" + name)?.classList.remove("hidden");
+    document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.nav === name));
+  }
+  function wireButtons(l) {
+    const rep = document.getElementById("detailReport");
+    if (rep) rep.onclick = async () => {
+      const reason = prompt("举报原因") || "";
+      if (!reason) return;
+      try {
+        const r = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() }, body: JSON.stringify({ lamp_id: l.lamp_id, reason, description: "" }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || "举报失败");
+        toast("举报已提交");
+      } catch (e) { toast(e.message || String(e), true); }
+    };
+    const rev = document.getElementById("detailReview");
+    if (rev) rev.onclick = () => { const h = document.getElementById("revLampId"); if (h) h.value = l.lamp_id; showView("review"); };
+  }
+  function renderDetail(data, id) {
+    const box = document.getElementById("detail");
+    const l = data && (data.lamp || data.item);
+    if (!box || !l) return false;
+    id = String(id || l.lamp_id || "");
+    const sig = sigOf(data);
+    const card = box.querySelector(":scope > .card");
+    if (rendered.id === id && rendered.sig === sig && card && card === rendered.card && box.getAttribute("data-lamp") === id) return true;
+    box.innerHTML = `<div class="card"><h3>${esc(l.title || "")}</h3><div class="muted">📍 ${esc(l.city || "")}${l.district ? " · " + esc(l.district) : ""}</div><div class="muted">💰 ${esc(l.price_text || "面议")}</div><p>${esc(l.description || "")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`;
+    box.setAttribute("data-lamp", id);
+    window.__yycjOpenLamp = id;
+    wireButtons(l);
+    last = { id, data };
+    try { paintAll(data, id); } catch (e) {}
+    try { placeShare(id); } catch (e) {}
+    try { if (window.__yycjDecorateDetail) window.__yycjDecorateDetail(); } catch (e) {}
+    rendered = { id, sig, card: box.querySelector(":scope > .card") };
+    return true;
+  }
+  window.__yycjRenderDetail = renderDetail;
   // Coalesce identical concurrent GET /api/home?limit=1 calls (same token, still in flight)
   // so detail-kit and share.js share one request at boot. Each caller still parses the same JSON.
   if (!window.__yycjHomeLite) {
     const inflight = {};
+    let waiting = null;
     window.__yycjHomeLite = () => {
       const t = token();
+      // before login there is no token yet: wait for it (up to 6s) instead of sending a request
+      // that is wasted; with a token the answer is shared with the feed request (net-cache.js)
+      if (!t) {
+        if (!waiting) waiting = (async () => { for (let i = 0; i < 60 && !token(); i += 1) await new Promise((r) => setTimeout(r, 100)); waiting = null; return token() ? window.__yycjHomeLite() : fetch("/api/home?limit=1").then((r) => r.json()); })();
+        return waiting;
+      }
       if (inflight[t]) return inflight[t];
       const p = fetch("/api/home?limit=1", { headers: { Authorization: "Bearer " + t } }).then((r) => r.json());
       inflight[t] = p;
