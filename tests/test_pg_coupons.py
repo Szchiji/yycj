@@ -63,7 +63,7 @@ def test_coupons():
                 h = await c.get("/api/home?city=上海&limit=20", headers=tok(G1))
                 by = {x["title"]: x for x in h.json()["items"]}
                 assert by["上上"]["coupon"]["text"] == "P100 PP200" and "coupon" not in by["下下"]
-                assert h.json()["coupon_display"] == "badge"
+                assert h.json()["coupon_display"] == "badge,filter,list"
                 h = await c.get("/api/home?city=上海&limit=20&coupon=1", headers=tok(G1))
                 assert [x["title"] for x in h.json()["items"]] == ["上上"] and h.json()["filters"]["active"] == 1
                 lst = (await c.get("/api/coupons?city=上海", headers=tok(G1))).json()["items"]

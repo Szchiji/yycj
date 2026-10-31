@@ -13,7 +13,7 @@ from bot.services.share_gate import join_kb, missing_required, open_card_kb, par
 
 router = Router(name="start")
 
-_OPEN_TEXT = {"s": "点下方打开资料。", "r": "点下方查看这条资料的评价。", "w": "点下方给这条资料写评价。"}
+_OPEN_TEXT = {"s": "点下方打开资料。", "r": "点下方查看这条资料的评价。", "w": "点下方给这条资料写评价。", "q": "点下方打开资料，领取优惠。"}
 
 HELP_TEXT = """<b>月影车姬</b>
 点左下角「首页」打开应用。

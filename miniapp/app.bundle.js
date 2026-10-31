@@ -2355,7 +2355,7 @@ try {
     let s = String(raw || "").trim();
     if (!s) return { id: "", kind: "s" };
     let kind = "s";
-    if (/^[srwc]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
+    if (/^[srwcq]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
       return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
@@ -2369,7 +2369,7 @@ try {
     if (fromQ) {
       // bot deep link (?start=r_/w_…) → WebApp button → go.html?lamp=<id>&open=r|w
       const open = String(q.get("open") || "").toLowerCase();
-      if (/^[rwc]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
+      if (/^[rwcq]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
       return restore(fromQ) || fromQ;
     }
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -2396,6 +2396,9 @@ try {
       setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
     } else if (kind === "w") {
       setTimeout(() => { try { document.getElementById("detailReview")?.click(); } catch (e) {} }, 700);
+    } else if (kind === "q") {
+      // channel coupon post 「领取优惠」 → detail, then point at the coupon block (coupons.js paints it)
+      setTimeout(() => { try { const b = document.querySelector("#detail .cpn-block"); if (b) { b.scrollIntoView({ block: "center", behavior: "smooth" }); b.classList.add("cpn-flash"); } } catch (e) {} }, 1200);
     } else if (kind === "c") {
       setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
     }
@@ -3777,7 +3780,7 @@ try {
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function role() { try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || localStorage.getItem("yycj_role") || "guest"; } catch (e) { return "guest"; } }
   const isTeacher = () => role() === "teacher" || role() === "merchant";
-  function display() { const d = (window.__yycjHomeData || {}).coupon_display; return d == null ? "badge" : String(d); }
+  function display() { const d = (window.__yycjHomeData || {}).coupon_display; return d == null ? "badge,filter,list" : String(d); }
   window.__yycjCouponMode = (k) => display().split(",").includes(k);
   function toast(msg) { const el = $("#toast"); if (!el) return; el.textContent = msg; el.classList.remove("hidden", "err"); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add("hidden"), 2600); }
   async function api(path, opt = {}) {
@@ -3785,6 +3788,28 @@ try {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || "请求失败");
     return d;
+  }
+  // 约课用优惠: the guest sends the code to the teacher when booking
+  const bookText = (code, text) => `你好，我想约课，使用优惠券：${code}（${text}）`;
+  function copy(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).catch(() => legacyCopy(text)); return true; } } catch (e) {}
+    return legacyCopy(text);
+  }
+  function legacyCopy(text) {
+    try { const t = document.createElement("textarea"); t.value = text; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;left:-9999px;top:0";
+      document.body.appendChild(t); t.select(); const ok = document.execCommand("copy"); t.remove(); return ok; } catch (e) { return false; }
+  }
+  let held = null;   // {lamp, code, text} — unused, valid code for the open listing
+  // contact links that are a plain t.me/<username> accept ?text= — prefill the booking line there
+  function prefillLinks() {
+    const box = $("#detail"); if (!box) return;
+    box.querySelectorAll("a.tg-link").forEach((a) => {
+      const raw = a.getAttribute("data-orig") || a.getAttribute("href") || "";
+      if (!a.getAttribute("data-orig")) a.setAttribute("data-orig", raw);
+      const m = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{3,31})\/?$/.exec(raw);
+      const url = held && m && !/bot$/i.test(m[1]) ? raw.replace(/\/$/, "") + "?text=" + encodeURIComponent(bookText(held.code, held.text)) : raw;
+      a.setAttribute("href", url); if (a.hasAttribute("data-tg")) a.setAttribute("data-tg", url);
+    });
   }
   const quotaTxt = (c) => c.quota ? `限${c.quota}张 · 剩${c.remain}张` : "不限量";
   const STATUS = { expired: "已结束", sold_out: "已领完", ended: "已结束", stopped: "已停用" };
@@ -3800,23 +3825,26 @@ try {
     try { c = (await api("/api/lamps/" + encodeURIComponent(id) + "/coupon")).coupon; } catch (e) { return; }
     if ((box.getAttribute("data-lamp") || "") !== id) return;
     el = card.querySelector(".cpn-block");
-    if (!c) { if (el) el.remove(); return; }
+    if (!c) { held = null; prefillLinks(); if (el) el.remove(); return; }
     if (!el) {
       el = document.createElement("div"); el.className = "cpn-block";
       const price = card.querySelector(".xhs-price"); if (price) price.after(el); else card.prepend(el);
     }
     el.dataset.lamp = id; el.dataset.ok = "1";
+    held = c.my_code && c.my_valid && !c.own ? { lamp: id, code: c.my_code, text: c.text } : null;
+    prefillLinks();
     const act = c.own ? `<span class="cpn-own">你发的优惠</span>`
-      : c.my_code ? `<div class="cpn-code"><span>我的券码</span><b>${esc(c.my_code)}</b>${c.my_used ? "<i>已用</i>" : ""}</div>`
+      : c.my_code ? `<div class="cpn-code"><span>我的券码</span><b>${esc(c.my_code)}</b>${c.my_used ? "<i>已用</i>" : (c.my_valid ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(c.my_code)}" data-cpn-t="${esc(c.text)}">复制券码</button>` : "<i>已失效</i>")}</div>`
       : c.live ? `<button type="button" class="btn primary cpn-claim" data-cpn-claim="${esc(c.coupon_id)}">领取</button>`
       : `<span class="cpn-off">${esc(STATUS[c.status] || "已结束")}</span>`;
     el.innerHTML = `<div class="cpn-l"><span class="cpn-tag">惠</span><div><b>${esc(c.text)}</b><small>${esc(c.left)} · ${esc(quotaTxt(c))}</small></div></div>${act}
-      ${c.my_code ? '<p class="cpn-tip">到店时把券码给老师看。也在「我的 · 我的优惠券」里。</p>' : ""}`;
+      ${c.my_code && c.my_valid ? `<p class="cpn-tip">约课时把券码发给老师（点「${esc(ctaLabel())}」会自动复制好）。有效至优惠结束：${esc(c.left)}。</p>` : ""}`;
   }
+  function ctaLabel() { return String((window.__yycjHome || {}).chat_cta_label || "想聊聊").slice(0, 12); }
   const watchDetail = () => {
     const box = $("#detail"); if (!box || !window.MutationObserver) return;
     let t = 0;
-    new MutationObserver(() => { clearTimeout(t); t = setTimeout(paintDetail, 120); }).observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-lamp"] });
+    new MutationObserver(() => { clearTimeout(t); t = setTimeout(() => { if (held && held.lamp !== box.getAttribute("data-lamp")) held = null; paintDetail(); prefillLinks(); }, 120); }).observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-lamp"] });
   };
 
   // ---- 我的 ----
@@ -3843,18 +3871,27 @@ try {
       card.innerHTML = `<h3>我的优惠</h3>
         <div class="cpn-block mine"><div class="cpn-l"><span class="cpn-tag">惠</span><div><b>${esc(c.text)}</b><small>${esc(c.left)} · 已领 ${c.claimed}${c.quota ? "/" + c.quota : ""}</small></div></div>
         <button type="button" class="btn" data-cpn-end="1">提前结束</button></div>
-        <div class="cpn-sub">谁领了（客人到店出示券码）</div>
+        ${findHtml()}
+        <div class="cpn-sub">谁领了（客人约课时会把券码发给你）</div>
         ${rows ? `<ul class="cpn-claims">${rows}</ul>` : "<p class='muted'>还没有人领取</p>"}`;
       return;
     }
     if (!d.can_issue) { card.innerHTML = "<h3>我的优惠</h3><p class='muted'>资料上架后，可以在这里发限时优惠，比如「P100 PP200 两天有效」。</p>"; return; }
-    card.innerHTML = `<h3>我的优惠</h3>
+    card.innerHTML = `<h3>我的优惠</h3>${d.has_claims ? findHtml() : ""}
       <p class="muted cpn-lead">发一个限时优惠，客人在你的详情页领取，到店出示券码。同一时间只能有 1 个。</p>
       <input id="cpnText" maxlength="${d.max_text}" placeholder="优惠内容，比如 P100 PP200" value="${esc(draft.text || "")}" />
       <div class="cpn-row"><span>有效期</span>${d.presets.map((n) => `<button type="button" class="area-chip${draft.days === n ? " on" : ""}" data-cpn-days="${n}">${n}天</button>`).join("")}</div>
       <div class="cpn-row"><span>限量</span><input id="cpnQuota" type="number" min="1" max="${d.max_quota}" inputmode="numeric" placeholder="不填 = 不限" value="${esc(draft.quota || "")}" /><em>张</em></div>
       <button type="button" class="btn primary block" data-cpn-new="1">发布优惠</button>
       <p class="muted cpn-tip">发出后立即显示；违规内容后台会停用。</p>`;
+  }
+  let found = null;
+  function findHtml() {
+    const r = found;
+    const res = !r ? "" : r.err ? `<p class="cpn-find-r muted">${esc(r.err)}</p>`
+      : `<div class="cpn-find-r"><b>${esc(r.code)}</b><span>${esc(r.who)} · ${esc(r.text)} · ${r.used ? "已用" : r.valid ? "有效" : "已失效"}</span>
+        ${r.valid || r.used ? `<button type="button" class="btn${r.used ? "" : " primary"}" data-cpn-use="${esc(r.code)}" data-used="${r.used ? 0 : 1}">${r.used ? "已用 ↺" : "标记已用"}</button>` : ""}</div>`;
+    return `<div class="cpn-find"><input id="cpnFind" maxlength="12" placeholder="输入客人发来的券码" value="${esc((r && r.q) || "")}" autocapitalize="characters" /><button type="button" class="btn" data-cpn-find="1">核对</button></div>${res}`;
   }
   async function paintGuest() {
     let items = [];
@@ -3863,8 +3900,9 @@ try {
     if (!card) return;
     if (!items.length) { card.innerHTML = "<h3>我的优惠券</h3><p class='muted'>在老师详情页领取的优惠会在这里，到店出示券码即可。</p>"; }
     else card.innerHTML = "<h3>我的优惠券</h3><ul class='cpn-mine'>" + items.map((c) => `<li data-cpn-open="${esc(c.lamp_id)}">
-      <div><b>${esc(c.title)}</b><span>${esc(c.text)}</span><small>${esc(c.live || c.status === "sold_out" ? c.left : (STATUS[c.status] || c.left))}</small></div>
-      <code class="${c.my_used ? "used" : ""}">${esc(c.my_code)}</code></li>`).join("") + "</ul>";
+      <div><b>${esc(c.title)}</b><span>${esc(c.text)}</span><small>${c.my_used ? "已用" : c.my_valid ? "有效 · " + esc(c.left) : "已失效"}</small></div>
+      <div class="cpn-mc"><code class="${c.my_valid ? "" : "used"}">${esc(c.my_code)}</code>${c.my_valid ? `<button type="button" class="cpn-copy" data-cpn-copy="${esc(c.my_code)}" data-cpn-t="${esc(c.text)}">复制券码</button>` : ""}</div></li>`).join("") + "</ul>" +
+      "<p class='muted cpn-tip'>约课时把券码发给老师，老师在「我的优惠」里核销。券码在优惠结束时间前有效。</p>";
   }
   async function paintCityList() {
     const card = ensureCard("cityCoupons", "#myClaims");
@@ -3905,12 +3943,35 @@ try {
       return;
     }
     if (t.closest && t.closest("[data-cpn-end]")) {
-      if (!confirm("提前结束这个优惠？已领的券码仍然有效。")) return;
+      if (!confirm("提前结束这个优惠？不能再领；已领的券码在原定结束时间前仍然有效。")) return;
       try { await api("/api/me/coupon/end", { method: "POST" }); toast("已结束"); paintTeacher(); } catch (e) { toast(e.message); }
       return;
     }
     const use = t.closest && t.closest("[data-cpn-use]");
-    if (use) { try { await api("/api/me/coupon/use", { method: "POST", body: JSON.stringify({ code: use.getAttribute("data-cpn-use"), used: use.getAttribute("data-used") === "1" }) }); paintTeacher(); } catch (e) { toast(e.message); } return; }
+    if (use) {
+      try {
+        const code = use.getAttribute("data-cpn-use");
+        await api("/api/me/coupon/use", { method: "POST", body: JSON.stringify({ code, used: use.getAttribute("data-used") === "1" }) });
+        if (found && found.code === code) { try { found = Object.assign((await api("/api/me/coupon/code?code=" + encodeURIComponent(code))).claim, { q: found.q }); } catch (e) {} }
+        toast(use.getAttribute("data-used") === "1" ? "已核销" : "已撤销核销"); paintTeacher();
+      } catch (e) { toast(e.message); }
+      return;
+    }
+    if (t.closest && t.closest("[data-cpn-find]")) {
+      const q = (($("#cpnFind") || {}).value || "").trim().toUpperCase();
+      if (!q) return toast("请输入券码");
+      try { found = Object.assign((await api("/api/me/coupon/code?code=" + encodeURIComponent(q))).claim, { q }); }
+      catch (e) { found = { err: e.message, q }; }
+      paintTeacher(); return;
+    }
+    const cp = t.closest && t.closest("[data-cpn-copy]");
+    if (cp) { copy(bookText(cp.getAttribute("data-cpn-copy"), cp.getAttribute("data-cpn-t") || "")); toast("已复制券码，发给老师即可"); return; }
+    // 想聊聊 / 约课 with a valid code: copy the booking line first (the relay chat can't be prefilled)
+    if (held && t.closest && t.closest("#detailChat")) {
+      copy(bookText(held.code, held.text)); toast("已复制券码，发给老师即可");
+    }
+    const tl = held && t.closest && t.closest("#detail a.tg-link");
+    if (tl) { copy(bookText(held.code, held.text)); }
     const op = t.closest && t.closest("[data-cpn-open]");
     if (op) { openLamp(op.getAttribute("data-cpn-open")); return; }
     if (t.closest && t.closest('[data-nav="me"], [data-switch]')) setTimeout(paintMe, 400);

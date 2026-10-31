@@ -70,6 +70,15 @@ async def api_my_coupon_use(body: UseBody, user_id: int = Depends(get_current_us
     return {"ok": True, **(await coupons.mine(user_id))}
 
 
+@router.get("/me/coupon/code")
+async def api_my_coupon_code(code: str = "", user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    """老师核销：按券码查（当前和以前发的优惠都能查）。"""
+    hit = await coupons.lookup(user_id, code)
+    if not hit:
+        raise HTTPException(status_code=404, detail="没找到这个券码")
+    return {"ok": True, "claim": hit}
+
+
 @router.get("/me/claims")
 async def api_my_claims(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
     return {"ok": True, "items": await coupons.my_claims(user_id)}

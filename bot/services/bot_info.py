@@ -114,6 +114,14 @@ async def startup_maintenance(scheduler=None) -> None:
     except Exception:
         logger.exception("channel directory job skipped")
     try:
+        if scheduler is not None and getattr(scheduler, "running", False):
+            # 优惠推送：过期 / 结束 / 停用 / 领完 → 频道帖改成「已结束」
+            from bot.services.coupon_push import job_close_due
+            scheduler.add_job(job_close_due, "interval", minutes=10, id="coupon_posts",
+                              replace_existing=True, coalesce=True, max_instances=1)
+    except Exception:
+        logger.exception("coupon post job skipped")
+    try:
         # pending reviews from the last day that never reached the bot admins (each sent once)
         from bot.services.review_notify import backfill_pending
         await backfill_pending(24)

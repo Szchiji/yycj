@@ -32,3 +32,12 @@
 .cpn-mine code{font-size:16px;letter-spacing:2px;color:var(--t-link,#E5CC8E);padding:4px 8px;border:1px solid var(--t-accent,#D4B26A);border-radius:8px;}
 .cpn-mine code.used{opacity:.5;text-decoration:line-through;}
 .cpn-list em{font-style:normal;color:var(--t-muted,#B4BCAF);font-size:18px;}
+.cpn-copy{margin-top:4px;padding:3px 10px;border-radius:999px;border:1px solid var(--t-accent,#D4B26A);background:transparent;color:var(--t-link,#E5CC8E);font-size:12px;}
+.cpn-mc{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.cpn-find{display:flex;gap:8px;margin:10px 0 4px;}
+.cpn-find input{flex:1;margin:0;text-transform:uppercase;letter-spacing:2px;}
+.cpn-find-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 4px;padding:8px 10px;border-radius:10px;background:rgba(212,178,106,.10);}
+.cpn-find-r b{font-family:ui-monospace,Menlo,monospace;letter-spacing:2px;color:var(--t-link,#E5CC8E);}
+.cpn-find-r span{flex:1;font-size:13px;color:var(--t-text,#F1EEE4);}
+.cpn-flash{animation:cpnFlash 1.2s ease 2;}
+@keyframes cpnFlash{50%{box-shadow:0 0 0 3px rgba(212,178,106,.55);}}

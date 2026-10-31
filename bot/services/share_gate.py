@@ -17,11 +17,11 @@ _UUID_DASH = re.compile(
 )
 
 
-OPEN_KINDS = {"s": "打开资料", "r": "查看评价", "w": "写评价"}
+OPEN_KINDS = {"s": "打开资料", "r": "查看评价", "w": "写评价", "q": "领取优惠"}
 
 
 def parse_start_payload(arg: str) -> tuple[str, Optional[str]]:
-    """``s_|r_|w_<uuid or 32hex>`` → (kind, lamp_id). s=详情, r=评价区, w=写评价. Bare id = s."""
+    """``s_|r_|w_|q_<uuid or 32hex>`` → (kind, lamp_id). s=详情, r=评价区, w=写评价, q=领取优惠. Bare id = s."""
     raw = (arg or "").strip()
     kind = "s"
     if len(raw) > 2 and raw[1] == "_" and raw[0].lower() in OPEN_KINDS:
@@ -48,7 +48,7 @@ def card_page_url(lamp_id: str, kind: str = "s") -> str:
         return ""
     if webapp.endswith(".html"):
         webapp = webapp.rsplit("/", 1)[0]
-    extra = f"&open={kind}" if kind in ("r", "w") else ""
+    extra = f"&open={kind}" if kind in ("r", "w", "q") else ""
     return f"{webapp}/go.html?lamp={lamp_id}{extra}"
 
 

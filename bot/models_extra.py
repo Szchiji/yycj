@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bot.models import Base
@@ -72,6 +72,10 @@ class Coupon(Base):
     claimed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)  # active / ended / stopped
     stopped_by: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    # channel post (优惠推送): edited to 「已结束」 once the coupon ends / expires / is stopped / sold out
+    post_chat: Mapped[str] = mapped_column(String(64), nullable=True)
+    post_mid: Mapped[int] = mapped_column(Integer, nullable=True)
+    post_closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

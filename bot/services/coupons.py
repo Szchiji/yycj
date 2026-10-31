@@ -66,7 +66,14 @@ def public(c: Coupon, mine: Optional[CouponClaim] = None) -> Dict[str, Any]:
     if mine is not None:
         out["my_code"] = mine.code
         out["my_used"] = bool(mine.used_at)
+        out["my_valid"] = code_valid(c, mine, now)
     return out
+
+
+def code_valid(c: Coupon, cl: CouponClaim, now: Optional[datetime] = None) -> bool:
+    """A claimed code is good until the coupon's own end time (not claim time + N), even if the teacher
+    ended the coupon early or it sold out. Void once used or when the admin stopped the coupon."""
+    return not cl.used_at and c.status != "stopped" and c.ends_at > (now or _now())
 
 
 def clean_text(raw: Any) -> str:
@@ -104,18 +111,44 @@ async def create(user_id: int, text: Any, days: Any, quota: Any = 0) -> Dict[str
                                 .order_by(Lamp.id.desc()).limit(1))).scalar_one_or_none()
         if not lamp:
             raise CouponError("资料上架后才能发优惠")
+        old = [x for (x,) in (await s.execute(select(Coupon.coupon_id).where(Coupon.user_id == user_id, Coupon.status == "active"))).all()]
         await s.execute(update(Coupon).where(Coupon.user_id == user_id, Coupon.status == "active").values(status="ended"))
         c = Coupon(coupon_id=str(uuid.uuid4()), user_id=user_id, lamp_id=lamp.lamp_id, city=lamp.city or "",
                    text=body, ends_at=_now() + timedelta(days=d), quota=q, claimed=0, status="active")
         s.add(c)
         await s.flush()
-        return public(c)
+        out = public(c)
+    await _after_change(old, "ended")
+    await _publish(out["coupon_id"])
+    return out
+
+
+async def _publish(coupon_id: str) -> None:
+    try:
+        from bot.services import coupon_push
+        await coupon_push.publish(coupon_id)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("coupon publish failed")
+
+
+async def _after_change(coupon_ids, reason: str) -> None:
+    from bot.services import coupon_push
+    for cid in coupon_ids or []:
+        try:
+            await coupon_push.close(cid, reason)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("coupon post close failed")
 
 
 async def end(user_id: int) -> bool:
+    """提前结束: no new claims. Codes already claimed stay valid until the coupon's own end time."""
     async with session_scope() as s:
-        r = await s.execute(update(Coupon).where(Coupon.user_id == user_id, Coupon.status == "active").values(status="ended"))
-        return bool(r.rowcount)
+        ids = [x for (x,) in (await s.execute(select(Coupon.coupon_id).where(Coupon.user_id == user_id, Coupon.status == "active"))).all()]
+        await s.execute(update(Coupon).where(Coupon.user_id == user_id, Coupon.status == "active").values(status="ended"))
+    await _after_change(ids, "ended")
+    return bool(ids)
 
 
 async def mine(user_id: int) -> Dict[str, Any]:
@@ -129,8 +162,11 @@ async def mine(user_id: int) -> Dict[str, Any]:
         if c:
             rows = (await s.execute(select(CouponClaim, User.guest_alias).outerjoin(User, User.user_id == CouponClaim.user_id)
                                     .where(CouponClaim.coupon_id == c.coupon_id).order_by(CouponClaim.id.desc()))).all()
-            claims = [{"code": cl.code, "who": alias or "客人", "used": bool(cl.used_at), "at": _iso(cl.created_at)} for cl, alias in rows]
-        return {"current": public(c) if c else None, "claims": claims, "can_issue": has_lamp,
+            claims = [{"code": cl.code, "who": alias or "客人", "used": bool(cl.used_at), "valid": code_valid(c, cl),
+                       "at": _iso(cl.created_at)} for cl, alias in rows]
+        has_claims = (await s.execute(select(CouponClaim.id).join(Coupon, Coupon.coupon_id == CouponClaim.coupon_id)
+                                      .where(Coupon.user_id == user_id).limit(1))).first() is not None
+        return {"current": public(c) if c else None, "claims": claims, "can_issue": has_lamp, "has_claims": has_claims,
                 "presets": list(PRESET_DAYS), "max_text": MAX_TEXT, "max_quota": MAX_QUOTA}
 
 
@@ -151,6 +187,14 @@ async def for_lamp(lamp_id: str, viewer: Optional[int] = None) -> Optional[Dict[
         c = (await s.execute(select(Coupon).where(Coupon.lamp_id == lamp_id, Coupon.status == "active")
                              .order_by(Coupon.id.desc()).limit(1))).scalar_one_or_none()
         if not c or c.ends_at <= _now():
+            if viewer:   # teacher ended it early / it sold out: the guest's code is still valid until ends_at
+                row = (await s.execute(select(Coupon, CouponClaim).join(CouponClaim, CouponClaim.coupon_id == Coupon.coupon_id)
+                                       .where(Coupon.lamp_id == lamp_id, CouponClaim.user_id == viewer)
+                                       .order_by(CouponClaim.id.desc()).limit(1))).first()
+                if row and code_valid(row[0], row[1]):
+                    out = public(row[0], row[1])
+                    out["own"] = False
+                    return out
             return None
         mine_ = None
         if viewer:
@@ -198,7 +242,11 @@ async def claim(user_id: int, coupon_id: str) -> Dict[str, Any]:
         s.add(cl)
         c.claimed = int(c.claimed or 0) + 1
         await s.flush()
-        return public(c, cl)
+        out = public(c, cl)
+        full = bool(c.quota and c.claimed >= c.quota)
+    if full:
+        await _after_change([coupon_id], "sold_out")
+    return out
 
 
 async def my_claims(user_id: int) -> List[Dict[str, Any]]:
@@ -255,4 +303,35 @@ async def admin_stop(coupon_id: str, admin_id: int) -> Optional[str]:
         if not c:
             return None
         c.status, c.stopped_by = "stopped", admin_id
-        return c.city
+        city = c.city
+    await _after_change([coupon_id], "stopped")
+    return city
+
+
+async def lookup(user_id: int, code: str) -> Optional[Dict[str, Any]]:
+    """老师核销: find a code among this teacher's coupons (current or earlier)."""
+    code = (code or "").strip().upper()
+    if not code:
+        return None
+    async with session_scope() as s:
+        row = (await s.execute(select(CouponClaim, Coupon, User.guest_alias).join(Coupon, Coupon.coupon_id == CouponClaim.coupon_id)
+                               .outerjoin(User, User.user_id == CouponClaim.user_id)
+                               .where(Coupon.user_id == user_id, CouponClaim.code == code)
+                               .order_by(CouponClaim.id.desc()).limit(1))).first()
+    if not row:
+        return None
+    cl, c, alias = row
+    return {"code": cl.code, "who": alias or "客人", "used": bool(cl.used_at), "valid": code_valid(c, cl),
+            "text": c.text, "ends_at": _iso(c.ends_at), "left": left_label(c.ends_at)}
+
+
+async def held_code(guest_id: int, teacher_id: int) -> Optional[Dict[str, Any]]:
+    """The guest's newest unused, valid code for this teacher (约课 / 想聊聊 carries it to the teacher)."""
+    async with session_scope() as s:
+        rows = (await s.execute(select(CouponClaim, Coupon).join(Coupon, Coupon.coupon_id == CouponClaim.coupon_id)
+                                .where(Coupon.user_id == teacher_id, CouponClaim.user_id == guest_id)
+                                .order_by(CouponClaim.id.desc()).limit(5))).all()
+    for cl, c in rows:
+        if code_valid(c, cl):
+            return {"code": cl.code, "text": c.text, "ends_at": c.ends_at}
+    return None

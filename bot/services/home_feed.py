@@ -39,7 +39,9 @@ DEFAULT_OPS = {
     "review_channel": "",  # 精选评价发到哪个频道；空 = 用推送频道
     "channel_directory": False,  # 频道按区目录（每天 12:00 刷新同一条，默认关）
     "coupons_enabled": True,  # 老师在「我的」发限时优惠
-    "coupon_display": "badge",  # 首页入口: badge = 卡片「惠」字 / filter = 筛选里「有优惠」 / list = 「我的 · 本城优惠」; 可多选逗号分隔
+    "broadcast_coupons": True,  # 新优惠推送到频道（默认开；结束/过期/停用时把帖子改成「已结束」）
+    "coupon_channel": "",  # 优惠推送到哪个频道；空 = 用推送频道
+    "coupon_display": "badge,filter,list",  # 首页入口: badge = 卡片「惠」字 / filter = 筛选里「有优惠」 / list = 「我的 · 本城优惠」; 可多选逗号分隔
     "directory_channel": "",  # 按区目录发到哪个频道；空 = 用推送频道
     "listing_fields": [
         {"key": "称呼", "label": "称呼", "form": True},
@@ -69,6 +71,10 @@ CITY_KEYS = [
     {"key": "broadcast_reviews", "label": "精选评价推送到频道", "type": "bool",
      "hint": "开 = 审核通过的 4–5 星评价（只发文字，不发凭证）发到下面的频道（默认关）"},
     {"key": "review_channel", "label": "精选评价发到的频道", "type": "text", "max": 128, "super": True,
+     "hint": "@频道名 或 -100…；空 = 用本城的推送频道。机器人必须是该频道管理员"},
+    {"key": "broadcast_coupons", "label": "优惠推送到频道", "type": "bool",
+     "hint": "开 = 老师发优惠时在频道发一条文字帖（查看详情 · 领取优惠）；结束 / 过期 / 停用时改成「已结束」（默认开）"},
+    {"key": "coupon_channel", "label": "优惠发到的频道", "type": "text", "max": 128, "super": True,
      "hint": "@频道名 或 -100…；空 = 用本城的推送频道。机器人必须是该频道管理员"},
     {"key": "approve_promo_text", "label": "上架通过后发给老师的话", "type": "textarea", "max": 2000},
     {"key": "chat_cta_label", "label": "聊天按钮文字", "type": "text", "max": 32},
@@ -140,7 +146,8 @@ def clean_city_overrides(raw: Any) -> Dict[str, Dict[str, Any]]:
     return out
 
 
-FEATURE_CHANNEL = {"channel_directory": "directory_channel", "broadcast_reviews": "review_channel"}
+FEATURE_CHANNEL = {"channel_directory": "directory_channel", "broadcast_reviews": "review_channel",
+                   "broadcast_coupons": "coupon_channel"}
 
 
 def feature_chat(site: Dict[str, Any], feature: str) -> str:
@@ -202,8 +209,10 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["broadcast_reviews"] = bool(out.get("broadcast_reviews"))
     out["channel_directory"] = bool(out.get("channel_directory"))
     out["coupons_enabled"] = bool(out.get("coupons_enabled", True))
+    out["broadcast_coupons"] = bool(out.get("broadcast_coupons", True))
+    out["coupon_channel"] = str(out.get("coupon_channel") or "").strip()[:128]
     disp = [x for x in str(out.get("coupon_display") or "").replace(" ", "").split(",") if x in ("badge", "filter", "list")]
-    out["coupon_display"] = ",".join(dict.fromkeys(disp)) or "badge"
+    out["coupon_display"] = ",".join(dict.fromkeys(disp)) or "badge,filter,list"
     out["review_channel"] = str(out.get("review_channel") or "").strip()[:128]
     out["directory_channel"] = str(out.get("directory_channel") or "").strip()[:128]
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
