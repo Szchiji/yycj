@@ -57,6 +57,10 @@
   async function openLamp(id) {
     if (!id) return;
     try { sessionStorage.setItem("yycj_open_lamp", id); localStorage.removeItem("yycj_open_lamp"); } catch (e) {}
+    // mark which listing the detail view is for, so detail-guard.js can show loading / retry states
+    const box = document.getElementById("detail");
+    if (box && box.getAttribute("data-lamp") !== id) { box.innerHTML = ""; box.setAttribute("data-lamp", id); }
+    window.__yycjOpenLamp = id;
     showDetail();
     const token = localStorage.getItem("yycj_token") || "";
     if (!token) return;
