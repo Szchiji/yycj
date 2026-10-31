@@ -1,7 +1,8 @@
 """频道按区目录（可选，默认关）：每城一条消息，列出各区在架资料，花名直达小程序详情。
 
-开关：城市设置「频道按区目录」(channel_directory)。每天 12:00（北京时间）刷新一次：
-第一次发新消息，之后只编辑同一条，不刷屏。失败只记日志。
+开关 / 频道：全站默认 + 每城可单独设（channel_directory / directory_channel；频道空 = 用推送频道）。
+每天 12:00（北京时间）逐城刷新；后台保存设置时也会马上同步一次。第一次发新消息，之后只编辑同一条。
+关掉或换频道：旧目录消息删掉（删不掉就改成「已停用」）。失败只记日志。
 """
 from __future__ import annotations
 
@@ -38,13 +39,44 @@ def render(city: str, lamps: List[Dict], bot_name: str) -> str:
     return text[:4000]
 
 
+async def _ref(city: str):
+    async with session_scope() as s:
+        ref = (await s.execute(select(ChannelDirectory).where(ChannelDirectory.city == city))).scalar_one_or_none()
+        return (ref.chat, int(ref.message_id)) if ref else ("", 0)
+
+
+async def _drop_ref(city: str) -> None:
+    async with session_scope() as s:
+        ref = (await s.execute(select(ChannelDirectory).where(ChannelDirectory.city == city))).scalar_one_or_none()
+        if ref:
+            await s.delete(ref)
+
+
+async def _retire(chat: str, mid: int, city: str) -> None:
+    """Remove an old directory message (switch off / channel moved). Delete; else mark it stopped."""
+    from bot.main import bot
+    try:
+        await bot.delete_message(chat_id=chat, message_id=mid)
+        return
+    except Exception:
+        pass
+    try:
+        await bot.edit_message_text(text=f"📖 {html.escape(city)} · 按区目录（已停用）", chat_id=chat, message_id=mid)
+    except Exception:
+        logger.warning("retire old directory for %s failed", city)
+
+
 async def refresh_city(city: str) -> bool:
-    from bot.services.broadcast import normalize_chat
-    from bot.services.home_feed import ops_for_city
+    """Post / edit this city's directory in its 按区目录 channel. Switch off → the old message is
+    removed; channel changed → old one removed, new one posted. Only this city's listings are listed."""
+    from bot.services.home_feed import feature_chat, ops_for_city
     site = ops_for_city(await home_service.get_or_create_settings(), city)
-    if not site.get("channel_directory"):
-        return False
-    chat = normalize_chat(str(site.get("broadcast_channel") or ""))
+    ref_chat, ref_mid = await _ref(city)
+    chat = feature_chat(site, "channel_directory") if site.get("channel_directory") else ""
+    if ref_mid and ref_chat != chat:
+        await _retire(ref_chat, ref_mid, city)
+        await _drop_ref(city)
+        ref_chat, ref_mid = "", 0
     if not chat:
         return False
     from bot.services import bot_info
@@ -55,14 +87,15 @@ async def refresh_city(city: str) -> bool:
             .where(Lamp.status == LampStatus.ACTIVE.value, Lamp.city == city)
             .order_by(Lamp.created_at.desc()).limit(400)
         )).all()
-        ref = (await s.execute(select(ChannelDirectory).where(ChannelDirectory.city == city))).scalar_one_or_none()
-        ref_chat, ref_mid = (ref.chat, ref.message_id) if ref else ("", 0)
-    if not rows:
+    if rows:
+        text = render(city, [{"lamp_id": a, "title": b, "district": c} for a, b, c in rows], bot_name)
+    elif ref_mid:
+        text = f"📖 <b>{html.escape(city)} · 按区目录</b>\n\n暂时没有在架资料"
+    else:
         return False
-    text = render(city, [{"lamp_id": a, "title": b, "district": c} for a, b, c in rows], bot_name)
     from bot.main import bot
     try:
-        if ref_mid and ref_chat == chat:
+        if ref_mid:
             try:
                 await bot.edit_message_text(text=text, chat_id=chat, message_id=ref_mid, disable_web_page_preview=True)
                 return True
@@ -84,12 +117,23 @@ async def refresh_city(city: str) -> bool:
 
 
 async def job_refresh_all() -> int:
+    """Every enabled city (each with its own channel / switch), plus cleanup of directories left in
+    cities that were switched off or are no longer enabled."""
     n = 0
     try:
         site = await home_service.get_or_create_settings()
-        for city in site.get("enabled_cities") or []:
+        cities = list(site.get("enabled_cities") or [])
+        async with session_scope() as s:
+            known = [c for (c,) in (await s.execute(select(ChannelDirectory.city))).all()]
+        for city in cities:
             if await refresh_city(city):
                 n += 1
+        for city in known:
+            if city not in cities:
+                chat, mid = await _ref(city)
+                if mid:
+                    await _retire(chat, mid, city)
+                await _drop_ref(city)
     except Exception:
         logger.exception("channel directory job failed")
     return n

@@ -146,6 +146,7 @@ CENTERS: Dict[str, Dict[str, Tuple[float, float]]] = {
 }
 
 RADII = (3, 5, 10)
+RADII_PINNED = (1, 3, 5, 10)  # 「1km 内」 only once listings carry their own map pin
 
 
 def _dkey(raw: Any) -> str:
@@ -170,7 +171,7 @@ def point_of(lamp: Dict[str, Any]) -> Optional[Tuple[float, float]]:
     la, ln = lamp.get("approx_lat"), lamp.get("approx_lng")
     try:
         if la is not None and ln is not None:
-            return (round(float(la), 2), round(float(ln), 2))  # ~1 km grid
+            return (round(round(float(la) / 0.005) * 0.005, 3), round(round(float(ln) / 0.005) * 0.005, 3))  # ~500 m grid
     except (TypeError, ValueError):
         pass
     return center_of(lamp.get("city"), lamp.get("district"))
@@ -184,9 +185,18 @@ def haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     return 2 * r * math.asin(min(1.0, math.sqrt(h)))
 
 
-def distance_label(km: Optional[float]) -> str:
+def has_pin(lamp: Dict[str, Any]) -> bool:
+    return lamp.get("approx_lat") is not None and lamp.get("approx_lng") is not None
+
+
+def distance_label(km: Optional[float], precise: bool = False) -> str:
+    """precise = both ends are real (rounded) points, not a district-centre estimate."""
     if km is None:
         return ""
+    if precise and km < 1.0:
+        return "1km内"
+    if precise and km < 1.5:
+        return "约1km"
     if km < 1.5:
         return "<2km"
     if km < 10:
@@ -203,7 +213,7 @@ def round_center(lat: Optional[float], lng: Optional[float]) -> Optional[Tuple[f
         return None
     if not (-90 <= la <= 90 and -180 <= ln <= 180):
         return None
-    return (round(la, 2), round(ln, 2))
+    return (round(round(la / 0.005) * 0.005, 3), round(round(ln / 0.005) * 0.005, 3))  # ~500 m grid
 
 
 # --- one predicate for feed + carousel -----------------------------------------------------
@@ -211,9 +221,10 @@ def round_center(lat: Optional[float], lng: Optional[float]) -> Optional[Tuple[f
 class Filter:
     def __init__(self, *, price: Optional[str] = None, tags: Optional[str] = None, open_only: bool = False,
                  lat: Optional[float] = None, lng: Optional[float] = None, radius: Optional[float] = None,
-                 sort: str = "new") -> None:
+                 sort: str = "new", exact_center: bool = True) -> None:
         self.band = parse_band(price)
         self.coupon_ids = None  # set of lamp_ids with a live coupon when 「有优惠」 is on
+        self.exact_center = bool(exact_center)  # False when the centre is a picked 区
         self.tags = parse_tags(tags)
         self.open_only = bool(open_only)
         self.center = round_center(lat, lng)
@@ -262,6 +273,12 @@ class Filter:
             return None
         pt = point_of(lamp)
         return haversine_km(self.center, pt) if pt else None
+
+    def precise(self, lamp: Dict[str, Any]) -> bool:
+        return bool(self.center) and self.exact_center and has_pin(lamp)
+
+    def label(self, lamp: Dict[str, Any]) -> str:
+        return distance_label(self.distance(lamp), self.precise(lamp))
 
     def match_python_side(self, lamp: Dict[str, Any]) -> bool:
         """营业中 / 半径. `lamp` already went through _with_shop (open_code)."""

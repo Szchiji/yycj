@@ -36,8 +36,8 @@ def test_tags_and_distance():
     assert ff.distance_label(0.4) == "<2km" and ff.distance_label(4.4) == "约4km" and ff.distance_label(23) == "约25km"
     # near without a centre falls back to newest
     assert ff.Filter(sort="near").sort == "new"
-    # listing coords are snapped to a ~1 km grid before any distance is computed
-    assert ff.point_of({"approx_lat": 22.53337, "approx_lng": 113.93049}) == (22.53, 113.93)
+    # listing coords are snapped to a ~500 m grid before any distance is computed
+    assert ff.point_of({"approx_lat": 22.53337, "approx_lng": 113.93049}) == (22.535, 113.93)
 
 
 def test_directory_render():
