@@ -32,6 +32,39 @@ def normalize_chat(chat: str) -> str:
     return raw
 
 
+_CHAT_RE = re.compile(r"^(@[A-Za-z][A-Za-z0-9_]{3,31}|-?\d{5,20})$")
+
+
+def valid_chat(raw: str) -> str:
+    """Normalised @name / -100… id, or "" when it can't be a chat."""
+    c = normalize_chat(raw)
+    return c if c and _CHAT_RE.match(c) else ""
+
+
+async def check_post_rights(chat: str) -> str:
+    """"" when the bot can post in ``chat``; otherwise a plain Chinese reason for the admin."""
+    c = valid_chat(chat)
+    if not c:
+        return f"频道格式不对：{str(chat)[:40]}（示例 @频道名 或 -100…）"
+    from bot.main import bot
+    try:
+        me = await bot.get_me()
+        member = await bot.get_chat_member(c, me.id)
+    except Exception as exc:
+        msg = str(exc).lower()
+        if "not found" in msg or "chat not found" in msg:
+            return f"找不到频道 {c}：检查频道名，或先把机器人拉进频道并设为管理员"
+        if "forbidden" in msg or "not a member" in msg or "kicked" in msg:
+            return f"机器人不在 {c} 里：请把机器人加为该频道管理员，并允许发消息"
+        return f"检查 {c} 失败，请稍后再试"
+    status = str(getattr(member, "status", "") or "").split(".")[-1].lower()
+    if status not in ("administrator", "creator"):
+        return f"机器人还不是 {c} 的管理员：请在频道里把机器人设为管理员，并允许发消息"
+    if getattr(member, "can_post_messages", None) is False:
+        return f"机器人在 {c} 没有「发消息」权限：请在频道管理员设置里打开"
+    return ""
+
+
 def album_link(chat: str, message_id: int) -> str:
     raw = normalize_chat(chat)
     if raw.startswith("@"):
@@ -311,7 +344,8 @@ async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Opti
     site = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
     if not site.get("broadcast_reviews"):
         return None
-    chat = normalize_chat(str(site.get("broadcast_channel") or ""))
+    from bot.services.home_feed import feature_chat
+    chat = feature_chat(site, "broadcast_reviews")
     if not chat:
         return None
     from bot.services import bot_info
