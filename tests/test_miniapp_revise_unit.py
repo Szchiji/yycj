@@ -60,7 +60,7 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261101j"}
+    assert vs == {"20261101k"}
 
 
 def test_filter_reset_applies_immediately_and_keeps_facets():
@@ -83,5 +83,14 @@ def test_closing_panel_applies_changes():
 
 def test_coupon_lists_fold_done_items():
     js = _read("coupons.js")
-    assert 'fold("used", "已核销"' in js and 'fold("hist", `往期优惠' in js and 'fold("gdone", "已用 / 已失效"' in js
+    assert 'fold(foldKey + it.coupon_id, "已核销"' in js and 'fold("hist", `往期优惠' in js and 'fold("gdone", "已用 / 已失效"' in js
     assert "已用 ↺" not in js and "撤销" in js
+
+
+def test_coupon_multi_item_form_and_strip():
+    js = _read("coupons.js")
+    # 发布表单：有效期 → 一项项添加（继续添加 / 编辑 / 删除）→ 发布优惠，items 一次提交
+    assert "data-cpn-add" in js and "继续添加" in js and "data-cpn-ied" in js and "data-cpn-idel" in js
+    assert "JSON.stringify({ days: draft.days, items })" in js and "整批共用" in js
+    # 详情页每项一行，各自领取；想聊聊带上全部券码
+    assert "cpn-its" in js and "remainTxt" in js and "bookTextAll(held.codes)" in js

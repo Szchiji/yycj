@@ -63,6 +63,10 @@ _ALTER_STATEMENTS = [
     "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_chat VARCHAR(64)",
     "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_mid INTEGER",
     "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_closed BOOLEAN DEFAULT false",
+    # 一次发多项优惠：同一批共用 batch_id；旧的单张优惠变成只有一项的一批
+    "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS batch_id VARCHAR(36)",
+    "UPDATE coupons SET batch_id = coupon_id WHERE batch_id IS NULL",
+    "CREATE INDEX IF NOT EXISTS ix_coupons_batch_id ON coupons (batch_id)",
 ]
 
 
