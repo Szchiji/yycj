@@ -116,6 +116,20 @@ def parse_query(text: str) -> Dict[str, Any]:
     return {"city": city, "price_min": price_min, "price_max": price_max, "keywords": keywords, "raw": text}
 
 
+def clean_price(price: Any, price_text: Any) -> Optional[int]:
+    """Numeric price used by the 价格档 filter: first number of the price text ("800P 1500PP" → 800).
+    The client-sent number is only kept when the text has none and it looks sane."""
+    from bot.services.feed_filters import parse_price
+    parsed = parse_price(price_text)
+    if parsed is not None:
+        return parsed
+    try:
+        v = int(price) if price is not None else None
+    except (TypeError, ValueError):
+        return None
+    return v if v is not None and 50 <= v <= 200000 else None
+
+
 def district_key(raw: Any) -> str:
     """Group free-text districts: "静安区" and "静安" → "静安"; "浦东新区" stays whole."""
     d = re.sub(r"\s+", "", str(raw or ""))[:32]
@@ -149,10 +163,20 @@ async def district_counts(city: str | None) -> Dict[str, Any]:
     return {"total": total, "items": items[:40]}
 
 
-async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None, district: str | None = None, sort: str = "new") -> List[Dict[str, Any]]:
+async def search_lamps(*, keyword: str | None = None, city: str | None = None, price_min: int | None = None, price_max: int | None = None, limit: int = 15, offset: int = 0, lat: float | None = None, lng: float | None = None, district: str | None = None, sort: str = "new", flt: Any = None) -> List[Dict[str, Any]]:
     by_reviews = sort == "reviews"
     async with session_scope() as s:
         conditions = [Lamp.status == LampStatus.ACTIVE.value]
+        if flt is not None:
+            # 价格档: strict (面议 / no number is not in any band); 标签: any of the picked tags
+            lo, hi = flt.band
+            if lo is not None:
+                conditions.append(and_(Lamp.price.is_not(None), Lamp.price >= lo))
+            if hi is not None:
+                conditions.append(and_(Lamp.price.is_not(None), Lamp.price < hi))
+            if flt.tags:
+                from bot.services.feed_filters import tag_variants
+                conditions.append(Lamp.tags.overlap(tag_variants(flt.tags)))
         if city:
             conditions.append(Lamp.city == city)
         if district and district_variants(district):
@@ -231,6 +255,7 @@ async def create_lamp_from_post(user_id: int, city: str, title: str, tags: List[
     if not media_list and photos:
         media_list = [{"type": "image", "url": p} for p in photos]
     photo_urls = [m["url"] for m in media_list if m.get("type") == "image"] or list(photos or [])
+    price = clean_price(price, price_text)
     async with session_scope() as s:
         lamp = Lamp(lamp_id=lamp_id, user_id=user_id, city=city, title=title, tags=tags or [], price=price, price_text=price_text, description=description or "", photos=photo_urls, media=media_list, district=district, approx_lat=approx_lat, approx_lng=approx_lng, approx_label=approx_label, publisher_role=publisher_role, authenticity_score=authenticity_score, status=LampStatus.PENDING.value)
         s.add(lamp)
@@ -270,3 +295,19 @@ def format_lamp_card(lamp: Dict[str, Any]) -> str:
         lines.append("")
         lines.append(_h(desc[:200]) + ("…" if len(desc) > 200 else ""))
     return "\n".join(lines)
+
+
+async def backfill_prices(limit: int = 5000) -> int:
+    """One pass at startup: re-derive lamps.price from price_text (fixes "800P 1500PP" → 8001500)."""
+    import logging
+    changed = 0
+    async with session_scope() as s:
+        rows = (await s.execute(select(Lamp).limit(limit))).scalars().all()
+        for lamp in rows:
+            want = clean_price(lamp.price, lamp.price_text)
+            if want != lamp.price:
+                lamp.price = want
+                changed += 1
+    if changed:
+        logging.getLogger(__name__).info("price backfill: %d listing(s) fixed", changed)
+    return changed

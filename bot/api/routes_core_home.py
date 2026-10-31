@@ -88,9 +88,14 @@ async def api_home(
     city: Optional[str] = None,
     q: Optional[str] = None,
     district: Optional[str] = Query(default=None, max_length=32),
-    sort: str = Query(default="new", pattern="^(new|reviews)$"),
+    sort: str = Query(default="new", pattern="^(new|reviews|near)$"),
     lat: Optional[float] = None,
     lng: Optional[float] = None,
+    price: Optional[str] = Query(default=None, max_length=16),
+    tags: Optional[str] = Query(default=None, max_length=160),
+    open_now: int = Query(default=0, ge=0, le=1, alias="open"),
+    radius: Optional[float] = Query(default=None, ge=0, le=50),
+    at: Optional[str] = Query(default=None, max_length=32),
     limit: int = Query(default=3, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=500),
     user_id: int = Depends(get_current_user_id),
@@ -108,6 +113,16 @@ async def api_home(
         limit = page_size
 
     area_key = search_service.district_key(district) if district else ""
+    from bot.services.feed_filters import Filter, distance_label
+    # 价格档 / 标签 / 营业中 / 距离: the same rules for the feed and the carousel.
+    if (lat is None or lng is None) and at:
+        # no location permission: the user picked a district as the centre
+        from bot.services.feed_filters import center_of
+        pt = center_of(use_city, at)
+        if pt:
+            lat, lng = pt
+    flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort)
+    sort = flt.sort
     pins = []
     try:
         pins_raw = await pin_query.list_active_pins()
@@ -119,6 +134,8 @@ async def api_home(
                     continue
                 # 地区筛选同时作用于轮播；该区没有轮播时前端自动隐藏轮播
                 if area_key and search_service.district_key(lamp.get("district")) != area_key:
+                    continue
+                if not flt.match_sql_side(lamp) or not flt.match_python_side(lamp):
                     continue
                 pins.append(
                     {
@@ -134,18 +151,36 @@ async def api_home(
         logger.exception("list pins failed")
 
     items = []
+    computed = flt.needs_python
     try:
         items = await search_service.search_lamps(
             keyword=q,
             city=use_city,
-            limit=limit,
-            offset=offset,
-            lat=lat,
-            lng=lng,
+            # 营业中 / 距离 are per-listing: take the city's matching set (small) and page it here
+            limit=600 if computed else limit,
+            offset=0 if computed else offset,
+            lat=None if computed else lat,
+            lng=None if computed else lng,
             district=(district or "").strip() or None,
-            sort=sort,
+            sort="reviews" if sort == "reviews" else "new",
+            flt=flt,
         )
-        if sort != "reviews":
+        if computed:
+            await _prefill_extras(items)
+            shop = [await _with_shop(x) for x in items]
+            shop = [x for x in shop if flt.match_python_side(x)]
+            if sort == "near":
+                for x in shop:
+                    x["_km"] = flt.distance(x)
+                shop.sort(key=lambda x: (0 if x.get("feed_pinned") else 1,
+                                         int(x.get("feed_pin_order") or 0) if x.get("feed_pinned") else 0,
+                                         x["_km"] if x.get("_km") is not None else 1e9))
+            elif sort != "reviews":
+                pinned = sorted([x for x in shop if x.get("feed_pinned")], key=lambda x: int(x.get("feed_pin_order") or 0))
+                fresh = sorted([x for x in shop if not x.get("feed_pinned")], key=lambda x: str(x.get("created_at") or ""), reverse=True)
+                shop = pinned + fresh
+            items = shop[offset: offset + limit]
+        elif sort != "reviews":
             pinned = [x for x in items if x.get("feed_pinned")]
             fresh = [x for x in items if not x.get("feed_pinned")]
             pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
@@ -167,7 +202,11 @@ async def api_home(
     safe_items = []
     for x in items:
         try:
-            safe_items.append(_ser_card(await _with_shop(x)))
+            card = _ser_card(x if computed else await _with_shop(x))
+            if flt.center:
+                # rounded estimate only; listing coordinates never leave the server
+                card["distance"] = distance_label(flt.distance(x))
+            safe_items.append(card)
         except Exception:
             logger.exception("serialize lamp failed")
 
@@ -195,6 +234,8 @@ async def api_home(
         "district": search_service.district_key(district) if district else "",
         "sort": sort,
         "districts": districts,
+        "filters": {"price": price or "", "tags": flt.tags, "open": int(flt.open_only),
+                    "radius": flt.radius, "near": bool(flt.center), "active": flt.active_count(area_key)},
         "count": len(safe_items),
         "limit": limit,
         "offset": offset,
@@ -207,6 +248,10 @@ async def api_home(
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
         "contacts": contacts,
         "listing_fields": settings.get("listing_fields") or [],
+        "review_form": {
+            "public_photos": settings.get("review_public_photos") is not False,
+            "proof_required": bool(settings.get("review_proof_required")),
+        },
     }
 
 
@@ -224,6 +269,41 @@ async def _home_contacts(settings: Dict[str, Any]) -> Dict[str, Any]:
         "bot_label": settings.get("bot_btn_label") or "机器人",
         "admin_label": settings.get("admin_btn_label") or "管理员",
     }
+
+
+@router.get("/home/facets")
+async def api_home_facets(city: Optional[str] = None, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    """筛选面板的选项：价格档（按本城价格自动分档）、常用标签、可估算距离的区。60 秒缓存。"""
+    from sqlalchemy import select
+    from bot.db import session_scope
+    from bot.models import Lamp, LampStatus
+    from bot.services import feed_filters as ff
+    settings = await home_service.get_or_create_settings()
+    enabled = list(settings.get("enabled_cities") or [])
+    use_city = city if city in enabled else (enabled[0] if enabled else (city or ""))
+    hit = ff.facets_cached(use_city)
+    if hit:
+        return hit
+    async with session_scope() as s:
+        rows = (await s.execute(
+            select(Lamp.price, Lamp.tags, Lamp.district, Lamp.approx_lat)
+            .where(Lamp.status == LampStatus.ACTIVE.value, Lamp.city == use_city)
+        )).all()
+    geo = sorted({search_service.district_key(d) for _p, _t, d, _a in rows if ff.center_of(use_city, d)})
+    located = sum(1 for _p, _t, d, a in rows if a is not None or ff.center_of(use_city, d))
+    data = {
+        "ok": True,
+        "city": use_city,
+        "total": len(rows),
+        "price_bands": ff.price_bands([p for p, _t, _d, _a in rows if p]),
+        "unpriced": sum(1 for p, _t, _d, _a in rows if not p),
+        "tags": ff.top_tags([t for _p, t, _d, _a in rows], n=12),
+        "radii": list(ff.RADII),
+        "geo_districts": [{"key": k} for k in geo],
+        "located": located,
+    }
+    ff.facets_store(use_city, data)
+    return data
 
 
 @router.get("/cities")

@@ -15,10 +15,33 @@
     try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
   }
   // 排序：最新上架（默认）/ 评价多。放在「地区」面板顶部，首页布局不变；本次会话内记住。
-  function getSort() { try { return sessionStorage.getItem("yycj_sort") === "reviews" ? "reviews" : ""; } catch (e) { return ""; } }
-  function setSort(v) { try { if (v === "reviews") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
+  function getSort() { try { const v = sessionStorage.getItem("yycj_sort") || ""; return (v === "reviews" || v === "near") ? v : ""; } catch (e) { return ""; } }
+  function setSort(v) { try { if (v === "reviews" || v === "near") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
+  // 价格档 / 标签 / 营业中 / 距离：跟地区一样，按城市记在本次会话里
+  function filtKey() { return "yycj_filt_" + curCity(); }
+  function getFilt() {
+    try { return JSON.parse(sessionStorage.getItem(filtKey()) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function setFilt(patch) {
+    const o = Object.assign({}, getFilt(), patch || {});
+    ["price", "tags", "open", "radius", "at", "lat", "lng"].forEach((k) => { if (!o[k]) delete o[k]; });
+    try {
+      if (Object.keys(o).length) sessionStorage.setItem(filtKey(), JSON.stringify(o));
+      else sessionStorage.removeItem(filtKey());
+    } catch (e) {}
+  }
+  function clearFilt() { try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
+  function activeFiltCount() {
+    const f = getFilt();
+    return [getArea(), f.price, f.tags, f.open, f.radius].filter(Boolean).length;
+  }
+  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false;
   function token() { return localStorage.getItem("yycj_token") || ""; }
-  function cacheKey(city, qq) { return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort(); }
+  function cacheKey(city, qq) {
+    const f = getFilt();
+    return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort()
+      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "");
+  }
   function readCache(city, qq) {
     try {
       const raw = sessionStorage.getItem(cacheKey(city, qq));
@@ -112,7 +135,8 @@
   }
   function cardHtml(t, idx) {
     const img = cover(t);
-    const loc = [t.city, t.district].filter(Boolean).join("·");
+    // 按距离时，右上角地区标签换成「区 · 约Nkm」（只显示取整后的距离，不暴露坐标）
+    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join(" · ") : [t.city, t.district].filter(Boolean).join("·");
     const tag = String((t.tags && t.tags[0]) || "").replace(/^#+/, "");
     const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
@@ -137,7 +161,7 @@
     const feed = $("#feed");
     if (feed) {
       feed.classList.add("has-cover");
-      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (getArea() ? "这个区域暂无上架" : "暂无上架") + "</p>";
+      feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (activeFiltCount() ? "没有符合筛选的上架" : "暂无上架") + "</p>";
     }
     const pins = $("#pins");
     if (pins) {
@@ -182,6 +206,13 @@
       if (city) params.set("city", city);
       if (getArea()) params.set("district", getArea());
       if (getSort()) params.set("sort", getSort());
+      const f = getFilt();
+      if (f.price) params.set("price", f.price);
+      if (f.tags) params.set("tags", f.tags);
+      if (f.open) params.set("open", "1");
+      if (f.radius) params.set("radius", String(f.radius));
+      if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
+      else if (f.at) params.set("at", f.at);
       const data = await api("/api/home?" + params.toString());
       applyData(data, reset);
       writeCache(data.city || city, q, data);
@@ -195,30 +226,91 @@
     const btn = $("#btnArea");
     const k = getArea();
     const so = getSort();
+    const f = getFilt();
+    const nAct = activeFiltCount();
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
-      if (lbl) lbl.textContent = k ? areaLabel(k) : so ? "评价多" : "地区▾";
-      btn.classList.toggle("on", !!(k || so));
-      btn.classList.toggle("long", k.length > 2 || (!k && !!so));
-      btn.setAttribute("aria-label", (k ? "地区：" + k : "地区筛选") + (so ? "，按评价多排序" : ""));
+      if (lbl) {
+        if (nAct) lbl.textContent = "筛选·" + nAct;
+        else if (so === "near") lbl.textContent = "附近";
+        else if (so === "reviews") lbl.textContent = "评价多";
+        else lbl.textContent = k ? areaLabel(k) : "筛选▾";
+      }
+      btn.classList.toggle("on", !!(nAct || so));
+      btn.classList.toggle("long", true);
+      btn.setAttribute("aria-label", "筛选" + (nAct ? "，已选" + nAct + "项" : ""));
     }
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
-    const chips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
-      .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
+    const facets = lastFacets || { price_bands: [], tags: [], radii: [3, 5, 10], geo_districts: [], located: 0 };
+    const pickedTags = new Set(String(f.tags || "").split(",").filter(Boolean));
     const sortRow = "<div class=\"sort-row\" role=\"radiogroup\" aria-label=\"排序\"><span class=\"sort-k\">排序</span>" +
-      "<button type=\"button\" class=\"sort-opt" + (so ? "" : " on") + "\" data-sort=\"\">最新上架</button>" +
-      "<button type=\"button\" class=\"sort-opt" + (so ? " on" : "") + "\" data-sort=\"reviews\">评价多</button></div>";
-    panel.innerHTML = sortRow + "<div class=\"area-chips\">" + chips.join("") + "</div>" +
-      ((d.items || []).length ? "" : "<p class=\"muted area-empty\">这个城市的资料还没填区域</p>");
+      "<button type=\"button\" class=\"sort-opt" + (!so ? " on" : "") + "\" data-sort=\"\">最新</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so === "reviews" ? " on" : "") + "\" data-sort=\"reviews\">评价多</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so === "near" ? " on" : "") + "\" data-sort=\"near\">距我近</button></div>";
+    const areaChips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
+      .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));
+    const priceChips = (facets.price_bands || []).map((b) =>
+      "<button type=\"button\" class=\"area-chip" + (f.price === b.key ? " on" : "") + "\" data-price=\"" + esc(b.key) + "\">" + esc(b.label) + "<i>" + b.count + "</i></button>"
+    ).join("") || "<span class=\"muted\">暂无标价</span>";
+    const tagChips = (facets.tags || []).map((t) =>
+      "<button type=\"button\" class=\"area-chip" + (pickedTags.has(t.tag) ? " on" : "") + "\" data-tag=\"" + esc(t.tag) + "\">" + esc(t.tag) + "<i>" + t.count + "</i></button>"
+    ).join("") || "<span class=\"muted\">暂无标签</span>";
+    const openChip = "<button type=\"button\" class=\"area-chip" + (f.open ? " on" : "") + "\" data-open=\"1\">营业中</button>";
+    const hasLoc = !!(f.lat && f.lng) || !!f.at;
+    const nearRow = "<div class=\"filt-row\"><span class=\"sort-k\">附近</span>" +
+      "<button type=\"button\" class=\"sort-opt" + (hasLoc ? " on" : "") + "\" data-loc=\"1\">" + (hasLoc ? (f.at ? ("以" + f.at + "为中心") : "已定位") : "用我的位置") + "</button>" +
+      (hasLoc ? "<button type=\"button\" class=\"sort-opt\" data-loc=\"0\">清除</button>" : "") + "</div>" +
+      (hasLoc ? "<div class=\"area-chips\">" + [3,5,10].map((r) =>
+        "<button type=\"button\" class=\"area-chip" + (String(f.radius) === String(r) ? " on" : "") + "\" data-radius=\"" + r + "\">" + r + "km</button>"
+      ).join("") + "</div>" : (facets.geo_districts && facets.geo_districts.length
+        ? "<div class=\"area-chips near-pick\"><span class=\"muted\" style=\"width:100%\">或选一个区作中心：</span>" +
+          facets.geo_districts.map((g) => "<button type=\"button\" class=\"area-chip" + (f.at === g.key ? " on" : "") + "\" data-at=\"" + esc(g.key) + "\">" + esc(g.key) + "</button>").join("") + "</div>"
+        : ""));
+    panel.innerHTML = sortRow +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">地区</div><div class=\"area-chips\">" + areaChips.join("") + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">价格</div><div class=\"area-chips\">" + priceChips + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">标签</div><div class=\"area-chips\">" + tagChips + "</div></div>" +
+      "<div class=\"filt-sec\"><div class=\"sort-k\">状态</div><div class=\"area-chips\">" + openChip + "</div></div>" +
+      "<div class=\"filt-sec\">" + nearRow + "</div>" +
+      "<div class=\"filt-actions\"><button type=\"button\" class=\"btn\" data-filt-reset=\"1\">重置</button>" +
+      "<button type=\"button\" class=\"btn primary\" data-filt-apply=\"1\">查看结果</button></div>";
   }
-  function toggleArea(open) {
+  async function ensureFacets() {
+    const city = curCity();
+    if (lastFacets && facetsCity === city) return;
+    try {
+      const data = await api("/api/home/facets?city=" + encodeURIComponent(city));
+      lastFacets = data; facetsCity = city;
+    } catch (e) { lastFacets = lastFacets || { price_bands: [], tags: [], radii: [3, 5, 10], geo_districts: [] }; }
+  }
+  function askLocation() {
+    if (locBusy) return;
+    locBusy = true;
+    const done = (lat, lng) => { setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "" }); locBusy = false; paintArea(); };
+    const fail = () => { locBusy = false; paintArea(); try { window.__yycjToast && window.__yycjToast("定位失败，可选区作中心"); } catch (e) {} };
+    try {
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
+        tg.LocationManager.init(() => {
+          try { tg.LocationManager.getLocation((loc) => loc && loc.latitude != null ? done(loc.latitude, loc.longitude) : fail()); }
+          catch (e) { fail(); }
+        });
+        return;
+      }
+    } catch (e) {}
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+    } else fail();
+  }
+  async function toggleArea(open) {
     const panel = $("#areaPanel");
     if (!panel) return;
     const on = open == null ? panel.classList.contains("hidden") : open;
     panel.classList.toggle("hidden", !on);
     $("#btnArea")?.setAttribute("aria-expanded", on ? "true" : "false");
+    if (on) await ensureFacets();
     paintArea();
   }
   function mountGuide() {
@@ -261,6 +353,13 @@
     if (city) params.set("city", city);
     if (getArea()) params.set("district", getArea());
     if (getSort()) params.set("sort", getSort());
+    const f = getFilt();
+    if (f.price) params.set("price", f.price);
+    if (f.tags) params.set("tags", f.tags);
+    if (f.open) params.set("open", "1");
+    if (f.radius) params.set("radius", String(f.radius));
+    if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
+    else if (f.at) params.set("at", f.at);
     return "/api/home?" + params.toString();
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
@@ -280,15 +379,48 @@
     }
     const sortBtn = ev.target.closest && ev.target.closest("#areaPanel [data-sort]");
     if (sortBtn) {
-      setSort(sortBtn.getAttribute("data-sort") || "");
-      toggleArea(false);
-      loadFeed(true);
+      const v = sortBtn.getAttribute("data-sort") || "";
+      setSort(v);
+      if (v === "near" && !(getFilt().lat || getFilt().at)) askLocation();
+      paintArea();
+      return;
     }
     const chip = ev.target.closest && ev.target.closest("#areaPanel [data-area]");
-    if (chip) {
-      setArea(chip.getAttribute("data-area") || "");
-      toggleArea(false);
-      loadFeed(true);
+    if (chip) { setArea(chip.getAttribute("data-area") || ""); paintArea(); return; }
+    const priceChip = ev.target.closest && ev.target.closest("#areaPanel [data-price]");
+    if (priceChip) {
+      const key = priceChip.getAttribute("data-price") || "";
+      setFilt({ price: getFilt().price === key ? "" : key }); paintArea(); return;
+    }
+    const tagChip = ev.target.closest && ev.target.closest("#areaPanel [data-tag]");
+    if (tagChip) {
+      const t = tagChip.getAttribute("data-tag") || "";
+      const cur = new Set(String(getFilt().tags || "").split(",").filter(Boolean));
+      if (cur.has(t)) cur.delete(t); else if (cur.size < 5) cur.add(t);
+      setFilt({ tags: [...cur].join(",") }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-open]")) {
+      setFilt({ open: getFilt().open ? "" : "1" }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { askLocation(); return; }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"0\"]")) {
+      setFilt({ lat: "", lng: "", at: "", radius: "" }); if (getSort() === "near") setSort(""); paintArea(); return;
+    }
+    const atChip = ev.target.closest && ev.target.closest("#areaPanel [data-at]");
+    if (atChip) {
+      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", radius: getFilt().radius || "5" });
+      paintArea(); return;
+    }
+    const radChip = ev.target.closest && ev.target.closest("#areaPanel [data-radius]");
+    if (radChip) {
+      const r = radChip.getAttribute("data-radius") || "";
+      setFilt({ radius: getFilt().radius === r ? "" : r }); paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-reset]")) {
+      clearFilt(); lastFacets = null; paintArea(); return;
+    }
+    if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-apply]")) {
+      toggleArea(false); loadFeed(true); return;
     }
     if (ev.target.id === "btnTutorial") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
@@ -303,7 +435,10 @@
       localStorage.setItem("yycj_city", opt.getAttribute("data-city") || "");
       $("#cityDrop")?.classList.add("hidden");
       setArea("");
+      clearFilt();
       lastAreas = null;
+      lastFacets = null;
+      facetsCity = "";
       toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
@@ -311,6 +446,17 @@
     }
   }, true);
   mountGuide();
+  const qInput = $("#homeQ");
+  if (qInput && !qInput.dataset.debounced) {
+    qInput.dataset.debounced = "1";
+    qInput.addEventListener("input", () => {
+      clearTimeout(qTimer);
+      qTimer = setTimeout(() => { q = (qInput.value || "").trim(); loadFeed(true); }, 320);
+    });
+    qInput.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); clearTimeout(qTimer); q = (qInput.value || "").trim(); loadFeed(true); }
+    });
+  }
   function tick() {
     carouselTimer = 0;
     if (!canRun()) return;

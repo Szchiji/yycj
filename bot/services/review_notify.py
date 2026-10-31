@@ -64,6 +64,19 @@ def _photo_ids(review: Dict[str, Any]) -> List[str]:
     return out[:3]
 
 
+def _proof_ids(review: Dict[str, Any]) -> List[str]:
+    """约课凭证 — admin DMs only."""
+    out = []
+    for p in review.get("proofs") or []:
+        s = str(p or "").strip()
+        if s:
+            out.append(s)
+    return out[:5]
+
+
+_SEC = (("diff", "人照课表差异"), ("pros", "优点"), ("cons", "不足"), ("extra", "补充"))
+
+
 async def _caption(review: Dict[str, Any], lamp: Dict[str, Any]) -> str:
     from bot.services import credit_service
     gid = review.get("guest_id")
@@ -78,17 +91,23 @@ async def _caption(review: Dict[str, Any], lamp: Dict[str, Any]) -> str:
         pass
     stars = int(review.get("stars") or 0)
     photos = _photo_ids(review)
-    why = "带图评价，需人工审核" if photos else "评价需审核"
+    proofs = _proof_ids(review)
+    why = "带凭证，需人工审核" if proofs else "带图评价，需人工审核" if photos else "评价需审核"
     place = " ".join(x for x in [str(lamp.get("city") or ""), str(lamp.get("district") or "")] if x)
     text = str(review.get("text") or "").strip()
+    sec = review.get("sections") or {}
+    if isinstance(sec, dict) and any(sec.get(k) for k, _ in _SEC):
+        body = "\n".join(f"<b>{lbl}</b>：{_h(str(sec.get(k))[:300])}" for k, lbl in _SEC if sec.get(k))
+    else:
+        body = f"内容：{_h(text[:600]) if text else '（无文字）'}"
     return (
         f"📝 新评价待审核 <code>{_h(str(review.get('review_id') or '')[:8])}</code>\n"
         f"资料：{_h(str(lamp.get('title') or '-'))}{(' · ' + _h(place)) if place else ''}\n"
         f"打分：{'★' * stars}{'☆' * max(0, 5 - stars)}（{stars} 星）\n"
         f"客人：{who}\n"
-        f"内容：{_h(text[:600]) if text else '（无文字）'}\n"
-        f"图片：{len(photos)} 张 · {why}"
-    )
+        f"{body}\n"
+        f"公开晒图：{len(photos)} 张 · 🔒约课凭证：{len(proofs)} 张（仅管理员）\n{why}"
+    )[:1024]
 
 
 async def _remember(review_id: str, chat_id: int, message_id: int, kind: str, body: str) -> None:
@@ -119,12 +138,22 @@ async def notify_new_review(review: Dict[str, Any], lamp: Optional[Dict[str, Any
         caption = await _caption(review, lamp)
         kb = admin_review_kb(rid)
         photos = _photo_ids(review)
+        proofs = _proof_ids(review)
         to = await recipients(lamp.get("city"))
         sent = 0
         for uid in to:
             try:
                 msg = None
                 kind = "text"
+                if proofs:
+                    # 凭证 album first (labelled), then the photos/caption card below
+                    try:
+                        await bot.send_media_group(uid, media=[
+                            InputMediaPhoto(media=p, caption=("🔒 约课凭证（仅管理员可见）" if i == 0 else None))
+                            for i, p in enumerate(proofs)
+                        ])
+                    except Exception:
+                        logger.exception("review proofs to admin %s failed", uid)
                 if len(photos) == 1:
                     try:
                         msg = await bot.send_photo(uid, photos[0], caption=caption, reply_markup=kb)
@@ -212,7 +241,7 @@ async def backfill_pending(hours: int = 24) -> int:
             .where(~Review.review_id.in_(select(ReviewNotice.review_id)))
             .order_by(Review.created_at.asc()).limit(50)
         )).scalars().all()
-        items = [_review_to_dict(r) for r in rows]
+        items = [_review_to_dict(r, admin=True) for r in rows]
     n = 0
     for it in items:
         if await notify_new_review(it):

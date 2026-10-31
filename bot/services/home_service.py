@@ -195,8 +195,42 @@ async def reorder_pins(ordered_ids: List[int]) -> List[Dict[str, Any]]:
     return await list_all_pins()
 
 
-def _review_to_dict(r: Review) -> Dict[str, Any]:
-    return {"review_id": r.review_id, "session_id": r.session_id, "lamp_id": r.lamp_id, "target_user_id": r.target_user_id, "guest_id": r.guest_id, "stars": r.stars, "text": r.text or "", "photos": list(r.photos or []), "status": r.status, "created_at": r.created_at, "reviewed_at": r.reviewed_at, "review_note": r.review_note}
+def _review_to_dict(r: Review, *, admin: bool = False) -> Dict[str, Any]:
+    """Public shape. 约课凭证 (proofs) only with admin=True — moderation paths only."""
+    out = {"review_id": r.review_id, "session_id": r.session_id, "lamp_id": r.lamp_id, "target_user_id": r.target_user_id, "guest_id": r.guest_id, "stars": r.stars, "text": r.text or "", "photos": list(r.photos or []), "sections": dict(getattr(r, "sections", None) or {}), "status": r.status, "created_at": r.created_at, "reviewed_at": r.reviewed_at, "review_note": r.review_note}
+    if admin:
+        out["proofs"] = list(getattr(r, "proofs", None) or [])
+    else:
+        out["proof_count"] = len(list(getattr(r, "proofs", None) or []))
+    return out
+
+
+SECTION_LIMITS = {"diff": 200, "pros": 200, "cons": 200, "extra": 1000}
+SECTION_LABELS = {"diff": "人照课表差异", "pros": "优点", "cons": "不足", "extra": "补充"}
+SECTION_MIN = 5  # 差异 / 优点 / 不足 each needs at least this many characters
+
+
+def clean_sections(raw: Any) -> Dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for k, lim in SECTION_LIMITS.items():
+        v = str(raw.get(k) or "").strip()[:lim]
+        if v:
+            out[k] = v
+    return out
+
+
+def sections_error(sec: Dict[str, str]) -> Optional[str]:
+    for k in ("diff", "pros", "cons"):
+        if len(sec.get(k, "")) < SECTION_MIN:
+            return f"「{SECTION_LABELS[k]}」至少写 {SECTION_MIN} 个字"
+    return None
+
+
+def sections_text(sec: Dict[str, str]) -> str:
+    """Plain-text form kept in reviews.text, so older clients / exports still read it."""
+    return "\n".join(f"{SECTION_LABELS[k]}：{sec[k]}" for k in ("diff", "pros", "cons", "extra") if sec.get(k))
 
 
 async def review_needs_audit(city: Optional[str]) -> bool:
@@ -205,11 +239,14 @@ async def review_needs_audit(city: Optional[str]) -> bool:
     return home_feed.audit_on(settings.get("review_require_audit"))
 
 
-async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None, auto_approve: bool = False) -> Dict[str, Any]:
+async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = "", photos: Optional[List[str]] = None, session_id: Optional[str] = None, target_user_id: Optional[int] = None, auto_approve: bool = False, sections: Optional[Dict[str, str]] = None, proofs: Optional[List[str]] = None) -> Dict[str, Any]:
     stars = max(1, min(5, int(stars)))
     review_id = str(uuid.uuid4())
+    sec = clean_sections(sections or {})
+    if sec and not (text or "").strip():
+        text = sections_text(sec)
     async with session_scope() as s:
-        r = Review(review_id=review_id, session_id=session_id, lamp_id=lamp_id, target_user_id=target_user_id, guest_id=guest_id, stars=stars, text=(text or "")[:2000], photos=list(photos or [])[:6], status=ReviewStatus.PENDING.value)
+        r = Review(review_id=review_id, session_id=session_id, lamp_id=lamp_id, target_user_id=target_user_id, guest_id=guest_id, stars=stars, text=(text or "")[:2000], photos=list(photos or [])[:6], sections=sec, proofs=list(proofs or [])[:5], status=ReviewStatus.PENDING.value)
         if auto_approve:
             # Same end state as an admin approval (set_review_status APPROVED): visible on the
             # card and counted in reputation, which is computed from approved reviews.
@@ -218,7 +255,7 @@ async def create_review(*, guest_id: int, lamp_id: str, stars: int, text: str = 
             r.review_note = "免审直接发布"
         s.add(r)
         await s.flush()
-        return _review_to_dict(r)
+        return _review_to_dict(r, admin=True)
 
 
 async def list_reviews_for_lamp(lamp_id: str, *, approved_only: bool = True) -> List[Dict[str, Any]]:
@@ -237,7 +274,7 @@ async def list_pending_reviews(limit: int = 50, cities: Optional[set] = None) ->
         stmt = stmt.where(Review.lamp_id.in_(select(Lamp.lamp_id).where(city_in(Lamp.city, cities))))
     async with session_scope() as s:
         res = await s.execute(stmt.order_by(Review.created_at.asc()).limit(max(1, min(limit, 200))))
-        return [_review_to_dict(x) for x in res.scalars().all()]
+        return [_review_to_dict(x, admin=True) for x in res.scalars().all()]
 
 
 async def list_my_reviews(guest_id: int, limit: int = 30) -> List[Dict[str, Any]]:
@@ -261,7 +298,18 @@ async def set_review_status(review_id: str, status: str, *, note: Optional[str] 
         if note:
             r.review_note = note[:256]
         await s.flush()
-        return _review_to_dict(r)
+        out = _review_to_dict(r)
+    if status == ReviewStatus.APPROVED.value and out.get("photos"):
+        try:
+            import asyncio
+            from bot.services.broadcast import broadcast_review
+            from bot.services import search_service as _ss
+            lamp = await _ss.get_lamp(out.get("lamp_id") or "")
+            if lamp:
+                asyncio.get_running_loop().create_task(broadcast_review(out, lamp))
+        except Exception:
+            pass
+    return out
 
 
 async def reputation_for_lamp(lamp_id: str) -> Dict[str, Any]:

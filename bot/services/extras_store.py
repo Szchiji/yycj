@@ -87,10 +87,12 @@ async def save_extras(lamp_id: str, extras: Dict[str, Any] | None, drop: Iterabl
             logger.exception("save extras failed")
 
 
-async def remember_broadcast(lamp_id: str, chat: str, mid: int) -> None:
+async def remember_broadcast(lamp_id: str, chat: str, mid: int, *, card_mid: int | None = None) -> None:
     if not lamp_id or not mid:
         return
     payload = {"_bc_chat": str(chat), "_bc_mid": str(int(mid))}
+    if card_mid:
+        payload["_bc_card_mid"] = str(int(card_mid))
     current = await load_extras(lamp_id)
     current.update(payload)
     async with session_scope() as s:
@@ -135,6 +137,18 @@ async def load_broadcast(lamp_id: str) -> Tuple[str, str]:
     if not mid:
         mid = str(extras.get("_bc_mid") or "")
     return chat, mid
+
+
+async def load_broadcast_card(lamp_id: str) -> int | None:
+    """Message id of the follow-up text card (album posts only); None for single-photo posts."""
+    if not lamp_id:
+        return None
+    extras = await load_extras(lamp_id)
+    raw = extras.get("_bc_card_mid")
+    try:
+        return int(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
 
 
 _orig_get = search_service.get_lamp

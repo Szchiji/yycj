@@ -130,7 +130,14 @@
       const stars = "★".repeat(t.stars || 0) + "☆".repeat(Math.max(0, 5 - (t.stars || 0)));
       const ph = (Array.isArray(t.photos) ? t.photos : []).slice(0, 3).map((u) => String(u || "")).filter((u) => /^[A-Za-z0-9_\-:./]+$/.test(u))
         .map((u) => { const src = /^https?:|^\//.test(u) ? u : "/api/media/file/" + encodeURIComponent(u); return `<img class="rv-ph" loading="lazy" src="${src}" alt="" />`; }).join("");
-      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div><p>${String(t.text || "").replace(/[<>]/g,"")}</p>${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
+      const sec = (t.sections && typeof t.sections === "object") ? t.sections : {};
+      const L = [["diff", "人照课表差异"], ["pros", "优点"], ["cons", "不足"], ["extra", "补充"]];
+      const clean = (x) => String(x || "").replace(/[<>]/g, "");
+      // structured reviews get section headers; old plain-text reviews render as before
+      const body = L.some(([k]) => sec[k])
+        ? `<dl class="rv-sec">${L.filter(([k]) => sec[k]).map(([k, l]) => `<dt>${l}</dt><dd>${clean(sec[k])}</dd>`).join("")}</dl>`
+        : `<p>${clean(t.text)}</p>`;
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div>${body}${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
     }).join("") : "<p class='muted'>暂无评价</p>";
     box.innerHTML = `<h3 style="font-size:1rem;margin:12px 0 6px">评价</h3>${rows}`;
     placeShare(id);

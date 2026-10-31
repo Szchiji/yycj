@@ -179,9 +179,26 @@ async def api_create_review(
         s = (p or "").strip()
         if s:
             photos.append(_normalize_one_url(s))
+    proofs = []
+    for p in body.proofs or []:
+        s = (p or "").strip()
+        if s:
+            proofs.append(_normalize_one_url(s))
+    proofs = proofs[:5]
+    sections = home_service.clean_sections(body.sections.model_dump() if body.sections else {})
+    from bot.services.home_feed import ops_for_city
+    ops = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
+    if body.sections is not None:
+        err = home_service.sections_error(sections)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+    if ops.get("review_proof_required") and not proofs:
+        raise HTTPException(status_code=400, detail="请上传约课凭证（1–5 张，仅管理员可见）")
+    if ops.get("review_public_photos") is False:
+        photos = []  # 只收私密凭证，不收公开晒图
     # 评价需审核 (per card city, fallback site-wide, unset = ON): off -> publish directly.
-    # Reviews with photos always wait for an admin, whatever the switch says.
-    auto = not photos and not await home_service.review_needs_audit(lamp.get("city"))
+    # Reviews with photos or 约课凭证 always wait for an admin, whatever the switch says.
+    auto = not photos and not proofs and not await home_service.review_needs_audit(lamp.get("city"))
     try:
         rev = await home_service.create_review(
             auto_approve=auto,
@@ -190,6 +207,8 @@ async def api_create_review(
             stars=body.stars,
             text=body.text,
             photos=photos[:3],
+            sections=sections,
+            proofs=proofs,
             session_id=body.session_id,
             target_user_id=int(target) if target else None,
         )
@@ -198,8 +217,9 @@ async def api_create_review(
     if rev.get("status") == "pending":
         # tell the bot admins (fire-and-forget: a Telegram problem never fails the submit)
         from bot.services import review_notify
-        review_notify.notify_soon(rev, lamp)
+        review_notify.notify_soon(dict(rev), lamp)
     rev["created_at"] = _ser_dt(rev.get("created_at"))
+    rev["proof_count"] = len(rev.pop("proofs", None) or [])  # never echo 凭证 back
     return {"ok": True, "review": rev}
 
 

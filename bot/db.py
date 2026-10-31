@@ -49,6 +49,17 @@ _ALTER_STATEMENTS = [
     # Home feed: WHERE status='active' AND city=? ORDER BY feed_pinned DESC, feed_pin_order, created_at DESC.
     # Additive, IF NOT EXISTS; the lamps table is small so the build lock is brief.
     "CREATE INDEX IF NOT EXISTS ix_lamps_feed ON lamps (status, city, feed_pinned DESC, feed_pin_order, created_at DESC)",
+    # 首页筛选: 价格档 (status, city, price) and 标签 (array overlap, GIN)
+    "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS sections JSONB DEFAULT '{}'::jsonb",
+    "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS proofs JSONB DEFAULT '[]'::jsonb",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_price ON lamps (status, city, price)",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_tags_gin ON lamps USING gin (tags)",
+    # 搜索: substring ILIKE on name / district / location text. pg_trgm may be unavailable
+    # (no permission): then these fail, get logged once, and search still works by scan.
+    "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_title_trgm ON lamps USING gin (title gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_district_trgm ON lamps USING gin (district gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_approx_trgm ON lamps USING gin (approx_label gin_trgm_ops)",
 ]
 
 

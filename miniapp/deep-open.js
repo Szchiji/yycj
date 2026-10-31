@@ -1,23 +1,26 @@
 (() => {
   if (window.__yycjDeepOpen) return;
   window.__yycjDeepOpen = true;
-  function restore(raw) {
+  function parseStart(raw) {
+    // s_<uuid> 详情 · r_<uuid> 详情+评价 · c_<uuid> 详情+想聊聊（频道推送按钮）
     let s = String(raw || "").trim();
-    if (!s) return "";
-    if (s.startsWith("s_")) s = s.slice(2);
+    if (!s) return { id: "", kind: "s" };
+    let kind = "s";
+    if (/^[src]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
-      return s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20);
+      return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
     }
-    return String(raw || "").replace(/^s_/, "");
+    return { id: String(raw || "").replace(/^[src]_/i, ""), kind };
   }
+  function restore(raw) { return parseStart(raw).id; }
   function lampId() {
     const q = new URLSearchParams(location.search || "");
     const fromQ = q.get("lamp") || q.get("id") || "";
     if (fromQ) return restore(fromQ) || fromQ;
     const tg = window.Telegram && window.Telegram.WebApp;
     const sp = (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || "";
-    if (sp) return restore(sp);
+    if (sp) { const p = parseStart(sp); try { sessionStorage.setItem("yycj_open_kind", p.kind); } catch (e) {} return p.id; }
     // Only a reload inside the same session reopens it (it used to live in localStorage, so every
     // later normal open of the app jumped to the last shared listing).
     try { return sessionStorage.getItem("yycj_open_lamp") || ""; } catch (e) { return ""; }
@@ -32,12 +35,22 @@
   function esc(t) {
     return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':'&quot;',"'":"&#39;" }[c]));
   }
+  function afterOpen(id) {
+    let kind = "s";
+    try { kind = sessionStorage.getItem("yycj_open_kind") || "s"; sessionStorage.removeItem("yycj_open_kind"); } catch (e) {}
+    if (kind === "r") {
+      setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
+    } else if (kind === "c") {
+      setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
+    }
+  }
   function paint(lamp, data) {
     const box = document.getElementById("detail");
     if (!box || !lamp) return;
     if (window.__yycjRenderDetail && window.__yycjRenderDetail(data || { lamp }, lamp.lamp_id)) {
       showDetail();
       try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
+      afterOpen(lamp.lamp_id);
       return;
     }
     box.setAttribute("data-lamp", lamp.lamp_id || "");
@@ -58,6 +71,7 @@
     // same extras as a detail opened from a card: photo/video gallery, tags, extras, reviews
     try { window.__yycjPaintGallery && window.__yycjPaintGallery(lamp.lamp_id); } catch (e) {}
     try { window.__yycjLoadDetailExtras && window.__yycjLoadDetailExtras(lamp.lamp_id); } catch (e) {}
+    afterOpen(lamp.lamp_id);
   }
   async function openLamp(id) {
     if (!id) return;

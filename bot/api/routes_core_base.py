@@ -70,11 +70,20 @@ class CreditAdjustBody(BaseModel):
 class RoleBody(BaseModel):
     role: str
 
+class ReviewSections(BaseModel):
+    diff: str = ""   # 人照课表差异
+    pros: str = ""   # 优点
+    cons: str = ""   # 不足
+    extra: str = ""  # 补充（选填）
+
+
 class ReviewCreateBody(BaseModel):
     lamp_id: str
     stars: int = 5
     text: str = ""
-    photos: List[str] = Field(default_factory=list)
+    photos: List[str] = Field(default_factory=list)   # 公开晒图（≤3）
+    proofs: List[str] = Field(default_factory=list)   # 约课凭证（1–5，仅管理员可见）
+    sections: Optional[ReviewSections] = None
     session_id: Optional[str] = None
 
 class AnnounceBody(BaseModel):
