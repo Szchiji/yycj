@@ -134,6 +134,7 @@
     }
     const p = await loadPlace(false);
     const teacher = role() === "teacher" || role() === "merchant";
+    card.dataset.place = p.set ? (p.district ? p.district + "附近" : "已设置") : "";
     const lead = teacher ? "也是你资料上显示的大致位置。改了马上生效，不用重新审核。" : "首页「附近 / 距我近」默认按这里算距离。";
     card.innerHTML = `<h3>常用位置</h3>
       <div class="place-row"><span class="place-dot${p.set ? " on" : ""}"></span><span class="place-st">${p.set ? "已设置 · 约 500 米范围" : "还没设置"}</span>
