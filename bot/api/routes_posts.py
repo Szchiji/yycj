@@ -72,6 +72,12 @@ async def api_create_post(
 
     tags = [t.strip()[:24] for t in (body.tags or []) if (t or "").strip()][:5]
 
+    # 地图选点: stored only on a ~500 m grid; it also becomes the teacher's 常用位置 (我的).
+    from bot.services import places
+    pin = places.snap(body.approx_lat, body.approx_lng) if body.approx_lat is not None else None
+    if pin:
+        await places.set_point(user_id, pin[0], pin[1])
+
     lamp_data = {
         "city": city,
         "title": (body.title or "").strip()[:64] or "未命名",
@@ -82,9 +88,9 @@ async def api_create_post(
         "photos": photos,
         "media": media,
         "district": (body.district or "").strip()[:64] or None,
-        "approx_lat": body.approx_lat,
-        "approx_lng": body.approx_lng,
-        "approx_label": (body.approx_label or "").strip()[:128] or None,
+        "approx_lat": pin[0] if pin else None,
+        "approx_lng": pin[1] if pin else None,
+        "approx_label": None if pin else ((body.approx_label or "").strip()[:128] or None),
         "publisher_role": role,
         "extras": dict(body.extras or {}),
         "hours": body.hours or [],
