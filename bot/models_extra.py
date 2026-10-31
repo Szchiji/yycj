@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bot.models import Base
@@ -54,6 +54,43 @@ class ChannelDirectory(Base):
     chat: Mapped[str] = mapped_column(String(64))
     message_id: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Coupon(Base):
+    """老师自己发的限时优惠（如「P100 PP200 两天有效 限10张」）。每位老师同一时间最多 1 张有效。"""
+
+    __tablename__ = "coupons"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    coupon_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    city: Mapped[str] = mapped_column(String(32), index=True)
+    text: Mapped[str] = mapped_column(String(64))
+    ends_at: Mapped[datetime] = mapped_column(DateTime, index=True)  # UTC
+    quota: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # 0 = 不限
+    claimed: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)  # active / ended / stopped
+    stopped_by: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    # channel post (优惠推送): edited to 「已结束」 once the coupon ends / expires / is stopped / sold out
+    post_chat: Mapped[str] = mapped_column(String(64), nullable=True)
+    post_mid: Mapped[int] = mapped_column(Integer, nullable=True)
+    post_closed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class CouponClaim(Base):
+    """客人领取：一人一张，领到一个 6 位码，到店出示给老师。"""
+
+    __tablename__ = "coupon_claims"
+    __table_args__ = (UniqueConstraint("coupon_id", "user_id", name="uq_coupon_claim_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    coupon_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    code: Mapped[str] = mapped_column(String(12), index=True)
+    used_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class UserPlace(Base):

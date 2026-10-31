@@ -6,7 +6,7 @@
     let s = String(raw || "").trim();
     if (!s) return { id: "", kind: "s" };
     let kind = "s";
-    if (/^[srwc]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
+    if (/^[srwcq]_/i.test(s)) { kind = s[0].toLowerCase(); s = s.slice(2); }
     s = s.replace(/-/g, "");
     if (s.length === 32) {
       return { id: s.slice(0, 8) + "-" + s.slice(8, 12) + "-" + s.slice(12, 16) + "-" + s.slice(16, 20) + "-" + s.slice(20), kind };
@@ -20,7 +20,7 @@
     if (fromQ) {
       // bot deep link (?start=r_/w_…) → WebApp button → go.html?lamp=<id>&open=r|w
       const open = String(q.get("open") || "").toLowerCase();
-      if (/^[rwc]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
+      if (/^[rwcq]$/.test(open)) { try { sessionStorage.setItem("yycj_open_kind", open); } catch (e) {} }
       return restore(fromQ) || fromQ;
     }
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -47,6 +47,9 @@
       setTimeout(() => { try { document.getElementById("yycjReviews")?.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 600);
     } else if (kind === "w") {
       setTimeout(() => { try { document.getElementById("detailReview")?.click(); } catch (e) {} }, 700);
+    } else if (kind === "q") {
+      // channel coupon post 「领取优惠」 → detail, then point at the coupon block (coupons.js paints it)
+      setTimeout(() => { try { const b = document.querySelector("#detail .cpn-block"); if (b) { b.scrollIntoView({ block: "center", behavior: "smooth" }); b.classList.add("cpn-flash"); } } catch (e) {} }, 1200);
     } else if (kind === "c") {
       setTimeout(() => { try { document.getElementById("detailChat")?.click(); } catch (e) {} }, 700);
     }
@@ -80,6 +83,7 @@
     try { window.__yycjLoadDetailExtras && window.__yycjLoadDetailExtras(lamp.lamp_id); } catch (e) {}
     afterOpen(lamp.lamp_id);
   }
+  window.__yycjOpenLampById = (id) => openLamp(id);  // used by 「本城优惠」 / 「我的优惠券」 (coupons.js)
   async function openLamp(id) {
     if (!id) return;
     try { sessionStorage.setItem("yycj_open_lamp", id); localStorage.removeItem("yycj_open_lamp"); } catch (e) {}

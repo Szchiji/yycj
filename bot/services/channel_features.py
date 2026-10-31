@@ -10,9 +10,10 @@ from bot.services.home_feed import FEATURE_CHANNEL, feature_chat, ops_for_city
 
 logger = logging.getLogger(__name__)
 
-LABELS = {"channel_directory": "频道按区目录", "broadcast_reviews": "精选评价推送到频道"}
-CHANNEL_KEYS = ("broadcast_channel", "directory_channel", "review_channel")
-GLOBAL_KEYS = ("channel_directory", "directory_channel", "broadcast_reviews", "review_channel")
+LABELS = {"channel_directory": "频道按区目录", "broadcast_reviews": "精选评价推送到频道", "broadcast_coupons": "优惠推送到频道"}
+CHANNEL_KEYS = ("broadcast_channel", "directory_channel", "review_channel", "coupon_channel")
+GLOBAL_KEYS = ("channel_directory", "directory_channel", "broadcast_reviews", "review_channel",
+               "broadcast_coupons", "coupon_channel")
 
 
 def _apply(site: Dict[str, Any], changes: Dict[str, Any], city: Optional[str]) -> Dict[str, Any]:
@@ -49,10 +50,17 @@ async def validate(changes: Dict[str, Any], *, city: Optional[str] = None) -> Di
     for feat in FEATURE_CHANNEL:
         if not after.get(feat):
             continue
+        # 优惠推送 is on by default: only check rights when it (or its channel) is touched in this save,
+        # so moving a city's 推送频道 doesn't suddenly need a Telegram round-trip
+        if feat == "broadcast_coupons" and "broadcast_coupons" not in clean and not clean.get("coupon_channel"):
+            continue
         chat = feature_chat(after, feat)
         where = f"（{city}）" if city else ""
         if not chat:
-            raise ValueError(f"「{LABELS[feat]}」{where}开着，但没有频道：请填它的频道，或先设推送频道")
+            # only an explicit 「开」 in this save is an error (优惠推送 is on by default: no channel = no post)
+            if clean.get(feat):
+                raise ValueError(f"「{LABELS[feat]}」{where}开着，但没有频道：请填它的频道，或先设推送频道")
+            continue
         # only ask Telegram when something relevant changed (switch turned on / channel moved)
         if before.get(feat) and feature_chat(before, feat) == chat:
             continue
@@ -62,7 +70,7 @@ async def validate(changes: Dict[str, Any], *, city: Optional[str] = None) -> Di
         if err:
             raise ValueError(f"「{LABELS[feat]}」{where}：{err}")
         checked.add(chat)
-    for k in ("directory_channel", "review_channel"):
+    for k in ("directory_channel", "review_channel", "coupon_channel"):
         v = clean.get(k)
         if v and v not in checked:
             err = await check_post_rights(v)
@@ -111,7 +119,8 @@ async def inherited_warnings(site: Dict[str, Any]) -> List[Dict[str, str]]:
                 continue
             chat = feature_chat(eff, feat)
             if not chat:
-                out.append({"city": city, "feature": LABELS[feat], "chat": "", "error": "没有频道"})
+                if feat != "broadcast_coupons":   # 优惠推送 is on by default; no channel simply means no post
+                    out.append({"city": city, "feature": LABELS[feat], "chat": "", "error": "没有频道"})
                 continue
             if chat not in seen:
                 try:

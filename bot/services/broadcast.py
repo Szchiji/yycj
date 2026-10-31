@@ -144,7 +144,7 @@ def start_url(bot_username: str, lamp_id: str, kind: str = "s") -> str:
     lid = compact_id(lamp_id)
     if not name or len(lid) != 32:
         return ""
-    prefix = kind if kind in ("s", "r", "w") else "s"
+    prefix = kind if kind in ("s", "r", "w", "q") else "s"
     return f"https://t.me/{name}?start={prefix}_{lid}"
 
 

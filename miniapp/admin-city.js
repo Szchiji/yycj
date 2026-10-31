@@ -230,16 +230,17 @@
     const row = (on, onId, ch, chId, label, hint) => `<div class="cc-f"><label class="row"><input type="checkbox" id="${onId}"${on ? " checked" : ""} /> ${label}</label>
       <div class="cc-fh"><label for="${chId}">发到的频道</label></div><input id="${chId}" maxlength="128" placeholder="${esc("空 = 用" + push)}" value="${esc(ch || "")}" />
       <p class="cc-hint">${hint}</p></div>`;
-    const table = (f.cities || []).map((c) => `<tr><td>${tagHtml(c.city)}</td><td>${featCell(c.channel_directory)}</td><td>${featCell(c.broadcast_reviews)}</td>
+    const table = (f.cities || []).map((c) => `<tr><td>${tagHtml(c.city)}</td><td>${featCell(c.channel_directory)}</td><td>${featCell(c.broadcast_reviews)}</td><td>${featCell(c.broadcast_coupons)}</td>
       <td><button class="btn cf-edit" type="button" data-cc="city" data-city="${esc(c.city)}">改</button></td></tr>`).join("");
-    return `<h4 style="margin-top:14px">频道按区目录 · 精选评价</h4>
+    return `<h4 style="margin-top:14px">频道按区目录 · 精选评价 · 优惠推送</h4>
       <p class="muted cc-lead">全站默认：没单独设的城市都用这里。每个城市的目录只列它自己的区和在架资料。机器人必须是频道管理员，保存时会检查。</p>
       ${row(g.channel_directory, "cfDirOn", g.directory_channel, "cfDirCh", "频道按区目录", "每天 12:00 更新同一条；关掉或换频道会删掉旧目录。")}
       <p class="cf-when">⏱ 按区目录的改动保存后不会马上发到频道，将在${esc(nextNoon())}生效。</p>
       ${row(g.broadcast_reviews, "cfRevOn", g.review_channel, "cfRevCh", "精选评价推送到频道", "审核通过的 4–5 星评价，只发文字，不发凭证。")}
-      <button class="btn primary" type="button" data-cc="save-feat">保存这两项</button>
+      ${row(g.broadcast_coupons !== false, "cfCpnOn", g.coupon_channel, "cfCpnCh", "优惠推送到频道", "老师发优惠时发一条文字帖（查看详情 · 领取优惠）；结束 / 过期 / 停用 / 领完时改成「已结束」。默认开。")}
+      <button class="btn primary" type="button" data-cc="save-feat">保存这三项</button>
       ${warnHtml(S.featWarn)}
-      ${table ? `<table class="cf-table"><thead><tr><th>城市</th><th>按区目录</th><th>精选评价</th><th></th></tr></thead><tbody>${table}</tbody></table>` : ""}`;
+      ${table ? `<table class="cf-table"><thead><tr><th>城市</th><th>按区目录</th><th>精选评价</th><th>优惠推送</th><th></th></tr></thead><tbody>${table}</tbody></table>` : ""}`;
   }
   // per-city overrides: GET/POST /api/admin/cities/settings
   S.cfg = {};
@@ -534,6 +535,7 @@
         const d = await post("/api/admin/channel-features", {
           channel_directory: !!document.getElementById("cfDirOn")?.checked, directory_channel: v("cfDirCh"),
           broadcast_reviews: !!document.getElementById("cfRevOn")?.checked, review_channel: v("cfRevCh"),
+          broadcast_coupons: !!document.getElementById("cfCpnOn")?.checked, coupon_channel: v("cfCpnCh"),
         });
         S.feat = d; S.cfg = {}; S.featWarn = d.warnings || [];
         alert("已保存。按区目录将在" + (d.directory_applies_at || nextNoon()) + "生效" + (S.featWarn.length ? "；有 " + S.featWarn.length + " 个城市的频道需要检查，见下方" : ""));

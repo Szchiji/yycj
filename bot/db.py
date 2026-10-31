@@ -60,6 +60,9 @@ _ALTER_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS ix_lamps_title_trgm ON lamps USING gin (title gin_trgm_ops)",
     "CREATE INDEX IF NOT EXISTS ix_lamps_district_trgm ON lamps USING gin (district gin_trgm_ops)",
     "CREATE INDEX IF NOT EXISTS ix_lamps_approx_trgm ON lamps USING gin (approx_label gin_trgm_ops)",
+    "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_chat VARCHAR(64)",
+    "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_mid INTEGER",
+    "ALTER TABLE coupons ADD COLUMN IF NOT EXISTS post_closed BOOLEAN DEFAULT false",
 ]
 
 

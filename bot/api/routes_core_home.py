@@ -96,6 +96,7 @@ async def api_home(
     open_now: int = Query(default=0, ge=0, le=1, alias="open"),
     radius: Optional[float] = Query(default=None, ge=0, le=50),
     at: Optional[str] = Query(default=None, max_length=32),
+    coupon: int = Query(default=0, ge=0, le=1),
     place: int = Query(default=1, ge=0, le=1),
     limit: int = Query(default=3, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=500),
@@ -138,6 +139,11 @@ async def api_home(
     flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort,
                  exact_center=near_src != "at")
     sort = flt.sort
+    coupons_on = bool(settings.get("coupons_enabled", True))
+    if coupon and coupons_on:
+        # 「有优惠」 filter: only listings with a live coupon (computed per listing, like 营业中)
+        from bot.services import coupons as coupon_svc
+        flt.coupon_ids = await coupon_svc.live_lamp_ids(use_city)
     pins = []
     try:
         pins_raw = await pin_query.list_active_pins()
@@ -225,6 +231,16 @@ async def api_home(
         except Exception:
             logger.exception("serialize lamp failed")
 
+    if coupons_on and safe_items:
+        try:
+            from bot.services import coupons as coupon_svc
+            live = await coupon_svc.live_by_lamp([c.get("lamp_id") for c in safe_items])
+            for c in safe_items:
+                if c.get("lamp_id") in live:
+                    c["coupon"] = live[c["lamp_id"]]
+        except Exception:
+            logger.exception("coupon badges failed")
+
     # 地区筛选：当前城市各区在架数（仅首屏返回）。轮播不受筛选影响。
     districts = None
     if offset == 0:
@@ -262,6 +278,7 @@ async def api_home(
         "media_max_count": int(settings.get("media_max_count") or 6),
         "page_size": int(settings.get("home_feed_page_size") or 3),
         "carousel_interval_sec": int(settings.get("carousel_interval_sec") or 4),
+        "coupon_display": (settings.get("coupon_display") or "badge,filter,list") if coupons_on else "",
         "contacts": contacts,
         "listing_fields": settings.get("listing_fields") or [],
         "review_form": {
@@ -404,13 +421,25 @@ async def api_session_request(
     sess = await session_service.create_request(
         body.lamp_id, user_id, lamp["user_id"], lamp_title=lamp.get("title"), guest_alias=alias
     )
+    # 约课用优惠：the guest's unused, valid code for this teacher rides along in the notice
+    held = None
     try:
+        from bot.services import coupons as coupon_svc
+        held = await coupon_svc.held_code(user_id, lamp["user_id"])
+    except Exception:
+        logger.exception("coupon lookup failed")
+    try:
+        import html as _html
         from bot.keyboards import session_accept_kb
         from bot.main import bot
+        note = ""
+        if held:
+            note = (f"\n🎟 对方带了优惠券：<code>{_html.escape(held['code'])}</code>（{_html.escape(held['text'])}）。"
+                    f"\n核销：我的 · 我的优惠 → 输入券码 → 标记已用。")
         await bot.send_message(
             lamp["user_id"],
-            f"🌕 有人通过月影车姬就你的资料 <b>{lamp.get('title')}</b> 发起匿名会话。\n"
-            f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。",
+            f"🌕 有人通过月影车姬就你的资料 <b>{_html.escape(str(lamp.get('title') or ''))}</b> 发起匿名会话。\n"
+            f"对方身份已遮蔽，接受后由机器人中转消息（24h 内有效）。" + note,
             reply_markup=session_accept_kb(sess["session_id"]),
         )
     except Exception:
@@ -419,5 +448,6 @@ async def api_session_request(
         "ok": True,
         "session_id": sess["session_id"],
         "status": sess["status"],
-        "message": "已发送想聊聊邀请，等待对方在 Bot 中接受",
+        "coupon_code": held["code"] if held else None,
+        "message": "已发送邀请，券码已带上 · 已复制券码，发给老师即可" if held else "已发送想聊聊邀请，等待对方在 Bot 中接受",
     }
