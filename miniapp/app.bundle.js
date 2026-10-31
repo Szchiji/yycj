@@ -280,7 +280,34 @@ try {
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [], lastAreas = null;
   let carouselMs = 4000, carouselTimer = 0, paused = false;
-  const TUTORIAL = ["右上角选城市，左上「地区」按区筛选。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
+  // 使用教程（「我的」底部）：按身份分两份，短句、一步一条
+  const TUTORIAL = {
+    guest: [
+      ["选城市", "右上角切换城市。"],
+      ["找人", "点「筛选」按区、价位、标签、营业中、有优惠来筛；或在搜索框搜花名、标签、城区、价位。"],
+      ["附近", "在「我的 · 常用位置」地图上点一下设好位置，卡片会显示「区 · 约N km」，筛选里还能选「1km内」等。别人看不到你的具体位置。"],
+      ["收藏", "进详情页，点底部「收藏」。收藏的都在「我的 · 我的收藏」。"],
+      ["优惠券", "卡片上有「惠」字就是有优惠。进详情点「领取」拿到券码；点「想聊聊」约课时券码会自动复制并带给老师。券码在优惠结束前有效。"],
+      ["写评价", "约课后在详情页点「评价」，按项目填写，并上传约课凭证（只给管理员审核，不公开），通过后展示。"],
+    ],
+    teacher: [
+      ["上架", "点底部「上架」填资料：先选「区」，再在地图上点大致位置（客人只看到「约N km」），提交审核。"],
+      ["营业时间", "在「我的上架 → 改资料」设营业时间，首页就会显示 营业中 / 未到点 / 已打烊；开工前 Bot 会问你今天开不开。"],
+      ["到期提醒", "上架剩 3 天、剩 1 天时 Bot 会提醒你续期。"],
+      ["我的优惠", "在「我的 · 我的优惠」发限时优惠（内容、天数、限量），会推送到本城频道。"],
+      ["核销券码", "客人约课时会把券码发给你：在「我的优惠」输入券码 → 核对 → 标记已用。"],
+      ["看数据", "「我的上架」里能看近 7 天浏览、收藏、匿名联系。"],
+    ],
+  };
+  function tutorialHtml() {
+    let r = "guest";
+    try { r = JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; } catch (e) {}
+    const list = r === "guest" ? TUTORIAL.guest : TUTORIAL.teacher;
+    return "<div class=\"sheet-panel tut\"><h3>使用教程 <small>" + (r === "guest" ? "客人" : "老师") + "</small></h3><ol class=\"tut-steps\">" +
+      list.map((x, i) => "<li><span class=\"tut-n\">" + (i + 1) + "</span><div><b>" + esc(x[0]) + "</b><p>" + esc(x[1]) + "</p></div></li>").join("") +
+      "</ol><button class=\"btn block\" id=\"guideClose\" type=\"button\">知道了</button></div>";
+  }
+  window.__yycjTutorialHtml = tutorialHtml;
   // 地区筛选：单选，本次会话内记住（按城市），切城市自动清空。只筛信息流，轮播不变。
   function curCity() { return localStorage.getItem("yycj_city") || ""; }
   function getArea() {
@@ -414,7 +441,7 @@ try {
   function cardHtml(t, idx) {
     const img = cover(t);
     // 按距离时，右上角地区标签换成「区 · 约Nkm」（只显示取整后的距离，不暴露坐标）
-    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join(" · ") : [t.city, t.district].filter(Boolean).join("·");
+    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join("\u2009·\u2009") : [t.city, t.district].filter(Boolean).join("·");
     const tag = String((t.tags && t.tags[0]) || "").replace(/^#+/, "");
     const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
@@ -423,7 +450,7 @@ try {
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
       imgTag(img, "thumb", idx < 3) +
-      "<button class=\"fav-btn\" type=\"button\" data-fav=\"" + esc(t.lamp_id) + "\">♡</button>" +
+      // 收藏只在详情页；卡片左上角放营业状态书签
       open +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
@@ -514,10 +541,8 @@ try {
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
       if (lbl) {
-        if (nAct) lbl.textContent = "筛选·" + nAct;
-        else if (so === "near") lbl.textContent = "附近";
-        else if (so === "reviews") lbl.textContent = "评价多";
-        else lbl.textContent = k ? areaLabel(k) : "筛选▾";
+        const word = nAct ? "筛选·" + nAct : so === "near" ? "附近" : so === "reviews" ? "评价多" : k ? areaLabel(k) : "筛选";
+        lbl.innerHTML = "<i class=\"area-ic\" aria-hidden=\"true\"></i><span class=\"area-w\">" + esc(word) + "</span><i class=\"area-car\" aria-hidden=\"true\">▾</i>";
       }
       btn.classList.toggle("on", !!(nAct || so));
       btn.classList.toggle("long", true);
@@ -614,7 +639,7 @@ try {
       btn.type = "button";
       btn.setAttribute("aria-expanded", "false");
       // invisible "教程" keeps the old button's exact size; the visible label sits on top
-      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">地区▾</span>";
+      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">筛选</span>";
       row.insertBefore(btn, row.firstChild);
       const panel = document.createElement("div");
       panel.id = "areaPanel";
@@ -634,7 +659,7 @@ try {
       const sheet = document.createElement("div");
       sheet.id = "guideSheet";
       sheet.className = "sheet hidden";
-      sheet.innerHTML = "<div class=\"sheet-panel\"><h3>教程</h3><ul>" + TUTORIAL.map((x) => "<li>" + x + "</li>").join("") + "</ul><button class=\"btn block\" id=\"guideClose\" type=\"button\">知道了</button></div>";
+      sheet.innerHTML = tutorialHtml();
       document.body.appendChild(sheet);
     }
   }
@@ -725,7 +750,9 @@ try {
     if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-apply]")) {
       toggleArea(false); loadFeed(true); return;
     }
-    if (ev.target.id === "btnTutorial") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
+    if (ev.target.id === "btnTutorial" || (ev.target.closest && ev.target.closest("[data-tutorial]"))) {
+      ev.preventDefault(); const sh = $("#guideSheet"); if (sh) { sh.innerHTML = tutorialHtml(); sh.classList.remove("hidden"); }
+    }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
     if (ev.target.id === "btnCity" || (ev.target.closest && ev.target.closest("#btnCity"))) {
       ev.preventDefault();
@@ -2194,14 +2221,20 @@ try {
     }
     paintHearts();
     paintList();
+    try { document.dispatchEvent(new CustomEvent("yycj:fav")); } catch (e) {}
   }
   window.__yycjPaintFav = paintHearts;
+  window.__yycjFavCount = () => ids.size;
+  window.__yycjFavLoad = load;
+  // 收藏只在详情页：先拿一次收藏列表，让详情页的「收藏」一打开就是对的状态（♥ / ♡）
+  (function boot(n) { if (token()) load().then(() => { try { document.dispatchEvent(new CustomEvent("yycj:fav")); } catch (e) {} }); else if (n < 20) setTimeout(() => boot(n + 1), 500); })(0);
   document.addEventListener("click", async (ev) => {
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
       ev.stopPropagation();
       window.__yycjBack = "fav";
       showView("view-fav");
+      document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.nav === "fav"));
       load();
       return;
     }
@@ -3686,6 +3719,7 @@ try {
     }
     const p = await loadPlace(false);
     const teacher = role() === "teacher" || role() === "merchant";
+    card.dataset.place = p.set ? (p.district ? p.district + "附近" : "已设置") : "";
     const lead = teacher ? "也是你资料上显示的大致位置。改了马上生效，不用重新审核。" : "首页「附近 / 距我近」默认按这里算距离。";
     card.innerHTML = `<h3>常用位置</h3>
       <div class="place-row"><span class="place-dot${p.set ? " on" : ""}"></span><span class="place-st">${p.set ? "已设置 · 约 500 米范围" : "还没设置"}</span>
@@ -3980,3 +4014,168 @@ try {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();
 ;} catch (e) { try { console.error("coupons.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "coupons.js" }); } catch (x) {} }
+/* ---- me-layout.js ---- */
+try {
+// 「我的」页分组（墨绿金卡片组）：按身份分区，长卡片折叠成一行 + 右侧摘要，点开再看详情。
+// 只移动 / 包装各模块已有的卡片（常用位置、优惠券、上架、昵称…），不改它们自己的逻辑。
+(() => {
+  if (window.__yycjMeLayout) return;
+  window.__yycjMeLayout = true;
+  const $ = (s) => document.querySelector(s);
+  const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const token = () => localStorage.getItem("yycj_token") || "";
+  function role() { try { return JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; } catch (e) { return "guest"; } }
+  const isTeacher = () => role() === "teacher" || role() === "merchant";
+  const ROLE = { guest: "客人", teacher: "老师", merchant: "商家" };
+
+  // section → ordered item ids (cards get an id below; rows are built here)
+  const LAYOUT = {
+    guest: [
+      ["我的", ["meRowFav", "myClaims", "meRevCard"]],
+      ["本城", ["cityCoupons"]],
+      ["设置", ["placeCard", "meNickCard"]],
+      ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
+    ],
+    teacher: [
+      ["经营", ["meListCard", "myCoupon"]],
+      ["设置", ["placeCard", "meNickCard", "meRevCard"]],
+      ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
+    ],
+  };
+  const FOLD = { myClaims: 1, cityCoupons: 1, placeCard: 1, meNickCard: 1, meRevCard: 1, myCoupon: 1, meListCard: 1 };
+  const OPEN_DEFAULT = { meListCard: 1 };
+  function isOpen(id) { try { const v = sessionStorage.getItem("yycj_me_open_" + id); return v == null ? !!OPEN_DEFAULT[id] : v === "1"; } catch (e) { return !!OPEN_DEFAULT[id]; } }
+  function setOpen(id, on) { try { sessionStorage.setItem("yycj_me_open_" + id, on ? "1" : "0"); } catch (e) {} }
+
+  let revs = null, revLoading = false;
+  async function loadRevs() {
+    if (revLoading || !token()) return; revLoading = true;
+    try { const r = await fetch("/api/reviews/mine", { headers: { Authorization: "Bearer " + token() } }); if (r.ok) revs = (await r.json()).items || []; } catch (e) {}
+    revLoading = false; paintRevs(); summarize();
+  }
+  const REV_ST = { pending: "审核中", approved: "已展示", rejected: "未通过", brush: "未通过" };
+  function paintRevs() {
+    const box = $("#myReviews"); if (!box || revs == null) return;
+    box.classList.remove("hidden");
+    box.innerHTML = revs.length ? "<ul class='me-revs'>" + revs.slice(0, 20).map((r) => `<li data-cpn-open="${esc(r.lamp_id || "")}">
+      <span class="me-stars">${"★".repeat(Math.max(0, Math.min(5, +r.stars || 0)))}</span><span class="me-rt">${esc(String(r.text || r.summary || "（无文字）").slice(0, 40))}</span>
+      <em class="st-${esc(r.status || "")}">${esc(REV_ST[r.status] || r.status || "")}</em></li>`).join("") + "</ul>"
+      : "<p class='muted'>还没有写过评价。约课后在详情页点「评价」。</p>";
+  }
+
+  function tagCards(me) {
+    const pick = (sel) => { const e = me.querySelector(sel); return e && e.closest(".card"); };
+    const set = (el, id) => { if (el && !el.id) el.id = id; };
+    set(pick("#myListings"), "meListCard");
+    set(pick("#guestNick"), "meNickCard");
+    const rv = $("#myReviews"); const rc = rv && rv.closest(".card"); if (rc && rc.querySelector("h3")) set(rc, "meRevCard");
+    const nick = $("#meNickCard h3"); if (nick && nick.textContent.trim() !== "昵称与身份") nick.textContent = "昵称与身份";
+    const hints = $("#adminEntry"); const hc = hints && hints.closest(".card"); if (hc) hc.classList.add("me-hide");
+    const tut = $("#meTutorial"); if (tut) tut.classList.add("me-hide");
+    const mc = $("#meCard"); if (mc) mc.classList.add("me-hide");
+  }
+  function row(id, icon, label, attrs) {
+    let r = document.getElementById(id);
+    if (!r) {
+      r = document.createElement("button"); r.type = "button"; r.id = id; r.className = "me-row";
+      r.innerHTML = `<b>${esc(label)}</b><span class="me-sum"></span><i class="me-chev">›</i>`;
+      Object.entries(attrs || {}).forEach(([k, v]) => r.setAttribute(k, v));
+    }
+    return r;
+  }
+  function rows() {
+    const home = window.__yycjHomeData || {};
+    const ct = home.contacts || {};
+    const out = {
+      meRowFav: !isTeacher() ? row("meRowFav", "♡", "我的收藏", { "data-me-fav": "1" }) : null,
+      meRowTut: row("meRowTut", "?", "使用教程", { "data-tutorial": "1" }),
+      meRowContact: ct.show_admin ? row("meRowContact", "✉", "联系" + (ct.admin_label || "管理员"), { "data-me-contact": "1" }) : null,
+      meRowAdmin: $("#adminEntry") && !$("#adminEntry").classList.contains("hidden") ? row("meRowAdmin", "⚙", "管理后台", { "data-me-admin": "1" }) : null,
+    };
+    return out;
+  }
+  function head(me) {
+    let h = $("#meHead");
+    if (!h) { h = document.createElement("div"); h.id = "meHead"; h.className = "card me-head"; me.prepend(h); }
+    const nick = (localStorage.getItem("yycj_guest_nick") || "").trim();
+    const r = role();
+    const name = nick || (ROLE[r] || "我");
+    const city = localStorage.getItem("yycj_city") || "";
+    const html = `<div class="me-av">${esc(name.slice(0, 1))}</div><div class="me-hn"><b>${esc(name)}</b>
+      <div><span class="me-pill">${esc(ROLE[r] || "客人")}</span>${city ? `<span class="me-city">📍 ${esc(city)}</span>` : ""}${nick ? "" : `<button type="button" class="me-link" data-me-open="meNickCard">设昵称</button>`}</div></div>`;
+    if (h.dataset.k !== html) { h.innerHTML = html; h.dataset.k = html; }
+    if (me.firstElementChild !== h) me.prepend(h);
+  }
+  let busy = false;
+  function arrange() {
+    const me = $("#view-me"); if (!me || busy) return;
+    busy = true;
+    try {
+      tagCards(me);
+      head(me);
+      const r = isTeacher() ? "teacher" : "guest";
+      const rw = rows();
+      let after = $("#meHead");
+      LAYOUT[r].forEach(([title, ids], i) => {
+        const key = r + i;
+        let sec = me.querySelector(`.me-sec[data-k="${key}"]`);
+        if (!sec) { sec = document.createElement("div"); sec.className = "me-sec"; sec.dataset.k = key; sec.innerHTML = `<h5>${esc(title)}</h5><div class="me-grp"></div>`; }
+        if (after.nextElementSibling !== sec) after.after(sec);
+        after = sec;
+        const grp = sec.querySelector(".me-grp");
+        let prev = null;
+        ids.forEach((id) => {
+          const el = rw[id] !== undefined ? rw[id] : document.getElementById(id);
+          if (!el) { const stale = document.getElementById(id); if (stale && rw[id] === null) stale.remove(); return; }
+          if (FOLD[id] && !el.classList.contains("me-fold")) { el.classList.add("me-fold"); el.classList.toggle("open", isOpen(id)); }
+          if (prev ? prev.nextElementSibling !== el : grp.firstElementChild !== el) { if (prev) prev.after(el); else grp.prepend(el); }
+          prev = el;
+        });
+        sec.classList.toggle("hidden", !grp.children.length);
+      });
+      // sections of the other role (after a 身份 switch)
+      me.querySelectorAll(".me-sec").forEach((s) => { if (!s.dataset.k.startsWith(r)) { s.querySelectorAll(".card").forEach((c) => me.appendChild(c)); s.remove(); } });
+      if (revs == null) loadRevs(); else paintRevs();
+      summarize();
+    } finally { setTimeout(() => { busy = false; }, 0); }
+  }
+  function sum(id, text) { const e = document.getElementById(id); if (!e) return; if (e.classList.contains("me-row")) { const s = e.querySelector(".me-sum"); if (s && s.textContent !== text) s.textContent = text; } else if (e.dataset.sum !== text) e.dataset.sum = text; }
+  function summarize() {
+    const fc = window.__yycjFavCount ? window.__yycjFavCount() : null;
+    sum("meRowFav", fc ? fc + " 个" : fc === 0 ? "在详情页点「收藏」" : "");
+    const mc = $("#myClaims");
+    if (mc) { const n = mc.querySelectorAll(".cpn-copy").length; const all = mc.querySelectorAll("li").length; sum("myClaims", n ? n + " 张可用" : all ? "暂无可用" : "还没有"); }
+    const cc = $("#cityCoupons"); if (cc) { const n = cc.querySelectorAll("li").length; sum("cityCoupons", n ? n + " 个优惠" : "暂无"); }
+    const pc = $("#placeCard"); if (pc) { const st = (pc.querySelector(".place-st") || {}).textContent || ""; sum("placeCard", /还没设置/.test(st) ? "未设置" : pc.dataset.place || "已设置"); }
+    const nk = (localStorage.getItem("yycj_guest_nick") || "").trim(); sum("meNickCard", (nk ? nk + " · " : "") + (ROLE[role()] || "客人"));
+    if (revs != null) sum("meRevCard", revs.length ? revs.length + " 条" + (revs.some((x) => x.status === "pending") ? " · 有审核中" : "") : "还没有");
+    const cp = $("#myCoupon");
+    if (cp) { const live = cp.querySelector("[data-cpn-end]"); const sm = cp.querySelector(".cpn-block.mine small"); sum("myCoupon", live && sm ? "进行中 · " + (sm.textContent.split("·").pop() || "").trim() : "未发优惠"); }
+    const lc = $("#meListCard"); if (lc) { const n = lc.querySelectorAll("[data-edit]").length; sum("meListCard", n ? n + " 条上架" : ""); }
+    const ct = (window.__yycjHomeData || {}).contacts || {};
+    sum("meRowContact", ""); sum("meRowTut", isTeacher() ? "老师版" : "客人版");
+  }
+  let t = null;
+  const soon = () => { clearTimeout(t); t = setTimeout(arrange, 60); };
+  function watch() {
+    const me = $("#view-me"); if (!me) return setTimeout(watch, 300);
+    new MutationObserver(soon).observe(me, { childList: true });
+    new MutationObserver(() => { clearTimeout(t); t = setTimeout(summarize, 80); }).observe(me, { childList: true, subtree: true, characterData: true });
+    arrange();
+  }
+  document.addEventListener("yycj:fav", () => summarize());
+  document.addEventListener("click", (ev) => {
+    const tg = ev.target;
+    if (tg.closest && tg.closest("[data-nav='me']")) { setTimeout(arrange, 120); setTimeout(arrange, 900); revs = null; }
+    const h3 = tg.closest && tg.closest(".me-fold > h3");
+    if (h3 && !tg.closest("button,a,input,select")) { const c = h3.parentElement; const on = !c.classList.contains("open"); c.classList.toggle("open", on); setOpen(c.id, on); return; }
+    const op = tg.closest && tg.closest("[data-me-open]");
+    if (op) { const c = document.getElementById(op.getAttribute("data-me-open")); if (c) { c.classList.add("open"); setOpen(c.id, true); c.scrollIntoView({ block: "center", behavior: "smooth" }); const i = c.querySelector("input"); if (i) setTimeout(() => i.focus(), 300); } return; }
+    if (tg.closest && tg.closest("[data-me-fav]")) { const b = $("nav [data-nav='fav']"); if (b) b.click(); return; }
+    if (tg.closest && tg.closest("[data-me-contact]")) { const a = $("#topAdmin"); if (a) a.click(); return; }
+    if (tg.closest && tg.closest("[data-me-admin]")) { const a = $("#adminEntry a"); if (a) location.href = a.href; return; }
+    if (tg.closest && tg.closest("[data-switch],#btnSaveNick")) setTimeout(arrange, 400);
+  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch); else watch();
+})();
+;} catch (e) { try { console.error("me-layout.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "me-layout.js" }); } catch (x) {} }

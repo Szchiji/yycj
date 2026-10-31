@@ -4,7 +4,34 @@
   const $ = (s) => document.querySelector(s);
   let offset = 0, q = "", lastItems = [], lastPins = [], cities = [], lastAreas = null;
   let carouselMs = 4000, carouselTimer = 0, paused = false;
-  const TUTORIAL = ["右上角选城市，左上「地区」按区筛选。","点卡片进详情。","客人可收藏分享；老师在上架提交。"];
+  // 使用教程（「我的」底部）：按身份分两份，短句、一步一条
+  const TUTORIAL = {
+    guest: [
+      ["选城市", "右上角切换城市。"],
+      ["找人", "点「筛选」按区、价位、标签、营业中、有优惠来筛；或在搜索框搜花名、标签、城区、价位。"],
+      ["附近", "在「我的 · 常用位置」地图上点一下设好位置，卡片会显示「区 · 约N km」，筛选里还能选「1km内」等。别人看不到你的具体位置。"],
+      ["收藏", "进详情页，点底部「收藏」。收藏的都在「我的 · 我的收藏」。"],
+      ["优惠券", "卡片上有「惠」字就是有优惠。进详情点「领取」拿到券码；点「想聊聊」约课时券码会自动复制并带给老师。券码在优惠结束前有效。"],
+      ["写评价", "约课后在详情页点「评价」，按项目填写，并上传约课凭证（只给管理员审核，不公开），通过后展示。"],
+    ],
+    teacher: [
+      ["上架", "点底部「上架」填资料：先选「区」，再在地图上点大致位置（客人只看到「约N km」），提交审核。"],
+      ["营业时间", "在「我的上架 → 改资料」设营业时间，首页就会显示 营业中 / 未到点 / 已打烊；开工前 Bot 会问你今天开不开。"],
+      ["到期提醒", "上架剩 3 天、剩 1 天时 Bot 会提醒你续期。"],
+      ["我的优惠", "在「我的 · 我的优惠」发限时优惠（内容、天数、限量），会推送到本城频道。"],
+      ["核销券码", "客人约课时会把券码发给你：在「我的优惠」输入券码 → 核对 → 标记已用。"],
+      ["看数据", "「我的上架」里能看近 7 天浏览、收藏、匿名联系。"],
+    ],
+  };
+  function tutorialHtml() {
+    let r = "guest";
+    try { r = JSON.parse(localStorage.getItem("yycj_user") || "{}").role || "guest"; } catch (e) {}
+    const list = r === "guest" ? TUTORIAL.guest : TUTORIAL.teacher;
+    return "<div class=\"sheet-panel tut\"><h3>使用教程 <small>" + (r === "guest" ? "客人" : "老师") + "</small></h3><ol class=\"tut-steps\">" +
+      list.map((x, i) => "<li><span class=\"tut-n\">" + (i + 1) + "</span><div><b>" + esc(x[0]) + "</b><p>" + esc(x[1]) + "</p></div></li>").join("") +
+      "</ol><button class=\"btn block\" id=\"guideClose\" type=\"button\">知道了</button></div>";
+  }
+  window.__yycjTutorialHtml = tutorialHtml;
   // 地区筛选：单选，本次会话内记住（按城市），切城市自动清空。只筛信息流，轮播不变。
   function curCity() { return localStorage.getItem("yycj_city") || ""; }
   function getArea() {
@@ -138,7 +165,7 @@
   function cardHtml(t, idx) {
     const img = cover(t);
     // 按距离时，右上角地区标签换成「区 · 约Nkm」（只显示取整后的距离，不暴露坐标）
-    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join(" · ") : [t.city, t.district].filter(Boolean).join("·");
+    const loc = t.distance ? [t.district || t.city, t.distance].filter(Boolean).join("\u2009·\u2009") : [t.city, t.district].filter(Boolean).join("·");
     const tag = String((t.tags && t.tags[0]) || "").replace(/^#+/, "");
     const n = t.media_count || (t.media && t.media.length) || (t.photos && t.photos.length) || 0;
     const pin = t.feed_pinned ? "<span class=\"badge\">置顶</span>" : "";
@@ -147,7 +174,7 @@
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
       imgTag(img, "thumb", idx < 3) +
-      "<button class=\"fav-btn\" type=\"button\" data-fav=\"" + esc(t.lamp_id) + "\">♡</button>" +
+      // 收藏只在详情页；卡片左上角放营业状态书签
       open +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
@@ -238,10 +265,8 @@
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
       if (lbl) {
-        if (nAct) lbl.textContent = "筛选·" + nAct;
-        else if (so === "near") lbl.textContent = "附近";
-        else if (so === "reviews") lbl.textContent = "评价多";
-        else lbl.textContent = k ? areaLabel(k) : "筛选▾";
+        const word = nAct ? "筛选·" + nAct : so === "near" ? "附近" : so === "reviews" ? "评价多" : k ? areaLabel(k) : "筛选";
+        lbl.innerHTML = "<i class=\"area-ic\" aria-hidden=\"true\"></i><span class=\"area-w\">" + esc(word) + "</span><i class=\"area-car\" aria-hidden=\"true\">▾</i>";
       }
       btn.classList.toggle("on", !!(nAct || so));
       btn.classList.toggle("long", true);
@@ -338,7 +363,7 @@
       btn.type = "button";
       btn.setAttribute("aria-expanded", "false");
       // invisible "教程" keeps the old button's exact size; the visible label sits on top
-      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">地区▾</span>";
+      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">筛选</span>";
       row.insertBefore(btn, row.firstChild);
       const panel = document.createElement("div");
       panel.id = "areaPanel";
@@ -358,7 +383,7 @@
       const sheet = document.createElement("div");
       sheet.id = "guideSheet";
       sheet.className = "sheet hidden";
-      sheet.innerHTML = "<div class=\"sheet-panel\"><h3>教程</h3><ul>" + TUTORIAL.map((x) => "<li>" + x + "</li>").join("") + "</ul><button class=\"btn block\" id=\"guideClose\" type=\"button\">知道了</button></div>";
+      sheet.innerHTML = tutorialHtml();
       document.body.appendChild(sheet);
     }
   }
@@ -449,7 +474,9 @@
     if (ev.target.closest && ev.target.closest("#areaPanel [data-filt-apply]")) {
       toggleArea(false); loadFeed(true); return;
     }
-    if (ev.target.id === "btnTutorial") { ev.preventDefault(); $("#guideSheet")?.classList.remove("hidden"); }
+    if (ev.target.id === "btnTutorial" || (ev.target.closest && ev.target.closest("[data-tutorial]"))) {
+      ev.preventDefault(); const sh = $("#guideSheet"); if (sh) { sh.innerHTML = tutorialHtml(); sh.classList.remove("hidden"); }
+    }
     if (ev.target.id === "guideClose" || ev.target.id === "guideSheet") $("#guideSheet")?.classList.add("hidden");
     if (ev.target.id === "btnCity" || (ev.target.closest && ev.target.closest("#btnCity"))) {
       ev.preventDefault();

@@ -73,14 +73,20 @@
     }
     paintHearts();
     paintList();
+    try { document.dispatchEvent(new CustomEvent("yycj:fav")); } catch (e) {}
   }
   window.__yycjPaintFav = paintHearts;
+  window.__yycjFavCount = () => ids.size;
+  window.__yycjFavLoad = load;
+  // 收藏只在详情页：先拿一次收藏列表，让详情页的「收藏」一打开就是对的状态（♥ / ♡）
+  (function boot(n) { if (token()) load().then(() => { try { document.dispatchEvent(new CustomEvent("yycj:fav")); } catch (e) {} }); else if (n < 20) setTimeout(() => boot(n + 1), 500); })(0);
   document.addEventListener("click", async (ev) => {
     if (ev.target.closest("[data-nav='fav']")) {
       ev.preventDefault();
       ev.stopPropagation();
       window.__yycjBack = "fav";
       showView("view-fav");
+      document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.nav === "fav"));
       load();
       return;
     }

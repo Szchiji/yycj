@@ -29,3 +29,13 @@ html body .near-pick{margin-top:6px;}
 
 html body .area-panel{max-height:calc(100vh - 210px);}
 html body .area-panel .filt-actions{position:sticky;bottom:-10px;margin:10px -10px -10px;padding:10px;background:var(--t-card);border-top:1px solid var(--t-line);}
+
+/* 「筛选」按钮加宽：更大点按区域、和搜索框留出间距，文字「筛选 / 筛选·N」不截断（卡片网格不变） */
+html body .search-row{gap:10px;align-items:stretch;}
+html body #btnArea{flex:none;min-width:76px;min-height:39px;padding:0 12px;margin:0;}
+html body #btnArea .area-sz{display:none;}
+html body #btnArea .area-lbl,html body #btnArea.long .area-lbl{position:static;inset:auto;display:flex;align-items:center;justify-content:center;gap:4px;height:100%;font-size:14px;letter-spacing:0;font-weight:600;overflow:visible;}
+html body #btnArea .area-w{white-space:nowrap;max-width:5.5em;overflow:hidden;text-overflow:ellipsis;}
+html body #btnArea .area-car{font-style:normal;font-size:10px;opacity:.7;}
+html body #btnArea .area-ic{display:inline-block;width:12px;height:10px;font-style:normal;background:linear-gradient(currentColor,currentColor) 0 0/100% 2px no-repeat,linear-gradient(currentColor,currentColor) 2px 4px/8px 2px no-repeat,linear-gradient(currentColor,currentColor) 4px 8px/4px 2px no-repeat;opacity:.85;}
+html body .search-row #homeQ{min-width:0;padding-left:12px;padding-right:10px;}html body .search-row #homeQ::placeholder{letter-spacing:-.3px;}
