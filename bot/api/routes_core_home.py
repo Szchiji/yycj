@@ -422,10 +422,10 @@ async def api_session_request(
         body.lamp_id, user_id, lamp["user_id"], lamp_title=lamp.get("title"), guest_alias=alias
     )
     # 约课用优惠：the guest's unused, valid code for this teacher rides along in the notice
-    held = None
+    held_all = []
     try:
         from bot.services import coupons as coupon_svc
-        held = await coupon_svc.held_code(user_id, lamp["user_id"])
+        held_all = await coupon_svc.held_codes(user_id, lamp["user_id"])
     except Exception:
         logger.exception("coupon lookup failed")
     try:
@@ -433,8 +433,9 @@ async def api_session_request(
         from bot.keyboards import session_accept_kb
         from bot.main import bot
         note = ""
-        if held:
-            note = (f"\n🎟 对方带了优惠券：<code>{_html.escape(held['code'])}</code>（{_html.escape(held['text'])}）。"
+        if held_all:
+            codes = "、".join(f"<code>{_html.escape(h['code'])}</code>（{_html.escape(h['text'])}）" for h in held_all)
+            note = (f"\n🎟 对方带了优惠券：{codes}。"
                     f"\n核销：我的 · 我的优惠 → 输入券码 → 标记已用。")
         await bot.send_message(
             lamp["user_id"],
@@ -448,6 +449,7 @@ async def api_session_request(
         "ok": True,
         "session_id": sess["session_id"],
         "status": sess["status"],
-        "coupon_code": held["code"] if held else None,
-        "message": "已发送邀请，券码已带上 · 已复制券码，发给老师即可" if held else "已发送想聊聊邀请，等待对方在 Bot 中接受",
+        "coupon_code": held_all[-1]["code"] if held_all else None,
+        "coupon_codes": [h["code"] for h in held_all],
+        "message": "已发送邀请，券码已带上 · 已复制券码，发给老师即可" if held_all else "已发送想聊聊邀请，等待对方在 Bot 中接受",
     }

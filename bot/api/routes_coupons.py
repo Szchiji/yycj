@@ -1,7 +1,7 @@
 """优惠券：老师在「我的」发，客人在详情页领取，后台按城市查看 / 停用。"""
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel
@@ -11,10 +11,17 @@ from bot.api.routes_core import router
 from bot.services import city_scope, coupons, home_service
 
 
+class CouponItem(BaseModel):
+    text: str = ""
+    quota: int = 0
+
+
 class CouponBody(BaseModel):
+    """New form: ``items`` (1–5, each with 数量). ``text`` / ``quota`` = old single-coupon body (cached clients)."""
     text: str = ""
     days: int = 2
     quota: int = 0
+    items: Optional[List[CouponItem]] = None
 
 
 class UseBody(BaseModel):
@@ -51,7 +58,10 @@ async def api_my_coupon_create(body: CouponBody, user_id: int = Depends(get_curr
     if await _role(user_id) not in ("teacher", "merchant"):
         raise HTTPException(status_code=403, detail="只有老师 / 商家可以发优惠")
     try:
-        await coupons.create(user_id, body.text, body.days, body.quota)
+        if body.items is not None:
+            await coupons.create(user_id, days=body.days, items=[i.model_dump() if hasattr(i, "model_dump") else i.dict() for i in body.items])
+        else:
+            await coupons.create(user_id, body.text, body.days, body.quota)
     except coupons.CouponError as e:
         _bad(e)
     return {"ok": True, **(await coupons.mine(user_id))}

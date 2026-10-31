@@ -1,5 +1,5 @@
 (() => {
-  // 后台「优惠券」：按当前城市（顶部城市切换）列出老师发的优惠，可停用。运营只看到自己负责的城市。
+  // 后台「优惠券」：按当前城市（顶部城市切换）列出老师发的优惠（一批一行，列出每一项），可整批停用。运营只看到自己负责的城市。
   if (window.__yycjAdminCoupons) return;
   window.__yycjAdminCoupons = true;
   const $ = (s, r = document) => r.querySelector(s);
@@ -26,7 +26,11 @@
     let items = [];
     try { items = (await api("/api/admin/coupons?" + p)).items || []; }
     catch (e) { c.innerHTML = `<h4>优惠券</h4><p class="muted">${esc(e.message)}</p>`; return; }
-    const rows = items.map((x) => `<tr><td>${esc(x.city)}</td><td>${esc(x.title)}<div class="muted">id ${esc(x.user_id)}</div></td><td class="cpn-a-text">${esc(x.text)}</td>
+    // one row per batch; the 优惠 cell lists each item with its own 已领 / 数量
+    const itemsCell = (x) => (x.items && x.items.length > 1)
+      ? x.items.map((i) => `<div class="cpn-a-it">${esc(i.text)} <span class="muted">${i.claimed}${i.quota ? "/" + i.quota : ""}${i.status === "sold_out" ? " 已领完" : ""}</span></div>`).join("")
+      : esc(x.text);
+    const rows = items.map((x) => `<tr><td>${esc(x.city)}</td><td>${esc(x.title)}<div class="muted">id ${esc(x.user_id)}</div></td><td class="cpn-a-text">${itemsCell(x)}</td>
       <td>${esc(x.live || x.status === "sold_out" ? x.left : "—")}</td><td>${x.claimed}${x.quota ? "/" + x.quota : ""}</td><td>${esc(ST[x.status] || x.status)}</td>
       <td>${x.status === "active" || x.status === "sold_out" ? `<button class="btn danger" type="button" data-cpn-stop="${esc(x.coupon_id)}">停用</button>` : ""}</td></tr>`).join("");
     c.innerHTML = `<h4>优惠券 <small class="muted">${esc(city() || "全部城市")}</small></h4>
@@ -37,7 +41,7 @@
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest && ev.target.closest("[data-cpn-stop]");
     if (b) {
-      if (!confirm("停用这个优惠？")) return;
+      if (!confirm("停用这批优惠？（这一批的所有项一起停用）")) return;
       try { await api(`/api/admin/coupons/${encodeURIComponent(b.getAttribute("data-cpn-stop"))}/stop`, { method: "POST" }); load(); } catch (e) { alert(e.message); }
       return;
     }
