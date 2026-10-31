@@ -155,3 +155,49 @@ async def report_no(cb: CallbackQuery, bot: Bot) -> None:
     await cb.answer("已驳回")
     if cb.message:
         await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已驳回（举报人信用已结算）")
+
+
+_REV_ACTIONS = {
+    "admin_rev_ok:": ("approved", "已通过"),
+    "admin_rev_no:": ("rejected", "已拒绝"),
+    "admin_rev_brush:": ("brush", "已判为刷评"),
+}
+
+
+@router.callback_query(F.data.startswith("admin_rev_"))
+async def review_action(cb: CallbackQuery, bot: Bot) -> None:
+    """评价审核按钮：超管 + 后台运营号（按负责城市）都能用；处理后同步所有管理员的那条消息。"""
+    from bot.services import admin_acl, home_service, review_notify
+    data = cb.data or ""
+    prefix = next((k for k in _REV_ACTIONS if data.startswith(k)), None)
+    if not cb.from_user or not prefix:
+        await cb.answer("无效操作", show_alert=True)
+        return
+    await admin_acl.warm()
+    if not admin_acl.is_admin(cb.from_user.id):
+        await cb.answer("无权限", show_alert=True)
+        return
+    review_id = data[len(prefix):]
+    if not await _in_scope(cb, "review", review_id):
+        return
+    status, label = _REV_ACTIONS[prefix]
+    try:
+        await home_service.set_review_status(review_id, status, note="拒绝刷评" if status == "brush" else None)
+    except LookupError:
+        await cb.answer("评价不存在", show_alert=True)
+        return
+    except RuntimeError:
+        await cb.answer("这条已经处理过了", show_alert=True)
+        try:
+            from bot.db import session_scope
+            from bot.models import Review
+            from sqlalchemy import select
+            async with session_scope() as s:
+                cur = (await s.execute(select(Review.status).where(Review.review_id == review_id))).scalar_one_or_none()
+            if cur:
+                await review_notify.sync_handled([review_id], cur)
+        except Exception:
+            pass
+        return
+    await cb.answer(label)
+    await review_notify.sync_handled([review_id], status, cb.from_user.id)
