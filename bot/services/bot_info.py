@@ -71,8 +71,12 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
             "ts": time.time(),
         }
         logger.info("Bot identity @%s id=%s", _cache["username"], _cache["id"])
-    except Exception:
-        logger.exception("refresh_bot_identity failed")
+    except Exception as exc:
+        if type(exc).__name__ == "TelegramRetryAfter":   # flood control right after a deploy: next refresh fills it
+            logger.warning("refresh_bot_identity: Telegram flood control (retry_after=%ss), using cached identity",
+                           getattr(exc, "retry_after", "?"))
+        else:
+            logger.exception("refresh_bot_identity failed")
     return dict(_cache)
 
 
