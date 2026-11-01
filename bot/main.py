@@ -2,6 +2,16 @@
 
 from __future__ import annotations
 
+if __name__ == "__main__":
+    # Railway starts us with `python -m bot.main`, which runs this file as module `__main__`. Every service
+    # does `from bot.main import bot`, which would import a SECOND copy of this file: a second Bot whose
+    # aiohttp session is never closed at shutdown ("Unclosed client session"). So hand over to the one real
+    # module `bot.main` right away; nothing below runs in `__main__`.
+    import importlib as _importlib
+
+    _importlib.import_module("bot.main").main()
+    raise SystemExit(0)
+
 import asyncio
 import hmac
 import logging
@@ -419,5 +429,3 @@ def main() -> None:
         asyncio.run(run_polling())
 
 
-if __name__ == "__main__":
-    main()
