@@ -111,6 +111,55 @@ def _schedule_jobs() -> None:
     scheduler.start()
 
 
+# Telegram flood control at startup (several deploys / restarts in a row all call setWebhook etc.):
+# wait the server's retry_after (+ a small buffer) and try again, a few times, with a cap on the total wait.
+TG_RETRY_ATTEMPTS = 3
+TG_RETRY_BUFFER = 1.5      # seconds on top of retry_after
+TG_RETRY_MAX_WAIT = 90.0   # total seconds one call may spend waiting
+
+
+async def _tg_call(label: str, make_call, *, attempts: int = TG_RETRY_ATTEMPTS, max_wait: float = TG_RETRY_MAX_WAIT,
+                   sleep=asyncio.sleep):
+    """Run ``await make_call()``; on TelegramRetryAfter wait and retry. Other errors propagate.
+    Never logs the request itself (the URL carries the bot token)."""
+    from aiogram.exceptions import TelegramRetryAfter
+    waited = 0.0
+    for n in range(1, attempts + 1):
+        try:
+            return await make_call()
+        except TelegramRetryAfter as exc:
+            delay = float(getattr(exc, "retry_after", 1) or 1) + TG_RETRY_BUFFER
+            if n >= attempts or waited + delay > max_wait:
+                logger.warning("%s: Telegram flood control, giving up after %s attempt(s) (retry_after=%ss, waited %.0fs)",
+                               label, n, getattr(exc, "retry_after", "?"), waited)
+                raise
+            logger.info("%s: Telegram flood control, retry %s/%s in %.1fs", label, n + 1, attempts, delay)
+            waited += delay
+            await sleep(delay)
+
+
+async def _setup_webhook() -> bool:
+    """setWebhook (+ getMe for the log line). Flood errors are retried; if it still fails we keep serving:
+    the webhook is almost always already set to this same URL by the previous / sibling deploy."""
+    try:
+        await _tg_call("set_webhook", lambda: bot.set_webhook(
+            url=settings.webhook_url,
+            secret_token=settings.webhook_secret or None,
+            drop_pending_updates=False,
+            allowed_updates=dp.resolve_used_update_types(),
+        ))
+    except Exception as exc:
+        logger.error("Webhook setup failed (%s: %s); keeping the server up - the webhook set by the previous deploy "
+                     "still points at %s", type(exc).__name__, str(exc)[:200], settings.webhook_url)
+        return False
+    try:
+        me = await _tg_call("get_me", bot.get_me)
+        logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
+    except Exception as exc:
+        logger.info("Webhook set -> %s (getMe skipped: %s)", settings.webhook_url, type(exc).__name__)
+    return True
+
+
 async def _startup() -> None:
     global _ready, _startup_error
     try:
@@ -146,14 +195,7 @@ async def _startup() -> None:
         if settings.use_webhook:
             if not settings.webhook_secret:
                 logger.warning("WEBHOOK_SECRET is not set: webhook requests are not authenticated")
-            await bot.set_webhook(
-                url=settings.webhook_url,
-                secret_token=settings.webhook_secret or None,
-                drop_pending_updates=False,
-                allowed_updates=dp.resolve_used_update_types(),
-            )
-            me = await bot.get_me()
-            logger.info("Webhook set -> %s | Bot @%s", settings.webhook_url, me.username)
+            await _setup_webhook()
         else:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
         webapp = settings.normalized_webapp_url
@@ -161,20 +203,20 @@ async def _startup() -> None:
             menu_url = _menu_webapp_url(webapp)
             logger.info("WEBAPP_URL=%s (menu=%s)", settings.webapp_url, menu_url)
             try:
-                await bot.set_chat_menu_button(
+                await _tg_call("set_chat_menu_button", lambda: bot.set_chat_menu_button(
                     menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=menu_url))
-                )
+                ))
                 logger.info("Chat menu button set -> %s", menu_url)
             except Exception:
                 logger.exception("set_chat_menu_button failed")
         try:
-            await bot.set_my_commands(
+            await _tg_call("set_my_commands", lambda: bot.set_my_commands(
                 [
                     BotCommand(command="start", description="打开欢迎"),
                     BotCommand(command="help", description="使用说明"),
                     BotCommand(command="admin", description="管理后台（管理员）"),
                 ]
-            )
+            ))
             logger.info("Bot commands set: /start /help /admin")
         except Exception:
             logger.exception("set_my_commands failed")
@@ -197,11 +239,39 @@ async def lifespan(_app: FastAPI):
             await task
         except (asyncio.CancelledError, Exception):
             pass
-    if scheduler.running:
-        scheduler.shutdown(wait=False)
-    await anti_brush.close_redis()
-    await close_db()
-    await bot.session.close()
+    await _shutdown()
+
+
+async def _close_http_clients() -> None:
+    """Close every outbound HTTP session: the aiogram Bot's aiohttp session plus the pooled httpx client
+    used for media. Each step is independent."""
+    try:
+        await bot.session.close()   # the only Bot instance in the app (bot.main.bot)
+    except Exception:
+        logger.exception("bot session close failed")
+    try:
+        from bot.api import routes_media
+        client = getattr(routes_media, "_HTTP", None)
+        if client is not None and not client.is_closed:
+            await client.aclose()
+    except Exception:
+        logger.exception("media http client close failed")
+
+
+async def _shutdown() -> None:
+    """Every step guarded, sessions closed last: one failing step must not leave the aiohttp session open
+    ('Unclosed client session' at exit)."""
+    try:
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+    except Exception:
+        logger.exception("scheduler shutdown failed")
+    for name, fn in (("redis", anti_brush.close_redis), ("db", close_db)):
+        try:
+            await fn()
+        except Exception:
+            logger.exception("%s close failed", name)
+    await _close_http_clients()
     logger.info("Bot stopped")
 
 
@@ -335,11 +405,7 @@ async def run_polling() -> None:
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
-        if scheduler.running:
-            scheduler.shutdown(wait=False)
-        await anti_brush.close_redis()
-        await close_db()
-        await bot.session.close()
+        await _shutdown()
 
 
 def main() -> None:
