@@ -4,7 +4,7 @@
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20261104a";
+    s.src = "./" + name + "?v=20261104b";
     document.head.appendChild(s);
   });
   if (window.__yycjAdminKit) return;
@@ -69,6 +69,12 @@
     setVal("opsPromo", s.approve_promo_text);
     setVal("opsChannel", s.broadcast_channel);
     setVal("opsBroadcastTpl", s.broadcast_template);
+    setVal("opsLinkDetail", s.link_label_detail != null ? s.link_label_detail : "查看详情");
+    setVal("opsLinkReviews", s.link_label_reviews != null ? s.link_label_reviews : "查看评价");
+    setVal("opsLinkWrite", s.link_label_write != null ? s.link_label_write : "写评价");
+    setVal("opsTeachViews", s.teacher_show_views !== false);
+    setVal("opsTeachFavs", s.teacher_show_favs !== false);
+    setVal("opsTeachContacts", s.teacher_show_contacts !== false);
     const saved = Array.isArray(s.listing_fields) ? s.listing_fields.filter((x) => x && x.key) : [];
     paintFields(saved.length ? toText(saved) : DEFAULT_TEXT);
   }
@@ -132,6 +138,18 @@
         if (tpl.trim()) body.broadcast_template = tpl;
         if (media) body.media_channel_id = media;
         if (window.__listingFields && window.__listingFields.length) body.listing_fields = window.__listingFields;
+        const ld = document.getElementById("opsLinkDetail");
+        const lr = document.getElementById("opsLinkReviews");
+        const lw = document.getElementById("opsLinkWrite");
+        if (ld) body.link_label_detail = ld.value;
+        if (lr) body.link_label_reviews = lr.value;
+        if (lw) body.link_label_write = lw.value;
+        const tv = document.getElementById("opsTeachViews");
+        const tf = document.getElementById("opsTeachFavs");
+        const tc = document.getElementById("opsTeachContacts");
+        if (tv) body.teacher_show_views = !!tv.checked;
+        if (tf) body.teacher_show_favs = !!tf.checked;
+        if (tc) body.teacher_show_contacts = !!tc.checked;
         opt = Object.assign({}, opt, { body: JSON.stringify(body) });
       }
     } catch (e) {}

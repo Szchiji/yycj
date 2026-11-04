@@ -36,6 +36,12 @@ class ExtraOpsBody(BaseModel):
     media_channel_id: Optional[str] = None
     broadcast_template: Optional[str] = None
     listing_fields: Optional[List[Dict[str, Any]]] = None
+    link_label_detail: Optional[str] = None
+    link_label_reviews: Optional[str] = None
+    link_label_write: Optional[str] = None
+    teacher_show_views: Optional[bool] = None
+    teacher_show_favs: Optional[bool] = None
+    teacher_show_contacts: Optional[bool] = None
 
 
 class ShadowBody(BaseModel):

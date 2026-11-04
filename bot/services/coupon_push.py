@@ -36,10 +36,11 @@ def _full(c) -> bool:
     return bool(getattr(c, "quota", 0) and (getattr(c, "claimed", 0) or 0) >= c.quota)
 
 
-def render(c, lamp: Optional[Lamp], bot_name: str, *, closed: str = "") -> str:
+def render(c, lamp: Optional[Lamp], bot_name: str, *, closed: str = "", detail_label: Optional[str] = None) -> str:
     """One post per batch: every item on its own line with its count; an item that is 领完 is struck through
-    and marked 「已领完」 while the rest stay open. ``c`` = one coupon or the batch's items (head first)."""
-    from bot.services.broadcast import start_url
+    and marked 「已领完」 while the rest stay open. ``c`` = one coupon or the batch's items (head first).
+    ``detail_label`` overrides the 详情 link text (empty = hide); default 查看详情."""
+    from bot.services.broadcast import LINK_SEP_HTML, start_url
     items = _items(c)
     head = items[0]
     title = html.escape(str(getattr(lamp, "title", "") or "老师"))
@@ -56,14 +57,30 @@ def render(c, lamp: Optional[Lamp], bot_name: str, *, closed: str = "") -> str:
         else:
             lines.append(f"💰 {t}" + (f" · 限{int(x.quota)}张" if x.quota else ""))
     body = f"🎟 限时优惠 · <b>{title}</b>\n📍 {loc}\n" + "\n".join(lines) + f"\n⏳ 有效至 {_bj(head.ends_at)}（北京时间）"
+    detail = "查看详情" if detail_label is None else str(detail_label).strip()[:16]
     links = []
-    for kind, label in (("s", "查看详情"), ("q", "领取优惠")):
+    for kind, label in (("s", detail), ("q", "领取优惠")):
+        label = str(label or "").strip()[:16]
+        if not label:
+            continue
         u = start_url(bot_name, head.lamp_id, kind)
         if u:
-            links.append(f'<a href="{html.escape(u, quote=True)}">{label}</a>')
+            links.append(f'<a href="{html.escape(u, quote=True)}">{html.escape(label)}</a>')
     if links:
-        body += "\n\n" + " · ".join(links)
+        body += "\n\n" + LINK_SEP_HTML.join(links)
     return body
+
+
+async def _detail_label_for(city: str) -> str:
+    try:
+        from bot.services import home_service
+        from bot.services.home_feed import ops_for_city
+        site = ops_for_city(await home_service.get_or_create_settings(), city)
+        raw = site.get("link_label_detail", "查看详情")
+        return str(raw if raw is not None else "查看详情").strip()[:16]
+    except Exception:
+        logger.exception("resolve detail label failed")
+        return "查看详情"
 
 
 async def _batch(s, coupon_id: str):
@@ -97,7 +114,9 @@ async def publish(coupon_id: str) -> Optional[int]:
         chat = feature_chat(site, "broadcast_coupons")
         if not chat:
             return None
-        text = render(items, lamp, await _bot_name())
+        raw = site.get("link_label_detail", "查看详情")
+        detail = str(raw if raw is not None else "查看详情").strip()[:16]
+        text = render(items, lamp, await _bot_name(), detail_label=detail)
         try:
             from bot.main import bot
             msg = await bot.send_message(chat, text, disable_web_page_preview=True)
@@ -133,7 +152,7 @@ async def refresh(coupon_id: str) -> bool:
         if not c or not c.post_mid or c.post_closed:
             return False
         lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
-        text = render(items, lamp, await _bot_name())
+        text = render(items, lamp, await _bot_name(), detail_label=await _detail_label_for(c.city))
         chat, mid = c.post_chat, int(c.post_mid)
     try:
         from bot.main import bot

@@ -20,7 +20,7 @@ class CityAnnounceBody(BaseModel):
 
 class CitySettingsBody(BaseModel):
     city: str
-    # {key: value}; null / "" = clear (use the site-wide value)
+    # {key: value}; null = clear (use site-wide). "" clears too unless the key has allow_blank (then "" = hide).
     overrides: Dict[str, Any] = {}
 
 

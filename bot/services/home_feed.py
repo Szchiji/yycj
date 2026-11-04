@@ -43,6 +43,14 @@ DEFAULT_OPS = {
     "coupon_channel": "",  # 优惠推送到哪个频道；空 = 用推送频道
     "coupon_display": "badge,filter,list",  # 首页入口: badge = 卡片「惠」字 / filter = 筛选里「有优惠」 / list = 「我的 · 本城优惠」; 可多选逗号分隔
     "directory_channel": "",  # 按区目录发到哪个频道；空 = 用推送频道
+    # 频道帖子末尾三个深链文案（空 = 不显示这一项）；城市可覆盖
+    "link_label_detail": "查看详情",
+    "link_label_reviews": "查看评价",
+    "link_label_write": "写评价",
+    # 老师「我的上架」是否显示三项统计（全站；默认开）
+    "teacher_show_views": True,
+    "teacher_show_favs": True,
+    "teacher_show_contacts": True,
     "listing_fields": [
         {"key": "称呼", "label": "称呼", "form": True},
         {"key": "城市", "label": "城市", "form": True},
@@ -64,6 +72,12 @@ CITY_KEYS = [
     {"key": "broadcast_channel", "label": "推送频道", "type": "text", "max": 128, "super": True,
      "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
     {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
+    {"key": "link_label_detail", "label": "频道链接 · 详情", "type": "text", "max": 16, "allow_blank": True,
+     "hint": "频道帖末尾「详情」链接文字；默认「查看详情」。留空 = 不显示这一项"},
+    {"key": "link_label_reviews", "label": "频道链接 · 评价", "type": "text", "max": 16, "allow_blank": True,
+     "hint": "默认「查看评价」。留空 = 不显示"},
+    {"key": "link_label_write", "label": "频道链接 · 写评价", "type": "text", "max": 16, "allow_blank": True,
+     "hint": "默认「写评价」。留空 = 不显示"},
     {"key": "channel_directory", "label": "频道按区目录", "type": "bool",
      "hint": "开 = 每天 12:00 更新一条本城的按区目录（只列本城的区和在架资料），花名直达详情；开关和换频道都在下一次 12:00 生效，关掉会删掉旧目录（默认关）"},
     {"key": "directory_channel", "label": "按区目录发到的频道", "type": "text", "max": 128, "super": True,
@@ -122,9 +136,11 @@ def clean_override_value(key: str, value: Any) -> Any:
             return None
         return max(meta["min"], min(meta["max"], n))
     text = str(value)
-    if t == "text":
-        text = text.strip()
+    if t in ("text", "textarea"):
+        text = text.strip() if t == "text" else text
     text = text[: meta.get("max", 2000)]
+    if meta.get("allow_blank"):
+        return text  # "" = hide this link for the city (not inherit)
     return text if text.strip() else None
 
 
@@ -215,6 +231,14 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["coupon_display"] = ",".join(dict.fromkeys(disp)) or "badge,filter,list"
     out["review_channel"] = str(out.get("review_channel") or "").strip()[:128]
     out["directory_channel"] = str(out.get("directory_channel") or "").strip()[:128]
+    for _lk, _ld in (("link_label_detail", "查看详情"), ("link_label_reviews", "查看评价"), ("link_label_write", "写评价")):
+        if isinstance(raw, dict) and _lk in raw:
+            out[_lk] = str(raw.get(_lk) if raw.get(_lk) is not None else "")[:16]
+        else:
+            out[_lk] = str(out.get(_lk) if out.get(_lk) is not None else _ld)[:16]
+    out["teacher_show_views"] = bool(out.get("teacher_show_views", True))
+    out["teacher_show_favs"] = bool(out.get("teacher_show_favs", True))
+    out["teacher_show_contacts"] = bool(out.get("teacher_show_contacts", True))
     raw_fields = raw.get("listing_fields") if isinstance(raw, dict) and "listing_fields" in raw else out.get("listing_fields")
     out["listing_fields"] = _sanitize_listing_fields(raw_fields, fallback=DEFAULT_OPS["listing_fields"])
     out["review_require_audit"] = audit_on(out.get("review_require_audit"))

@@ -288,6 +288,9 @@
     { id: "annText", label: "首页公告", on: { id: "annOn", label: "显示公告" } },
     { id: "opsChannel", label: "推送频道", hint: "新上架资料推送到这个频道（@频道名 或 -100…）" },
     { id: "opsBroadcastTpl", label: "推送文案模板" },
+    { id: "opsLinkDetail", label: "频道链接 · 详情", hint: "默认「查看详情」。留空 = 频道帖不显示这一项", make: () => { const i = document.createElement("input"); i.id = "opsLinkDetail"; i.maxLength = 16; i.placeholder = "查看详情"; return i; } },
+    { id: "opsLinkReviews", label: "频道链接 · 评价", hint: "默认「查看评价」。留空 = 不显示", make: () => { const i = document.createElement("input"); i.id = "opsLinkReviews"; i.maxLength = 16; i.placeholder = "查看评价"; return i; } },
+    { id: "opsLinkWrite", label: "频道链接 · 写评价", hint: "默认「写评价」。留空 = 不显示", make: () => { const i = document.createElement("input"); i.id = "opsLinkWrite"; i.maxLength = 16; i.placeholder = "写评价"; return i; } },
     { id: "opsPromo", label: "上架通过后发给老师的话", make: () => { const t = document.createElement("textarea"); t.id = "opsPromo"; t.rows = 4; t.placeholder = "审核通过后私信发给老师的话"; return t; } },
     { id: "opsCta", label: "聊天按钮文字" },
     { id: "opsAdminContact", label: "管理员联系链接", hint: "首页「管理员」按钮打开的链接，https://t.me/用户名 或 @用户名" },
@@ -320,7 +323,13 @@
       site = document.createElement("div");
       site.id = "ccSiteOnly";
       site.className = "cc-hide";
-      site.innerHTML = `<h3 class="cc-site-h">全站专用（不分城市）</h3>`;
+      site.innerHTML = `<h3 class="cc-site-h">全站专用（不分城市）</h3>
+        <div class="ops-card" id="opsTeacherStatsCard"><h4>老师「我的上架」数据</h4>
+          <p class="muted">关掉后，老师端「我的上架」卡片上不再显示这一项；管理台数据看板不受影响。全站生效。</p>
+          <label class="row"><input type="checkbox" id="opsTeachViews" checked /> 显示浏览</label>
+          <label class="row"><input type="checkbox" id="opsTeachFavs" checked /> 显示收藏</label>
+          <label class="row"><input type="checkbox" id="opsTeachContacts" checked /> 显示匿名联系</label>
+        </div>`;
       card.insertAdjacentElement("afterend", site);
       // admin-kit puts the 上架栏 editor right after the template box; pin it to 媒体与推送 before the template moves
       const tpl = document.getElementById("opsBroadcastTpl");
@@ -521,7 +530,7 @@
           if (!k) return;
           let v = el.value;
           if (k.type === "bool") v = v === "" ? null : v === "1";
-          else if (String(v).trim() === "") v = null;
+          else if (String(v).trim() === "") v = k.allow_blank ? "" : null;
           const cur = k.override === undefined ? null : k.override;
           if (String(v) !== String(cur)) overrides[k.key] = v;
         });
