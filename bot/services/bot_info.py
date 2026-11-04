@@ -63,7 +63,8 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         if bot is None:
             from bot.main import bot as app_bot
             bot = app_bot
-        me = await bot.get_me()
+        from bot.services.tg_retry import tg_call
+        me = await tg_call("get_me (bot identity)", bot.get_me)
         _cache = {
             "username": me.username or "",
             "id": me.id,
@@ -72,9 +73,10 @@ async def refresh_bot_identity(bot=None) -> Dict[str, Any]:
         }
         logger.info("Bot identity @%s id=%s", _cache["username"], _cache["id"])
     except Exception as exc:
-        if type(exc).__name__ == "TelegramRetryAfter":   # flood control right after a deploy: next refresh fills it
-            logger.warning("refresh_bot_identity: Telegram flood control (retry_after=%ss), using cached identity",
-                           getattr(exc, "retry_after", "?"))
+        from bot.services.tg_retry import is_transient
+        if type(exc).__name__ == "TelegramRetryAfter" or is_transient(exc):
+            # flood control / Bad Gateway / network blip even after retries: keep the cached identity, next refresh fills it
+            logger.warning("refresh_bot_identity: %s after retries, using cached identity", type(exc).__name__)
         else:
             logger.exception("refresh_bot_identity failed")
     return dict(_cache)
