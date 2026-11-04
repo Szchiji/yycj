@@ -70,7 +70,18 @@ async def api_me_listings(user_id: int = Depends(get_current_user_id)) -> Dict[s
             it["stats"] = stats.get(str(it.get("lamp_id")), {})
     except Exception:
         logger.exception("listing stats failed")
-    return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN}
+    show = {"views": True, "favs": True, "contacts": True}
+    try:
+        from bot.services import home_service
+        st = await home_service.get_or_create_settings()
+        show = {
+            "views": bool(st.get("teacher_show_views", True)),
+            "favs": bool(st.get("teacher_show_favs", True)),
+            "contacts": bool(st.get("teacher_show_contacts", True)),
+        }
+    except Exception:
+        logger.exception("teacher stats flags failed")
+    return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN, "stats_show": show}
 
 
 @router.post("/me/listings/{lamp_id}/edit")

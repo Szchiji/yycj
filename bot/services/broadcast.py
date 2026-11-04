@@ -135,6 +135,25 @@ def compact_id(lamp_id: str) -> str:
 
 
 LINK_LABELS = (("s", "查看详情"), ("r", "查看评价"), ("w", "写评价"))
+# Telegram HTML (esp. iOS) collapses ordinary spaces between adjacent <a> tags, so the old
+# " · ".join(...) looked stuck together as 查看详情查看评价写评价. Non-breaking spaces keep the dots.
+LINK_SEP_HTML = "&nbsp;·&nbsp;"
+
+
+def link_labels_from_site(site: dict | None = None) -> list[tuple[str, str]]:
+    """(kind, label) pairs; empty / whitespace label = that link is omitted."""
+    site = site or {}
+    out: list[tuple[str, str]] = []
+    for kind, key, default in (
+        ("s", "link_label_detail", "查看详情"),
+        ("r", "link_label_reviews", "查看评价"),
+        ("w", "link_label_write", "写评价"),
+    ):
+        raw = site[key] if key in site else default
+        label = str(raw if raw is not None else default).strip()[:16]
+        if label:
+            out.append((kind, label))
+    return out
 
 
 def start_url(bot_username: str, lamp_id: str, kind: str = "s") -> str:
@@ -152,19 +171,26 @@ def start_url(bot_username: str, lamp_id: str, kind: str = "s") -> str:
 startapp_url = start_url
 
 
-def links_html(bot_username: str, lamp_id: str) -> str:
+def links_html(bot_username: str, lamp_id: str, *, labels=None, sep: str | None = None) -> str:
+    """HTML deep-link line for channel captions. ``labels`` = iterable of (kind, label);
+    omit / empty label hides that link. Separator is fixed NBSP·NBSP so iOS Telegram shows it."""
     parts = []
-    for kind, label in LINK_LABELS:
+    for kind, label in (labels if labels is not None else LINK_LABELS):
+        label = str(label or "").strip()[:16]
+        if not label:
+            continue
         u = start_url(bot_username, lamp_id, kind)
         if u:
-            parts.append(f'<a href="{html.escape(u, quote=True)}">{label}</a>')
-    return " · ".join(parts)
+            parts.append(f'<a href="{html.escape(u, quote=True)}">{html.escape(label)}</a>')
+    joiner = LINK_SEP_HTML if sep is None else sep
+    return joiner.join(parts)
 
 
 def caption_html(plain: str, links: str = "", *, limit: int = 1024) -> str:
     """Escape the filled template (user content may contain < & …) and append the HTML links.
     Telegram counts visible characters, so trim the plain text first, never the markup."""
-    room = limit - (len("查看详情 · 查看评价 · 写评价") + 2 if links else 0)
+    # visible budget ≈ labels + " · " between them (nbsp renders as one space each side)
+    room = limit - (min(40, len(links) // 2) + 2 if links else 0)
     body = html.escape((plain or "").strip()[:max(0, room)], quote=False)
     return (body + ("\n\n" + links if links else "")).strip()
 
@@ -210,7 +236,8 @@ async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]], *, li
     merged.setdefault("聊天按钮", site.get("chat_cta_label") or "想聊聊")
     plain = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
     plain = re.sub(r"\n{3,}", "\n\n", plain)
-    caption = caption_html(plain, links_html(bot_name, lid) if links else "")
+    link_line = links_html(bot_name, lid, labels=link_labels_from_site(site)) if links else ""
+    caption = caption_html(plain, link_line)
     return chat, caption, bot_name, None
 
 

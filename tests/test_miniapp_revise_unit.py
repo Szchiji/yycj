@@ -60,7 +60,7 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261101m"}
+    assert vs == {"20261104b"}
 
 
 def test_filter_reset_applies_immediately_and_keeps_facets():
