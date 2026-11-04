@@ -1,4 +1,4 @@
-"""管理员硬删资料：软下架不变；硬删清掉资料及其直接子表，会话/信用记录保留；删前记下城市并触发按区目录防抖刷新（YYCJ_TEST_PG）。"""
+"""管理员硬删资料：软下架不变；硬删清掉资料、会话、该资料相关信用流水及其直接子表；删前记下城市并触发按区目录防抖刷新（YYCJ_TEST_PG）。"""
 import asyncio
 import os
 import types
@@ -48,7 +48,7 @@ def test_admin_hard_delete_keeps_unlist_and_refreshes_directory():
         import bot.main as m
         from bot import db
         from bot.db import session_scope
-        from bot.models import HomepagePin, Lamp, Report, Review, Session, User
+        from bot.models import CreditHistory, HomepagePin, Lamp, Report, Review, Session, SessionMessage, User
         from bot.models_extra import ChannelDirectory, Coupon, CouponClaim, Favorite, LampView
         from bot.services import bot_info, channel_directory as cd, home_service, listing_ops
         db._engine = None
@@ -74,6 +74,10 @@ def test_admin_hard_delete_keeps_unlist_and_refreshes_directory():
                          text="100P", ends_at=now + timedelta(days=1), quota=2, status="active"))
             s.add(CouponClaim(coupon_id=cid, batch_id=cid, user_id=7, code="123456"))
             s.add(Session(session_id=sid, lamp_id=lids[0], user_a_id=8991, user_b_id=7, status="ended"))
+            s.add(SessionMessage(session_id=sid, from_role="a", content="hi"))
+            s.add(CreditHistory(user_id=8991, action="session_end", delta=2, reason="会话结算", related_id=sid))
+            s.add(CreditHistory(user_id=8991, action="daily_recovery", delta=1, reason="日恢复", related_id=None))
+            s.add(CreditHistory(user_id=8991, action="other", delta=1, reason="别的资料", related_id=lids[1]))
             s.add(ChannelDirectory(city=CITY, chat="@jm_dir", message_id=700))
         prev = await home_service.get_or_create_settings()
         prev_cities = list(prev.get("enabled_cities") or [])
@@ -117,7 +121,12 @@ def test_admin_hard_delete_keeps_unlist_and_refreshes_directory():
                 assert (await s.execute(select(Report).where(Report.lamp_id == lids[0]))).scalars().first() is None
                 assert (await s.execute(select(Coupon).where(Coupon.coupon_id == cid))).scalar_one_or_none() is None
                 assert (await s.execute(select(CouponClaim).where(CouponClaim.coupon_id == cid))).scalars().first() is None
-                assert (await s.execute(select(Session).where(Session.session_id == sid))).scalar_one().lamp_id == lids[0]
+                assert (await s.execute(select(Session).where(Session.session_id == sid))).scalar_one_or_none() is None
+                assert (await s.execute(select(SessionMessage).where(SessionMessage.session_id == sid))).scalars().first() is None
+                assert (await s.execute(select(CreditHistory).where(CreditHistory.related_id == sid))).scalars().first() is None
+                # unrelated credit stays
+                left = list((await s.execute(select(CreditHistory).where(CreditHistory.user_id == 8991))).scalars())
+                assert {x.action for x in left} == {"daily_recovery", "other"}
                 soft = (await s.execute(select(Lamp).where(Lamp.lamp_id == lids[1]))).scalar_one()
                 assert soft.status == "hidden" and soft.title == "软下架乙"
             gate.set()
@@ -137,7 +146,9 @@ def test_admin_hard_delete_keeps_unlist_and_refreshes_directory():
             m.bot = real
             async with session_scope() as s:
                 await s.execute(delete(ChannelDirectory).where(ChannelDirectory.city == CITY))
+                await s.execute(delete(SessionMessage).where(SessionMessage.session_id == sid))
                 await s.execute(delete(Session).where(Session.session_id == sid))
+                await s.execute(delete(CreditHistory).where(CreditHistory.user_id == 8991))
                 await s.execute(delete(CouponClaim).where(CouponClaim.coupon_id == cid))
                 await s.execute(delete(Coupon).where(Coupon.coupon_id == cid))
                 await s.execute(delete(Review).where(Review.review_id == rid))

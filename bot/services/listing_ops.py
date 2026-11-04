@@ -94,9 +94,9 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
 
 async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
     """Admin hard-delete: permanently remove the listing and its direct children.
-    Soft 下架 (unlist_lamp) is unchanged. Sessions / credit history stay (orphan lamp_id)."""
+    Soft 下架 (unlist_lamp) is unchanged. Also removes sessions for this lamp and credit_history rows whose related_id is this lamp / those sessions / those reports (not the user's whole history)."""
     from sqlalchemy import delete as sql_delete
-    from bot.models import HomepagePin, Report, Review
+    from bot.models import CreditHistory, HomepagePin, Report, Review, Session, SessionMessage
     from bot.models_extra import Coupon, CouponClaim, Favorite, LampView, ReviewNotice
 
     async with session_scope() as s:
@@ -112,6 +112,14 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
         review_ids = [
             r.review_id
             for r in (await s.execute(select(Review).where(Review.lamp_id == lamp_id))).scalars()
+        ]
+        report_ids = [
+            r.report_id
+            for r in (await s.execute(select(Report).where(Report.lamp_id == lamp_id))).scalars()
+        ]
+        session_ids = [
+            r.session_id
+            for r in (await s.execute(select(Session).where(Session.lamp_id == lamp_id))).scalars()
         ]
 
     # Channel / coupon posts before the row disappears (bc_* + get_lamp still work).
@@ -132,6 +140,11 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
         lamp = res.scalar_one_or_none()
         if not lamp:
             raise ValueError("资料不存在")
+        credit_keys = [lamp_id, *session_ids, *report_ids]
+        await s.execute(sql_delete(CreditHistory).where(CreditHistory.related_id.in_(credit_keys)))
+        if session_ids:
+            await s.execute(sql_delete(SessionMessage).where(SessionMessage.session_id.in_(session_ids)))
+            await s.execute(sql_delete(Session).where(Session.session_id.in_(session_ids)))
         if coupon_ids:
             await s.execute(sql_delete(CouponClaim).where(CouponClaim.coupon_id.in_(coupon_ids)))
             await s.execute(sql_delete(Coupon).where(Coupon.coupon_id.in_(coupon_ids)))
@@ -151,7 +164,8 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
         "title": title,
         "was_live": was_live,
         "deleted": True,
-        "kept": ["sessions", "credit_history"],
+        "sessions_removed": len(session_ids),
+        "reports_removed": len(report_ids),
     }
 
 
