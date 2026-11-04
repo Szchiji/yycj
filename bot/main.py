@@ -121,31 +121,10 @@ def _schedule_jobs() -> None:
     scheduler.start()
 
 
-# Telegram flood control at startup (several deploys / restarts in a row all call setWebhook etc.):
-# wait the server's retry_after (+ a small buffer) and try again, a few times, with a cap on the total wait.
-TG_RETRY_ATTEMPTS = 3
-TG_RETRY_BUFFER = 1.5      # seconds on top of retry_after
-TG_RETRY_MAX_WAIT = 90.0   # total seconds one call may spend waiting
-
-
-async def _tg_call(label: str, make_call, *, attempts: int = TG_RETRY_ATTEMPTS, max_wait: float = TG_RETRY_MAX_WAIT,
-                   sleep=asyncio.sleep):
-    """Run ``await make_call()``; on TelegramRetryAfter wait and retry. Other errors propagate.
-    Never logs the request itself (the URL carries the bot token)."""
-    from aiogram.exceptions import TelegramRetryAfter
-    waited = 0.0
-    for n in range(1, attempts + 1):
-        try:
-            return await make_call()
-        except TelegramRetryAfter as exc:
-            delay = float(getattr(exc, "retry_after", 1) or 1) + TG_RETRY_BUFFER
-            if n >= attempts or waited + delay > max_wait:
-                logger.warning("%s: Telegram flood control, giving up after %s attempt(s) (retry_after=%ss, waited %.0fs)",
-                               label, n, getattr(exc, "retry_after", "?"), waited)
-                raise
-            logger.info("%s: Telegram flood control, retry %s/%s in %.1fs", label, n + 1, attempts, delay)
-            waited += delay
-            await sleep(delay)
+# Telegram flood control / transient errors at startup: retried by the shared helper (bot/services/tg_retry.py).
+from bot.services.tg_retry import (  # noqa: E402,F401
+    TG_RETRY_ATTEMPTS, TG_RETRY_BUFFER, TG_RETRY_MAX_WAIT, tg_call as _tg_call,
+)
 
 
 async def _setup_webhook() -> bool:
