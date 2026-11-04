@@ -36,6 +36,9 @@
       } else if (act === "relist") {
         await call("/api/admin/listings/" + encodeURIComponent(id) + "/relist", {});
         note("已重新上架");
+      } else if (act === "delete") {
+        await call("/api/admin/listings/" + encodeURIComponent(id) + "/delete", {});
+        note("已永久删除");
       } else return;
       document.getElementById("btnRefresh")?.click();
     } catch (e) {

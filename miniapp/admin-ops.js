@@ -115,6 +115,7 @@
           <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期30天</button>
           <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
           <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
+          <button class="btn danger" data-list="delete" data-id="${esc(x.lamp_id)}" data-title="${esc(x.title || "")}">删除</button>
         </div>
       </div>`).join("") || "<p class='muted'>暂无资料</p>";
   }
@@ -191,6 +192,7 @@
       if (act === "renew") await api(`/api/admin/listings/${id}/renew`, { method: "POST", body: JSON.stringify({ days: 30 }) });
       if (act === "unlist") await api(`/api/admin/listings/${id}/unlist`, { method: "POST", body: JSON.stringify({ reason: "admin" }) });
       if (act === "relist") await api(`/api/admin/listings/${id}/relist`, { method: "POST", body: "{}" });
+      if (act === "delete") await api(`/api/admin/listings/${id}/delete`, { method: "POST", body: "{}" });
       await loadListings();
     } catch (e) { alert(e.message || String(e)); }
   });

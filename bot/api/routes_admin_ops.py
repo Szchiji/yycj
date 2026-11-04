@@ -171,6 +171,17 @@ async def api_admin_unlist(
     return {"ok": True, **data}
 
 
+@router.post("/admin/listings/{lamp_id}/delete")
+async def api_admin_delete_lamp(lamp_id: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    """Permanent hard-delete. Soft 下架 stays on /unlist."""
+    await city_scope.guard(admin_id, "lamp", lamp_id)
+    try:
+        data = await listing_ops.delete_lamp(lamp_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **data}
+
+
 @router.post("/admin/listings/{lamp_id}/relist")
 async def api_admin_relist(lamp_id: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "lamp", lamp_id)

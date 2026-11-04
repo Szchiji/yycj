@@ -4,7 +4,7 @@
     if (document.getElementById(id)) return;
     const s = document.createElement("script");
     s.id = id;
-    s.src = "./" + name + "?v=20261029d";
+    s.src = "./" + name + "?v=20261104a";
     document.head.appendChild(s);
   });
   if (window.__yycjAdminKit) return;
@@ -89,7 +89,7 @@
       const items = ((await r.json()).items) || [];
       window.__yycjListings = items;
       const ST = { active: "已上架", hidden: "已下架" };
-      box.innerHTML = items.map((x) => "<div class=\"pick-item\"><div class=\"meta\"><strong>" + esc(x.title || "") + "</strong><div class=\"muted\">" + esc(x.city || "") + " · " + (ST[x.status] || x.status) + " · " + dueText(x) + "</div></div><div class=\"row\"><button class=\"btn\" data-fill-proxy=\"" + esc(x.lamp_id) + "\">代改</button><button class=\"btn\" data-list=\"renew\" data-id=\"" + esc(x.lamp_id) + "\">续期</button><button class=\"btn\" data-list=\"relist\" data-id=\"" + esc(x.lamp_id) + "\">重新上架</button><button class=\"btn danger\" data-list=\"unlist\" data-id=\"" + esc(x.lamp_id) + "\">下架</button></div></div>").join("") || "<p class='muted'>暂无资料</p>";
+      box.innerHTML = items.map((x) => "<div class=\"pick-item\"><div class=\"meta\"><strong>" + esc(x.title || "") + "</strong><div class=\"muted\">" + esc(x.city || "") + " · " + (ST[x.status] || x.status) + " · " + dueText(x) + "</div></div><div class=\"row\"><button class=\"btn\" data-fill-proxy=\"" + esc(x.lamp_id) + "\">代改</button><button class=\"btn\" data-list=\"renew\" data-id=\"" + esc(x.lamp_id) + "\">续期</button><button class=\"btn\" data-list=\"relist\" data-id=\"" + esc(x.lamp_id) + "\">重新上架</button><button class=\"btn danger\" data-list=\"unlist\" data-id=\"" + esc(x.lamp_id) + "\">下架</button><button class=\"btn danger\" data-list=\"delete\" data-id=\"" + esc(x.lamp_id) + "\" data-title=\"" + esc(x.title || "") + "\">删除</button></div></div>").join("") || "<p class='muted'>暂无资料</p>";
     } catch (e) {}
   }
   document.addEventListener("click", async (ev) => {

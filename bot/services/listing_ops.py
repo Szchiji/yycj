@@ -90,6 +90,86 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
     return out
 
 
+
+
+async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
+    """Admin hard-delete: permanently remove the listing and its direct children.
+    Soft 下架 (unlist_lamp) is unchanged. Also removes sessions for this lamp and credit_history rows whose related_id is this lamp / those sessions / those reports (not the user's whole history)."""
+    from sqlalchemy import delete as sql_delete
+    from bot.models import CreditHistory, HomepagePin, Report, Review, Session, SessionMessage
+    from bot.models_extra import Coupon, CouponClaim, Favorite, LampView, ReviewNotice
+
+    async with session_scope() as s:
+        res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
+        lamp = res.scalar_one_or_none()
+        if not lamp:
+            raise ValueError("资料不存在")
+        city = lamp.city or ""
+        title = lamp.title or ""
+        was_live = lamp.status == LampStatus.ACTIVE.value
+        coupons = list((await s.execute(select(Coupon).where(Coupon.lamp_id == lamp_id))).scalars())
+        coupon_ids = [c.coupon_id for c in coupons]
+        review_ids = [
+            r.review_id
+            for r in (await s.execute(select(Review).where(Review.lamp_id == lamp_id))).scalars()
+        ]
+        report_ids = [
+            r.report_id
+            for r in (await s.execute(select(Report).where(Report.lamp_id == lamp_id))).scalars()
+        ]
+        session_ids = [
+            r.session_id
+            for r in (await s.execute(select(Session).where(Session.lamp_id == lamp_id))).scalars()
+        ]
+
+    # Channel / coupon posts before the row disappears (bc_* + get_lamp still work).
+    try:
+        from bot.services.broadcast import mark_unlist
+        await mark_unlist(lamp_id, reason="deleted")
+    except Exception:
+        logger.exception("mark deleted on channel failed")
+    if coupon_ids:
+        try:
+            from bot.services import coupon_push
+            await coupon_push.close(coupon_ids[0], "deleted")
+        except Exception:
+            logger.exception("coupon post close on delete failed")
+
+    async with session_scope() as s:
+        res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
+        lamp = res.scalar_one_or_none()
+        if not lamp:
+            raise ValueError("资料不存在")
+        credit_keys = [lamp_id, *session_ids, *report_ids]
+        await s.execute(sql_delete(CreditHistory).where(CreditHistory.related_id.in_(credit_keys)))
+        if session_ids:
+            await s.execute(sql_delete(SessionMessage).where(SessionMessage.session_id.in_(session_ids)))
+            await s.execute(sql_delete(Session).where(Session.session_id.in_(session_ids)))
+        if coupon_ids:
+            await s.execute(sql_delete(CouponClaim).where(CouponClaim.coupon_id.in_(coupon_ids)))
+            await s.execute(sql_delete(Coupon).where(Coupon.coupon_id.in_(coupon_ids)))
+        if review_ids:
+            await s.execute(sql_delete(ReviewNotice).where(ReviewNotice.review_id.in_(review_ids)))
+            await s.execute(sql_delete(Review).where(Review.lamp_id == lamp_id))
+        await s.execute(sql_delete(HomepagePin).where(HomepagePin.lamp_id == lamp_id))
+        await s.execute(sql_delete(Favorite).where(Favorite.lamp_id == lamp_id))
+        await s.execute(sql_delete(LampView).where(LampView.lamp_id == lamp_id))
+        await s.execute(sql_delete(Report).where(Report.lamp_id == lamp_id))
+        await s.execute(sql_delete(Lamp).where(Lamp.lamp_id == lamp_id))
+
+    await _directory_on_live(lamp_id, city)  # 硬删 → 刷新该城目录（城市在删前记下）
+    return {
+        "lamp_id": lamp_id,
+        "city": city,
+        "title": title,
+        "was_live": was_live,
+        "deleted": True,
+        "sessions_removed": len(session_ids),
+        "reports_removed": len(report_ids),
+    }
+
+
+
 async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))

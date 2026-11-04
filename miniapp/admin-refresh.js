@@ -23,6 +23,7 @@
           <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期</button>
           <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
           <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
+          <button class="btn danger" data-list="delete" data-id="${esc(x.lamp_id)}" data-title="${esc(x.title || "")}">删除</button>
         </div>
       </div>`).join("") || "<p class='muted'>暂无资料</p>";
   }

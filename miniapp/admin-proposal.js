@@ -80,13 +80,14 @@
       if (it.dataset.ux !== "1") return; // wait for admin-ux.js to finish its own pass first
       const on = !!it.querySelector(".st-active");
       const find = (sel) => it.querySelector(sel);
-      const unlist = find('[data-list="unlist"]'), relist = find('[data-list="relist"]'), renew = find('[data-list="renew"]'), proxy = find("[data-fill-proxy]");
+      const unlist = find('[data-list="unlist"]'), relist = find('[data-list="relist"]'), renew = find('[data-list="renew"]'), proxy = find("[data-fill-proxy]"), del = find('[data-list="delete"]');
       // drop admin-ux's own 更多 + duplicate buttons (a second 下架 lived in its menu)
       it.querySelectorAll('[data-list="unlist"]').forEach((b) => { if (b !== unlist) b.remove(); });
       const oldRow = it.querySelector(":scope > .row");
       if (renew && renew.textContent !== "续期") renew.textContent = "续期";
       if (proxy && proxy.textContent !== "代改") proxy.textContent = "代改";
-      const spec = on ? { sig: "L1", danger: unlist, main: proxy, more: [renew] } : { sig: "L0", danger: null, main: relist, more: [proxy, renew] };
+      if (del && del.textContent !== "删除") del.textContent = "删除";
+      const spec = on ? { sig: "L1d", danger: unlist, main: proxy, more: [renew, del] } : { sig: "L0d", danger: null, main: relist, more: [proxy, renew, del] };
       spec.more = spec.more.filter(Boolean);
       lbar(it, spec);
       if (oldRow) oldRow.remove();
