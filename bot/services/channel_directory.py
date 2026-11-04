@@ -5,6 +5,8 @@
 关掉或换频道：旧目录消息删掉（删不掉就改成「已停用」）。失败只记日志。
 Telegram 临时错误（Bad Gateway / 5xx / 网络 / 限流）：每次调用重试约 3 次；编辑遇到临时错误只重试编辑，
 不改发新消息（避免重复）；只有「消息不存在」这类真错误才发新消息。整城仍失败 → 几分钟后再试这一城一次。
+有上新（审核通过上架 / 续期或重新上架）→ 只刷新这一城的目录（这一城开了按区目录才刷），每城约 90 秒防抖：
+这段时间内上新多条只刷一次。改设置不触发（仍等每天 12:00）。
 """
 from __future__ import annotations
 
@@ -24,6 +26,9 @@ logger = logging.getLogger(__name__)
 MAX_PER_AREA = 30
 RETRY_CITY_AFTER = 300   # seconds: a city whose refresh failed on a transient error is tried once more
 _bg: set = set()         # pending retry tasks (kept referenced)
+NEW_LISTING_DEBOUNCE = 90   # seconds: listings going live within this window → one refresh per city
+_pending: Dict[str, "asyncio.Task"] = {}
+_sleep = asyncio.sleep       # patched in tests
 
 
 def render(city: str, lamps: List[Dict], bot_name: str) -> str:
@@ -159,6 +164,47 @@ def _schedule_retry(cities: List[str]) -> None:
     _bg.add(t)
     t.add_done_callback(_bg.discard)
     logger.warning("channel directory failed for %s; retrying once in %ss", ", ".join(cities), RETRY_CITY_AFTER)
+
+
+async def on_listing_live(lamp_id: str = "", city: str = "") -> bool:
+    """A listing just went live (approved / renewed / relisted): refresh only its city's directory, debounced.
+    Best effort, never raises. Returns True when a refresh was scheduled (False: off for this city / coalesced)."""
+    try:
+        if not city and lamp_id:
+            async with session_scope() as s:
+                city = (await s.execute(select(Lamp.city).where(Lamp.lamp_id == lamp_id))).scalar_one_or_none() or ""
+        if not city:
+            return False
+        from bot.services.home_feed import feature_chat, ops_for_city
+        site = ops_for_city(await home_service.get_or_create_settings(), city)
+        if not site.get("channel_directory") or not feature_chat(site, "channel_directory"):
+            return False
+        t = _pending.get(city)
+        if t is not None and not t.done():
+            return False          # already queued: this listing is picked up by that refresh
+        t = asyncio.get_running_loop().create_task(_debounced_refresh(city))
+        _pending[city] = t
+        t.add_done_callback(lambda done, c=city: _pending.pop(c, None) if _pending.get(c) is done else None)
+        logger.info("channel directory for %s: new listing, refreshing in %ss", city, NEW_LISTING_DEBOUNCE)
+        return True
+    except Exception:
+        logger.exception("channel directory auto-refresh scheduling failed")
+        return False
+
+
+async def _debounced_refresh(city: str) -> str:
+    await _sleep(NEW_LISTING_DEBOUNCE)
+    _pending.pop(city, None)    # listings going live from now on queue another refresh
+    try:
+        st = await _refresh_city(city)
+    except Exception:
+        logger.exception("channel directory auto-refresh for %s failed", city)
+        st = "fail"
+    if st == "fail":
+        _schedule_retry([city])
+    elif st == "ok":
+        logger.info("channel directory for %s refreshed (new listing)", city)
+    return st
 
 
 async def job_refresh_all() -> int:

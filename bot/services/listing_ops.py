@@ -35,11 +35,24 @@ async def set_listing_expiry(lamp_id: str, *, days: Optional[int] = None) -> Dic
             raise ValueError("资料不存在")
         lamp.expires_at = until
         lamp.unlist_reason = None
-        if lamp.status == LampStatus.HIDDEN.value:
+        relisted = lamp.status == LampStatus.HIDDEN.value
+        if relisted:
             lamp.status = LampStatus.ACTIVE.value
         lamp.updated_at = datetime.utcnow()
         await s.flush()
-        return {"lamp_id": lamp.lamp_id, "expires_at": lamp.expires_at, "status": lamp.status}
+        out = {"lamp_id": lamp.lamp_id, "expires_at": lamp.expires_at, "status": lamp.status}
+        city = lamp.city or ""
+    if relisted:   # 续期后重新上架 = 上新
+        await _directory_on_live(lamp_id, city)
+    return out
+
+
+async def _directory_on_live(lamp_id: str, city: str = "") -> None:
+    try:
+        from bot.services import channel_directory
+        await channel_directory.on_listing_live(lamp_id, city)
+    except Exception:
+        logger.exception("directory auto-refresh hook failed")
 
 
 async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
@@ -73,11 +86,16 @@ async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
             raise ValueError("资料不存在")
         if lamp.expires_at and lamp.expires_at <= datetime.utcnow():
             raise ValueError("已过期，请先续期")
+        was_live = lamp.status == LampStatus.ACTIVE.value
         lamp.status = LampStatus.ACTIVE.value
         lamp.unlist_reason = None
         lamp.updated_at = datetime.utcnow()
         await s.flush()
-        return {"lamp_id": lamp.lamp_id, "status": lamp.status, "expires_at": lamp.expires_at}
+        out = {"lamp_id": lamp.lamp_id, "status": lamp.status, "expires_at": lamp.expires_at}
+        city = lamp.city or ""
+    if not was_live:   # 重新上架 = 上新
+        await _directory_on_live(lamp_id, city)
+    return out
 
 
 async def expire_due_lamps() -> int:
