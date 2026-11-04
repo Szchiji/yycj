@@ -65,12 +65,13 @@
       const unlist = row.querySelector("[data-list='unlist']");
       const relist = row.querySelector("[data-list='relist']");
       const renew = row.querySelector("[data-list='renew']");
+      const del = row.querySelector("[data-list='delete']");
       const proxy = row.querySelector("[data-fill-proxy]");
       const more = document.createElement("div");
       more.className = "ad-more";
       more.innerHTML = `<button class="btn" type="button" data-more>更多</button><div class="ad-more-menu hidden"></div>`;
       const menu = more.querySelector(".ad-more-menu");
-      [proxy, renew, on ? null : relist, on ? unlist : null].forEach((b) => {
+      [proxy, renew, on ? null : relist, on ? unlist : null, del].forEach((b) => {
         if (!b) return;
         if (b.getAttribute("data-list") === "renew") b.textContent = "续期";
         menu.appendChild(b);
@@ -98,10 +99,16 @@
   if (listBox) new MutationObserver(() => polishListings()).observe(listBox, { childList: true, subtree: true });
   setTimeout(polishListings, 1500);
   document.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("[data-list='unlist'], [data-admin='post-no'], #btnShadowOn");
+    const btn = ev.target.closest("[data-list='unlist'], [data-list='delete'], [data-admin='post-no'], #btnShadowOn");
     if (!btn || btn.dataset.confirmed === "1") return;
     ev.preventDefault(); ev.stopPropagation();
-    const msg = btn.id === "btnShadowOn" ? "确定遮蔽该用户？" : btn.getAttribute("data-admin") === "post-no" ? "确定拒绝这份投稿？" : "确定下架这份资料？";
+    let msg = "确定下架这份资料？";
+    if (btn.id === "btnShadowOn") msg = "确定遮蔽该用户？";
+    else if (btn.getAttribute("data-admin") === "post-no") msg = "确定拒绝这份投稿？";
+    else if (btn.getAttribute("data-list") === "delete") {
+      const t = btn.getAttribute("data-title") || "这份资料";
+      msg = "确定永久删除「" + t + "」？删掉后不能恢复，只是想藏起来请用「下架」。";
+    }
     if (!(await confirmBox(msg))) return;
     btn.dataset.confirmed = "1"; btn.click();
     setTimeout(() => { delete btn.dataset.confirmed; }, 500);
