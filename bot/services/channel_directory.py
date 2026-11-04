@@ -5,7 +5,7 @@
 关掉或换频道：旧目录消息删掉（删不掉就改成「已停用」）。失败只记日志。
 Telegram 临时错误（Bad Gateway / 5xx / 网络 / 限流）：每次调用重试约 3 次；编辑遇到临时错误只重试编辑，
 不改发新消息（避免重复）；只有「消息不存在」这类真错误才发新消息。整城仍失败 → 几分钟后再试这一城一次。
-有上新（审核通过上架 / 续期或重新上架）→ 只刷新这一城的目录（这一城开了按区目录才刷），每城约 90 秒防抖：
+有上新（审核通过上架 / 续期或重新上架）或下架（管理员下架 / 封号下架 / 到期自动下架 / 删除 / 改到别的城市）→ 只刷新这一城的目录（这一城开了按区目录才刷），每城约 90 秒防抖：
 这段时间内上新多条只刷一次。改设置不触发（仍等每天 12:00）。
 """
 from __future__ import annotations
@@ -190,6 +190,19 @@ async def on_listing_live(lamp_id: str = "", city: str = "") -> bool:
     except Exception:
         logger.exception("channel directory auto-refresh scheduling failed")
         return False
+
+
+async def on_listing_gone(lamp_id: str = "", city: str = "") -> bool:
+    """A live listing left the directory (delisted / expired / deleted / moved city). Same debounce;
+    pass `city` when the row is already gone."""
+    return await on_listing_live(lamp_id, city)
+
+
+async def on_cities_changed(cities) -> int:
+    n = 0
+    for c in dict.fromkeys(c for c in cities if c):
+        n += 1 if await on_listing_live("", c) else 0
+    return n
 
 
 async def _debounced_refresh(city: str) -> str:

@@ -1,5 +1,5 @@
 """有上新自动刷新按区目录：只刷新这一城、这一城开了才刷、每城防抖（多条上新只刷一次）、审核通过 / 续期重新上架都会触发；
-改设置不触发（YYCJ_TEST_PG）。"""
+下架 / 封号 / 到期 / 删除 / 改城市也会刷新；改设置不触发（YYCJ_TEST_PG）。"""
 import asyncio
 import os
 import types
@@ -108,6 +108,42 @@ def test_directory_auto_refresh_on_new_listing():
             waits.clear()
             await listing_ops.set_listing_expiry(ids[2], days=7)
             assert waits == [] and not cd._pending
+            # leaving the directory: admin unlist + ban-unlist coalesce into one refresh; the listing is gone from it
+            async def cycle(*acts, expect_calls=1):
+                gate.clear(); fake.calls.clear(); waits.clear()
+                for act in acts:
+                    await act()
+                await asyncio.sleep(0.01)
+                assert len(waits) == (1 if expect_calls else 0), waits
+                gate.set()
+                await asyncio.sleep(0.05)
+                e = [c for c in fake.calls if c[0] == "edit"]
+                assert len(e) == expect_calls
+                return e[0][3] if e else ""
+            txt = await cycle(lambda: listing_ops.unlist_lamp(ids[0], reason="admin"),
+                              lambda: listing_ops.unlist_lamp(ids[1], reason="banned"))
+            assert "江一" not in txt and "江二" not in txt and "江三" in txt
+            # unlisting something already hidden → nothing
+            await cycle(lambda: listing_ops.unlist_lamp(ids[0]), expect_calls=0)
+            # scheduler auto-expiry → refresh
+            async with session_scope() as s:
+                from sqlalchemy import select
+                (await s.execute(select(Lamp).where(Lamp.lamp_id == ids[2]))).scalar_one().expires_at = \
+                    datetime.utcnow() - timedelta(minutes=1)
+            txt = await cycle(listing_ops.expire_due_lamps)
+            assert "江三" not in txt and "江四" in txt
+            # moving a live listing to another (disabled) city → old city refreshed
+            from bot.services import listing_flow
+            txt = await cycle(lambda: listing_flow.apply_admin_edit(ids[4], {"city": OFF, "description": "x"}))
+            assert "江四" not in txt
+            # deletion: city captured before the row is gone
+            ids.append(str(uuid.uuid4()))
+            async with session_scope() as s:
+                s.add(Lamp(lamp_id=ids[-1], user_id=8981, title="江五", city=ON, district="蓬江", status="active",
+                           description="演示"))
+            from bot.services import demo_purge
+            txt = await cycle(demo_purge.purge_demo_listings)
+            assert "江五" not in txt
             # settings change does not trigger anything
             await home_service.update_city_overrides(ON, {"channel_directory": True})
             assert not cd._pending

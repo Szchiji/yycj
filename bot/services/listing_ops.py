@@ -47,6 +47,14 @@ async def set_listing_expiry(lamp_id: str, *, days: Optional[int] = None) -> Dic
     return out
 
 
+async def _directory_cities(cities) -> None:
+    try:
+        from bot.services import channel_directory
+        await channel_directory.on_cities_changed(cities)
+    except Exception:
+        logger.exception("directory auto-refresh hook failed")
+
+
 async def _directory_on_live(lamp_id: str, city: str = "") -> None:
     try:
         from bot.services import channel_directory
@@ -61,6 +69,8 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
         lamp = res.scalar_one_or_none()
         if not lamp:
             raise ValueError("资料不存在")
+        was_live = lamp.status == LampStatus.ACTIVE.value
+        city = lamp.city or ""
         lamp.status = LampStatus.HIDDEN.value
         lamp.unlist_reason = (reason or "admin")[:64]
         lamp.feed_pinned = False
@@ -75,6 +85,8 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
         await mark_unlist(lamp_id, reason=reason)
     except Exception:
         pass
+    if was_live:   # 下架（管理员 / 封号）→ 刷新该城目录
+        await _directory_on_live(lamp_id, city)
     return out
 
 
@@ -111,6 +123,7 @@ async def expire_due_lamps() -> int:
         )
         lamps = list(res.scalars().all())
         ids = [x.lamp_id for x in lamps]
+        gone_cities = [x.city or "" for x in lamps]
         for lamp in lamps:
             lamp.status = LampStatus.HIDDEN.value
             lamp.unlist_reason = "expired"
@@ -128,6 +141,7 @@ async def expire_due_lamps() -> int:
             await mark_unlist(lid, reason="expired")
         except Exception:
             pass
+    await _directory_cities(gone_cities)   # 到期自动下架 → 刷新这些城的目录（每城一次）
     try:
         from bot.services import listing_flow
         r = await listing_flow.remind_expiring(3)

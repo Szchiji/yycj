@@ -30,8 +30,14 @@ async def purge_demo_listings() -> Dict[str, Any]:
     async with session_scope() as s:
         lamps = list((await s.execute(select(Lamp))).scalars().all())
         ids: List[str] = [x.lamp_id for x in lamps if _is_demo(x)]
+        gone_cities = [x.city or "" for x in lamps if _is_demo(x) and x.status == "active"]  # captured before delete
         if ids:
             await s.execute(delete(HomepagePin).where(HomepagePin.lamp_id.in_(ids)))
             await s.execute(delete(Lamp).where(Lamp.lamp_id.in_(ids)))
         logger.info("purged %s demo lamps", len(ids))
-        return {"seeded": False, "purged": len(ids), "lamp_ids": ids}
+    try:
+        from bot.services import channel_directory
+        await channel_directory.on_cities_changed(gone_cities)
+    except Exception:
+        logger.exception("directory auto-refresh hook failed")
+    return {"seeded": False, "purged": len(ids), "lamp_ids": ids}
