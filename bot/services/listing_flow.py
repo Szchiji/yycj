@@ -53,6 +53,7 @@ async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin
             raise ValueError("资料不存在")
         if not admin and int(lamp.user_id) != int(owner_id):
             raise ValueError("只能改自己的资料")
+        old_city, old_live = lamp.city or "", lamp.status == LampStatus.ACTIVE.value
         lamp.city = (data.get("city") or lamp.city)[:32]
         lamp.title = (data.get("title") or lamp.title)[:128]
         lamp.tags = list(data.get("tags") or lamp.tags or [])[:5]
@@ -73,7 +74,15 @@ async def apply_edit(lamp_id: str, data: Dict[str, Any], *, owner_id: int, admin
             lamp.status = LampStatus.ACTIVE.value
         lamp.updated_at = datetime.utcnow()
         await s.flush()
-        return {"lamp_id": lamp.lamp_id, "title": lamp.title, "status": lamp.status, "expires_at": lamp.expires_at}
+        out = {"lamp_id": lamp.lamp_id, "title": lamp.title, "status": lamp.status, "expires_at": lamp.expires_at}
+        new_city, new_live = lamp.city or "", lamp.status == LampStatus.ACTIVE.value
+    if old_live and new_live and old_city != new_city:   # 改城市：旧城少一条、新城多一条
+        try:
+            from bot.services import channel_directory
+            await channel_directory.on_cities_changed([old_city, new_city])
+        except Exception:
+            logger.exception("directory auto-refresh hook failed")
+    return out
 
 
 async def apply_admin_edit(lamp_id: str, data: Dict[str, Any]) -> Dict[str, Any]:

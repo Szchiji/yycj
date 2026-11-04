@@ -34,6 +34,11 @@ async def approve_lamp(lamp_id: str, *, days=None):
         await listing_ops.set_listing_expiry(lamp_id, days=days)
     except Exception:
         logger.exception("set expiry after approve failed")
+    try:   # 有上新 → refresh that city's 按区目录 (debounced, only if enabled there)
+        from bot.services import channel_directory
+        await channel_directory.on_listing_live(lamp_id)
+    except Exception:
+        logger.exception("directory auto-refresh hook failed")
 
 
 async def search_lamps(**kwargs):
