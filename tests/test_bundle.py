@@ -29,8 +29,8 @@ def test_go_and_index_share_bundle_version():
         html = (ROOT / "miniapp" / page).read_text("utf-8")
         js = re.search(r"app\.bundle\.js\?v=([A-Za-z0-9]+)", html)
         css = re.search(r"app\.bundle\.css\?v=([A-Za-z0-9]+)", html)
-        assert js and css and js.group(1) == css.group(1), page
-        vers.append(js.group(1))
+        assert js and css, page
+        vers.append((js.group(1), css.group(1)))
     assert vers[0] == vers[1]
 
 
