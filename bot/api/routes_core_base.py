@@ -136,6 +136,7 @@ class AliasBody(BaseModel):
     alias: str = ""
 
 class LampOpBody(BaseModel):
+    operation_id: Optional[str] = None
     reason: str = "admin"
     days: Optional[int] = None
 

@@ -1,6 +1,6 @@
 # t134 视觉 / 独立弹窗：未上线的真实 HTML 预览
 
-此分支仅用于评审，**不合并、不部署**。红色 Error 的模型修复独立在 PR #56；续期逻辑完全未改。
+初始 t134 评审记录。随后 t137 明确批准无需截图直接发布，t138 又明确要求未来续期重新发频道并通知老师；最终发布范围以 PR 与下述发布说明为准。红色 Error 根因独立在 PR #56。
 
 ## 启动
 
@@ -34,7 +34,7 @@ cd /workspace/yycj-followup-review
 
 ## 验证
 
-- Python：131 passed, 21 DB-dependent skipped；未连接生产 DB。
+- 初始 Python：131 passed, 21 DB-dependent skipped；未连接生产 DB。
 - DOM：后台全站/城市开关和独立文本保存、社区/地图/轮播位置、弹窗关闭/跨上海午夜/用户城市隔离/XSS/隐藏 app 等待均通过。
 - 执行：`PATH=/workspace/venv-yycj/bin:$PATH NODE_PATH=/workspace/yycj-admin-ship/tests/node_modules npm --prefix tests run test:ui`（也可 `npm --prefix tests ci` 后去掉 NODE_PATH）。
 - 未运行浏览器；截图由父代理桌面评审执行，不能把这些纯 DOM 检查当成视觉通过。

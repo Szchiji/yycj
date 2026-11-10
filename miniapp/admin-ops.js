@@ -189,7 +189,10 @@
     const id = btn.getAttribute("data-id");
     const act = btn.getAttribute("data-list");
     try {
-      if (act === "renew") await api(`/api/admin/listings/${id}/renew`, { method: "POST", body: JSON.stringify({ days: 30 }) });
+      if (act === "renew") {
+        // The capture handler in admin-list.js owns renewal and its stable operation key.
+        alert("请刷新后台后再续期"); return;
+      }
       if (act === "unlist") await api(`/api/admin/listings/${id}/unlist`, { method: "POST", body: JSON.stringify({ reason: "admin" }) });
       if (act === "relist") await api(`/api/admin/listings/${id}/relist`, { method: "POST", body: "{}" });
       if (act === "delete") await api(`/api/admin/listings/${id}/delete`, { method: "POST", body: "{}" });

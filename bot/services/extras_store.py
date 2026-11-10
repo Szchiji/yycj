@@ -91,8 +91,7 @@ async def remember_broadcast(lamp_id: str, chat: str, mid: int, *, card_mid: int
     if not lamp_id or not mid:
         return
     payload = {"_bc_chat": str(chat), "_bc_mid": str(int(mid))}
-    if card_mid:
-        payload["_bc_card_mid"] = str(int(card_mid))
+    payload["_bc_card_mid"] = str(int(card_mid)) if card_mid else ""
     current = await load_extras(lamp_id)
     current.update(payload)
     async with session_scope() as s:

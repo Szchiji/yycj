@@ -229,19 +229,15 @@ async def api_admin_renew(
     lamp_id: str, body: LampOpBody = LampOpBody(), admin_id: int = Depends(get_admin_user_id)
 ) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "lamp", lamp_id)
+    import re
+    from bot.services import renewal
+    operation_id = str(body.operation_id or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", operation_id):
+        raise HTTPException(status_code=400, detail="请刷新后台后重试续期（缺少防重复操作编号）")
     try:
-        data = await listing_ops.set_listing_expiry(lamp_id, days=body.days)
+        return await renewal.renew_listing(lamp_id, admin_id, body.days, operation_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    album = None
-    try:
-        full = await search_service.get_lamp(lamp_id) or {}
-        extras = dict((full or {}).get("extras") or {})
-        album = await listing_flow.broadcast_listing(full, extras)
-    except Exception:
-        logger.exception("renew broadcast failed")
-    data["expires_at"] = _ser_dt(data.get("expires_at"))
-    return {"ok": True, **data, "album": album}
 
 
 @router.post("/admin/homepage/pins/remove")
