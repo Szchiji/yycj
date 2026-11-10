@@ -40,6 +40,8 @@ def _settings_to_dict(row: SiteSettings) -> Dict[str, Any]:
         "enabled_cities": cities,
         "ops": ops,
         "updated_at": row.updated_at,
+        "config_revision": getattr(row,"config_revision",0) or 0,
+        "updated_by": getattr(row,"updated_by",None),
     }
     out.update(ops)
     return out
@@ -61,7 +63,7 @@ async def get_or_create_settings() -> Dict[str, Any]:
         return _settings_to_dict(row)
 
 
-async def update_city_overrides(city: str, changes: Dict[str, Any]) -> Dict[str, Any]:
+async def update_city_overrides(city: str, changes: Dict[str, Any], *, actor_id=None) -> Dict[str, Any]:
     """Set / clear one city's overrides under the settings row lock. A None / empty value clears that key."""
     city = (city or "").strip()[:32]
     async with session_scope() as s:
@@ -86,6 +88,8 @@ async def update_city_overrides(city: str, changes: Dict[str, Any]) -> Dict[str,
             allc.pop(city, None)
         ops["city_overrides"] = allc
         row.ops_config = home_feed.merge_ops(ops)
+        row.config_revision=(row.config_revision or 0)+1
+        row.updated_by=actor_id
         row.updated_at = datetime.utcnow()
         await s.flush()
         return _settings_to_dict(row)
@@ -97,6 +101,7 @@ async def update_settings(
     announcement_enabled: Optional[bool] = None,
     enabled_cities: Optional[List[str]] = None,
     ops_config: Optional[Dict[str, Any]] = None,
+    actor_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     async with session_scope() as s:
         # Row lock: the console fires several saves at once; without FOR UPDATE they
@@ -119,6 +124,8 @@ async def update_settings(
         if ops_config is not None:
             merged = home_feed.merge_ops({**(getattr(row, "ops_config", None) or {}), **ops_config})
             row.ops_config = merged
+        row.config_revision=(row.config_revision or 0)+1
+        row.updated_by=actor_id
         row.updated_at = datetime.utcnow()
         await s.flush()
         return _settings_to_dict(row)

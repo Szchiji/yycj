@@ -14,6 +14,7 @@ import bot.api.routes_coupons  # noqa: F401
 import bot.api.routes_place  # noqa: F401
 import bot.api.routes_community  # noqa: F401
 import bot.api.routes_client_log  # noqa: F401
+import bot.api.routes_execution  # noqa: F401
 import bot.api.routes_admin_insights  # noqa: F401
 import bot.models_extra  # noqa: F401
 import bot.services.role_lock  # noqa: F401

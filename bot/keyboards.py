@@ -101,18 +101,5 @@ def admin_review_kb(review_id: str) -> InlineKeyboardMarkup:
 
 
 def welcome_kb(items) -> InlineKeyboardMarkup | ReplyKeyboardRemove:
-    """Private /start buttons; only allow known Mini App pages and safe external URLs."""
-    from bot.services.community import clean_welcome_buttons
-    buttons = []
-    base = get_settings().normalized_webapp_url.rstrip("/")
-    if base.endswith(".html"):
-        base = base.rsplit("/", 1)[0]
-    for item in clean_welcome_buttons(items):
-        if item["type"] == "webapp":
-            if not base:
-                continue
-            target = "?page=me" if item["target"] == "me" else ""
-            buttons.append(InlineKeyboardButton(text=item["label"], web_app=WebAppInfo(url=base + "/go.html" + target)))
-        else:
-            buttons.append(InlineKeyboardButton(text=item["label"], url=item["target"]))
-    return InlineKeyboardMarkup(inline_keyboard=[buttons[i:i+2] for i in range(0, len(buttons), 2)]) if buttons else remove_kb()
+    from bot.services.message_buttons import resolve,keyboard
+    return keyboard(resolve(items,'welcome',base=get_settings().normalized_webapp_url)) or remove_kb()

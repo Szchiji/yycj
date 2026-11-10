@@ -971,7 +971,7 @@ try {
     if(!op)return '';
     const review={pending:'修改待审核',approved:'审核已通过',rejected:'修改未通过；原媒体保留',stale:'申请已失效，请重新提交'};
     const channel={pending:'等待同步',sending:'处理中或结果待核对，不可重发',synced:op.action==='repost'?'完整新频道帖已发送':'原频道文字已同步',failed:'频道同步明确失败',unknown:'频道送达结果不明，不可盲目重发',not_configured:'未配置频道，尚未同步',no_post:'没有原频道帖；改文字不会自动新发',not_required:'当前不需要频道推送',stale:'媒体已有新版本，旧操作不会重发'};
-    const notice={pending:'等待通知（先完成频道步骤）',sending:'处理中或结果待核对，不可重发',sent:'老师通知已发送',failed:'老师通知明确失败',unknown:'通知结果不明，不可盲目重发',not_required:'无需老师通知',stale:'媒体已有更新，旧通知不再发送'};
+    const notice={skipped:'老师成功通知已按当前开关跳过',pending:'等待通知（先完成频道步骤）',sending:'处理中或结果待核对，不可重发',sent:'老师通知已发送',failed:'老师通知明确失败',unknown:'通知结果不明，不可盲目重发',not_required:'无需老师通知',stale:'媒体已有更新，旧通知不再发送'};
     const button=(step,label)=>`<button class="btn" type="button" data-edit-retry="${esc(op.operation_id)}" data-edit-step="${step}">${label}</button>`;
     let out=`<div class="edit-result" data-edit-scope="${esc(scope)}"><strong>本次修改状态</strong><p>${op.text_saved?'文字已保存；有效期不变':(op.review_status==='pending'?'整份修改待审核，原资料尚未替换':'原资料保留；本申请未替换资料')}</p>`;
     if(op.review_status!=='none')out+=`<p>${esc(review[op.review_status]||op.review_status)}</p>`;

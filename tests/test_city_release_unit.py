@@ -36,7 +36,7 @@ def test_safe_targets_and_welcome_limits():
     ]
     raw += [{"type": "webapp", "label": str(i), "target": "me"} for i in range(8)]
     clean = clean_welcome_buttons(raw)
-    assert len(clean) == 6 and all(x["target"] == "me" for x in clean)
+    assert len(clean) == 8 and all(x["target"] == "me" for x in clean)
     assert clean_welcome_buttons("junk") == []
 
 

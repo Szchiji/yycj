@@ -20,7 +20,8 @@ def export(out):
     for asset in source.iterdir():
         if asset.is_file() and asset.suffix in ('.js','.css','.svg','.png','.jpg','.webp') and asset.name!='telegram-web-app.js':
             shutil.copy2(asset,out/asset.name)
-    cfg=json.dumps({'settings':DEFAULT_OPS,'keys':CITY_KEYS},ensure_ascii=False).replace('</','<\\/')
+    review_settings={**DEFAULT_OPS,'bot_welcome_buttons':[{'type':'webapp','label':'示例 · 首页','target':'home','new_row':True},{'type':'webapp','label':'示例 · 我的','target':'me','new_row':False},{'type':'url','label':'示例 · 使用说明','target':'https://example.invalid/help','new_row':True}]}
+    cfg=json.dumps({'settings':review_settings,'keys':CITY_KEYS},ensure_ascii=False).replace('</','<\\/')
     bootstrap=(ROOT/'scripts/preview/fixtures.js').read_text()
     bootstrap=bootstrap.replace("mode=q.get('preview') || 'home'","mode=window.__EDIT_REVIEW_MODE || q.get('preview') || 'home'")
     bootstrap=bootstrap.replace("admin=mode==='admin'","admin=mode.startsWith('admin')")
@@ -28,7 +29,7 @@ def export(out):
     bootstrap=bootstrap.replace("    if(!admin)return;","    if(window.__EDIT_REVIEW_MODE)return;\n    if(!admin)return;")
     bootstrap=bootstrap.replace("'/preview-assets/cover'+(i+1)+'.svg'", "'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"360\" height=\"480\"><rect width=\"360\" height=\"480\" fill=\"%23244D43\"/><text x=\"40\" y=\"220\" fill=\"%23D4B26A\" font-size=\"25\">评审占位 · 非真实资料</text></svg>')")
     extension=(ROOT/'scripts/preview/edit-fixtures.js').read_text()
-    previews=[('teacher-edit','go.html','老师修改资料表单'),('teacher-statuses','go.html','老师我的上架 / 分步状态'),('admin-edit','desk.html','管理员免审编辑 / 通知重试'),('admin-review','desk.html','管理员媒体审核')]
+    previews=[('teacher-edit','go.html','老师修改资料表单'),('teacher-statuses','go.html','老师我的上架 / 分步状态'),('admin-edit','desk.html','管理员免审编辑 / 通知重试'),('admin-review','desk.html','管理员媒体审核'),('admin-buttons','desk.html','统一按钮编辑 / 独立开关'),('admin-executions','desk.html','城市执行日志 / 安全步骤重试')]
     csp="default-src 'none'; script-src 'unsafe-inline' file:; style-src 'unsafe-inline' file:; img-src data: file: blob:; media-src data: file: blob:; connect-src 'none'; object-src 'none'; form-action 'none'"
     for mode,page,label in previews:
         html=(source/page).read_text()

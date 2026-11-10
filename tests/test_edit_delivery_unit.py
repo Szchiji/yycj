@@ -57,7 +57,7 @@ def test_notification_adapter_passes_current_owner_city_new_album_lamp_id(monkey
     send=AsyncMock(return_value=True);monkeypatch.setattr(listing_notify,'notify_publisher_approved',send)
     assert asyncio.run(delivery.notify(lamp,'https://t.me/newcity/900'))['status']=='sent'
     assert send.call_args.args==(77,'较新文字','https://t.me/newcity/900')
-    assert send.call_args.kwargs=={'city':'深圳','lamp_id':'lamp1','raise_errors':True,'listing_active':True}
+    assert send.call_args.kwargs=={'city':'深圳','lamp_id':'lamp1','raise_errors':True,'listing_active':True,'operation_id':None,'actor_id':None}
 
 
 def test_rejection_notification_and_strict_failure_outcomes(monkeypatch):

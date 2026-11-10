@@ -158,9 +158,10 @@ async def save_state(operation_id,st):
 async def run_steps(operation_id):
     """Caller holds listing_lock; checkpoints commit BEFORE external calls."""
     async with session_scope() as s:
-        op=await s.get(Operation,operation_id);st=dict(op.state);lamp_id=op.lamp_id
+        op=await s.get(Operation,operation_id);st=dict(op.state);lamp_id=op.lamp_id;actor_id=op.actor_id
     full=await search_service.get_lamp(lamp_id)
     if not full:return
+    full["_edit_operation_id"]=operation_id;full["_edit_actor_id"]=actor_id
     async with session_scope() as s:
         current=(await s.execute(select(Lamp).where(Lamp.lamp_id==lamp_id))).scalar_one()
         full["_edit_listing_active"]=live(current)
@@ -179,12 +180,18 @@ async def run_steps(operation_id):
             st.update(channel_status="stale" if stale else "not_required",channel_retryable=False,notification_status="not_required",notification_retryable=False)
         else:
             st.update(channel_status="sending",channel_retryable=False);await save_state(operation_id,st)
+            from bot.services import execution_log
+            record=await execution_log.begin('listing_edit',st['action'],city=full.get('city'),listing_id=lamp_id,operation_id=operation_id,actor_id=actor_id,target='channel',retry_kind='edit_channel')
             result=await edit_delivery.channel(full,st["action"])
+            await execution_log.finish(record,result['status'],result['status'] if result['status'] in execution_log.REASONS else 'delivery_unknown' if result['status']=='unknown' else None)
             st.update(channel_status=result["status"],channel_retryable=result["retryable"],album=result.get("album"))
         await save_state(operation_id,st)
     if st["notification_status"]=="pending" and (st["channel_status"] in ("synced","not_required") or st.get("notify_rejected")):
         st.update(notification_status="sending",notification_retryable=False);await save_state(operation_id,st)
+        from bot.services import execution_log
+        record=await execution_log.begin('listing_edit','notification',city=full.get('city'),listing_id=lamp_id,operation_id=operation_id,actor_id=actor_id,target='private',retry_kind='edit_notification')
         result=await edit_delivery.notify(full,st.get("album"),rejected=st.get("notify_rejected",False))
+        await execution_log.finish(record,result['status'],'disabled' if result['status']=='skipped' else 'failed' if result['status']=='failed' else 'delivery_unknown' if result['status']=='unknown' else None)
         st.update(notification_status=result["status"],notification_retryable=result["retryable"]);await save_state(operation_id,st)
 
 

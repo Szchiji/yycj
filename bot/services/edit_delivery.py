@@ -71,8 +71,10 @@ async def notify(lamp, album, *, rejected=False):
             from bot.main import bot
             await bot.send_message(int(lamp["user_id"]),"你的灯笼投稿未通过审核。")
         else:
-            await listing_notify.notify_publisher_approved(int(lamp["user_id"]),lamp.get("title") or "资料",album,
-                city=lamp.get("city"),lamp_id=lamp["lamp_id"],raise_errors=True,listing_active=lamp.get("_edit_listing_active",lamp.get("status")=="active"))
+            sent = await listing_notify.notify_publisher_approved(int(lamp["user_id"]),lamp.get("title") or "资料",album,
+                city=lamp.get("city"),lamp_id=lamp["lamp_id"],raise_errors=True,listing_active=lamp.get("_edit_listing_active",lamp.get("status")=="active"),operation_id=lamp.get("_edit_operation_id"),actor_id=lamp.get("_edit_actor_id"))
+            if sent is None:return outcome("skipped")
+            if sent is False:return outcome("unknown")
         return outcome("sent")
     except Exception as exc:
         log.exception("edit owner notification failed for %s",lamp.get("lamp_id"))

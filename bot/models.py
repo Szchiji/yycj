@@ -239,6 +239,8 @@ class SiteSettings(Base):
     announcement_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     enabled_cities: Mapped[list] = mapped_column(JSONB, default=list)
     ops_config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    config_revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    updated_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
@@ -308,3 +310,22 @@ class ListingEditOperation(Base):
     state: Mapped[dict] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExecutionRecord(Base):
+    """Safe operational metadata only: never message bodies or credentials."""
+    __tablename__='execution_records'
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    operation_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True,index=True)
+    feature: Mapped[str] = mapped_column(String(32),index=True)
+    step: Mapped[str] = mapped_column(String(24))
+    city: Mapped[Optional[str]] = mapped_column(String(32),nullable=True,index=True)
+    listing_id: Mapped[Optional[str]] = mapped_column(String(64),nullable=True,index=True)
+    actor_id: Mapped[Optional[int]] = mapped_column(BigInteger,nullable=True)
+    config_revision: Mapped[Optional[int]] = mapped_column(Integer,nullable=True)
+    target_ref: Mapped[Optional[str]] = mapped_column(String(80),nullable=True)
+    status: Mapped[str] = mapped_column(String(24),index=True)
+    reason_code: Mapped[Optional[str]] = mapped_column(String(40),nullable=True)
+    retry_kind: Mapped[Optional[str]] = mapped_column(String(24),nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime,default=datetime.utcnow,index=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime,nullable=True)
