@@ -64,3 +64,29 @@ def test_blank_label_is_a_real_change():
     after = _site(link_label_reviews="")
     assert effective_labels(after, "上海")[1] == ""
     assert cities_whose_labels_changed(before, after) == ["上海", "深圳"]
+
+def test_review_channel_mid_lives_on_review_not_post():
+    from bot.models import Post, Review
+    assert hasattr(Review, "post_chat") and hasattr(Review, "post_mid")
+    assert not hasattr(Post, "post_chat") and not hasattr(Post, "post_mid")
+
+
+def test_review_count_keys_match_state_write():
+    import ast
+    import inspect
+    from bot.services import label_sync
+
+    src = inspect.getsource(label_sync._review_counts)
+    tree = ast.parse(src)
+    keys = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
+            for k in node.value.keys:
+                if isinstance(k, ast.Constant):
+                    keys.add(k.value)
+    assert "reviews_stored" in keys and "reviews_legacy" in keys
+    run_src = inspect.getsource(label_sync._run_city_locked)
+    assert 'reviews["reviews_stored"]' in run_src
+    assert 'reviews["reviews_legacy"]' in run_src
+    assert 'reviews["stored"]' not in run_src
+    assert 'reviews["legacy"]' not in run_src

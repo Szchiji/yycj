@@ -225,8 +225,8 @@ async def _run_city_locked(city: str, *, only_failed: bool) -> Dict[str, Any]:
             row.failed = failed
             row.status = "done"
             row.finished_at = datetime.utcnow()
-            row.reviews_stored = reviews["stored"]
-            row.reviews_legacy = reviews["legacy"]
+            row.reviews_stored = reviews["reviews_stored"]
+            row.reviews_legacy = reviews["reviews_legacy"]
             row.note = ""
             await s.flush()
             return _public(row)
