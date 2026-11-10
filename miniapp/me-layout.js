@@ -13,13 +13,13 @@
   // section → ordered item ids (cards get an id below; rows are built here)
   const LAYOUT = {
     guest: [
-      ["我的", ["meRowFav", "myClaims", "meRevCard"]],
+      ["我的", ["meTodos", "meRowFav", "myClaims", "meRevCard"]],
       ["本城", ["cityCoupons"]],
       ["设置", ["placeCard", "meNickCard"]],
       ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
     ],
     teacher: [
-      ["经营", ["meListCard", "myCoupon"]],
+      ["经营", ["meTodos", "meListCard", "myCoupon"]],
       ["设置", ["placeCard", "meNickCard", "meRevCard"]],
       ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
     ],
@@ -76,6 +76,46 @@
     };
     return out;
   }
+  let todos = null, todoLoading = false;
+  async function loadTodos() {
+    if (todoLoading || !token()) return;
+    todoLoading = true;
+    try {
+      const r = await fetch("/api/me/todos", { headers: { Authorization: "Bearer " + token() } });
+      if (r.ok) todos = await r.json();
+    } catch (e) {}
+    todoLoading = false;
+    paintTodos();
+  }
+  function openFold(id, also) {
+    const c = document.getElementById(id);
+    if (c) { c.classList.add("open"); setOpen(c.id, true); c.scrollIntoView({ block: "center", behavior: "smooth" }); }
+    if (also) also();
+  }
+  function paintTodos() {
+    const me = $("#view-me"); if (!me) return;
+    let el = $("#meTodos");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "meTodos";
+      el.className = "card me-todos";
+      el.innerHTML = "<h3>待办</h3><div class=\"me-todo-row\"></div>";
+    }
+    const d = todos || {};
+    const cells = isTeacher()
+      ? [["expiring", d.expiring || 0, "3 天内到期"], ["pending", d.pending || 0, "待核销优惠"]]
+      : [["coupons", d.coupons || 0, "可用优惠券"], ["favs", d.favs || 0, "收藏"]];
+    const hint = isTeacher()
+      ? "快到期会打开「我的上架」；待核销打开「我的优惠」。续期仍由管理员处理。"
+      : "点一下就打开原来的优惠券或收藏。约课是在详情页点「想聊聊」，没有单独的课表，所以这里不列待上课。";
+    const row = el.querySelector(".me-todo-row") || el;
+    if (!el.querySelector(".me-todo-row")) el.innerHTML = "<h3>待办</h3><div class=\"me-todo-row\"></div><p class=\"muted me-todo-hint\"></p>";
+    let hintEl = el.querySelector(".me-todo-hint");
+    if (!hintEl) { hintEl = document.createElement("p"); hintEl.className = "muted me-todo-hint"; el.appendChild(hintEl); }
+    hintEl.textContent = hint;
+    const box = el.querySelector(".me-todo-row");
+    box.innerHTML = cells.map(([k, n, lab]) => `<button type="button" class="me-todo" data-todo="${k}"><b>${esc(n)}</b><span class="muted">${esc(lab)}</span></button>`).join("");
+  }
   function head(me) {
     let h = $("#meHead");
     if (!h) { h = document.createElement("div"); h.id = "meHead"; h.className = "card me-head"; me.prepend(h); }
@@ -118,6 +158,8 @@
       // sections of the other role (after a 身份 switch)
       me.querySelectorAll(".me-sec").forEach((s) => { if (!s.dataset.k.startsWith(r)) { s.querySelectorAll(".card").forEach((c) => me.appendChild(c)); s.remove(); } });
       if (revs == null) loadRevs(); else paintRevs();
+      paintTodos();
+      if (todos == null) loadTodos();
       summarize();
     } finally { setTimeout(() => { busy = false; }, 0); }
   }
@@ -148,11 +190,20 @@
   document.addEventListener("yycj:fav", () => summarize());
   document.addEventListener("click", (ev) => {
     const tg = ev.target;
-    if (tg.closest && tg.closest("[data-nav='me']")) { setTimeout(arrange, 120); setTimeout(arrange, 900); revs = null; }
+    if (tg.closest && tg.closest("[data-nav='me']")) { setTimeout(arrange, 120); setTimeout(arrange, 900); revs = null; todos = null; }
     const h3 = tg.closest && tg.closest(".me-fold > h3");
     if (h3 && !tg.closest("button,a,input,select")) { const c = h3.parentElement; const on = !c.classList.contains("open"); c.classList.toggle("open", on); setOpen(c.id, on); return; }
     const op = tg.closest && tg.closest("[data-me-open]");
     if (op) { const c = document.getElementById(op.getAttribute("data-me-open")); if (c) { c.classList.add("open"); setOpen(c.id, true); c.scrollIntoView({ block: "center", behavior: "smooth" }); const i = c.querySelector("input"); if (i) setTimeout(() => i.focus(), 300); } return; }
+    const td = tg.closest && tg.closest("[data-todo]");
+    if (td) {
+      const k = td.getAttribute("data-todo");
+      if (k === "favs") { const b = $("nav [data-nav='fav']"); if (b) b.click(); }
+      else if (k === "coupons") openFold("myClaims");
+      else if (k === "expiring") openFold("meListCard");
+      else if (k === "pending") openFold("myCoupon");
+      return;
+    }
     if (tg.closest && tg.closest("[data-me-fav]")) { const b = $("nav [data-nav='fav']"); if (b) b.click(); return; }
     if (tg.closest && tg.closest("[data-me-contact]")) { const a = $("#topAdmin"); if (a) a.click(); return; }
     if (tg.closest && tg.closest("[data-me-admin]")) { const a = $("#adminEntry a"); if (a) location.href = a.href; return; }

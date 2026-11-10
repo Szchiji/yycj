@@ -128,6 +128,13 @@ async def startup_maintenance(scheduler=None) -> None:
     except Exception:
         logger.exception("coupon post job skipped")
     try:
+        if scheduler is not None and getattr(scheduler, "running", False):
+            from bot.services.label_sync import job_tick
+            scheduler.add_job(job_tick, "interval", seconds=15, id="label_sync",
+                              replace_existing=True, coalesce=True, max_instances=1)
+    except Exception:
+        logger.exception("label sync job skipped")
+    try:
         # pending reviews from the last day that never reached the bot admins (each sent once)
         from bot.services.review_notify import backfill_pending
         await backfill_pending(24)

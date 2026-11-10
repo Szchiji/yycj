@@ -6,7 +6,7 @@
   const KEY = "yycj_admin_city";
   const token = () => localStorage.getItem("yycj_token") || "";
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const S = { sel: localStorage.getItem(KEY) || "", sum: null, scope: null, isSuper: false, ops: null };
+  const S = { sel: localStorage.getItem(KEY) || "", sum: null, scope: null, isSuper: false, ops: null, sync: {} };
   const reg = { post: {}, review: {}, report: {}, lamp: {}, pin: {}, user: {} };
   const palette = {};
   const tagClass = (c) => {
@@ -440,7 +440,61 @@
   }).observe(document.getElementById("pane-venue") || document.body, { childList: true, subtree: true });
   relayout();
 
+  function beijing(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const s = new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+    return s + "（北京时间）";
+  }
+  function syncHtml(city) {
+    const d = S.sync[city];
+    if (!d || d === "loading") {
+      return `<div class="cc-sync"><div class="line"><h4 style="margin:14px 0 0">历史频道帖</h4></div><p class="muted">读取同步进度…</p></div>`;
+    }
+    if (d.error) return `<div class="cc-sync"><div class="line"><h4 style="margin:14px 0 0">历史频道帖</h4></div><p class="muted">读不到进度（${esc(d.error)}）</p></div>`;
+    const stMap = { idle: "尚未同步", queued: "排队更新中", running: "正在更新", done: "上次已完成" };
+    const tag = stMap[d.status] || d.status || "";
+    const when = beijing(d.finished_at || d.started_at || d.queued_at);
+    const failN = (d.failed || []).length || d.retry || 0;
+    const rows = (d.failed || []).slice(0, 8).map((x) => `<tr><td>${esc(x.kind === "coupon" ? "优惠帖" : "上架帖")}</td><td>${esc(x.error || "")}</td><td>${esc((x.detail || x.id || "").slice(0, 40))}</td></tr>`).join("");
+    const table = `<table class="cf-table"><tr><th>类型</th><th>状态</th><th>说明</th></tr>
+      <tr><td>上架 / 优惠帖</td><td>已更新 ${esc(d.updated || 0)}${failN ? " · 待重试 " + failN : ""}</td><td>${when ? "上次 " + esc(when) : "保存链接文案后约 30 秒自动改文字"}</td></tr>
+      <tr><td>精选评价</td><td>${d.reviews_legacy ? "旧帖不可定位 " + d.reviews_legacy : "可定位 " + (d.reviews_stored || 0)}</td><td>旧帖没有存消息编号，这次改不到；以后新发的会记下。</td></tr>
+      ${rows}</table>`;
+    return `<div class="cc-sync">
+      <div class="line" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px">
+        <h4 style="margin:0">历史频道帖</h4><span class="cc-badge${d.status === "running" || d.status === "queued" ? " own" : ""}">${esc(tag)}</span>
+      </div>
+      <p class="muted">只改能找到原消息的上架帖和优惠帖；消失的跳过，不补发。保存链接文案后约 30 秒自动改文字，不必等到中午。按区目录的设置改动仍是中午再生效。</p>
+      <div class="cc-sync-nums">
+        <div><b>${esc(d.updated || 0)}</b><span class="muted">已更新</span></div>
+        <div><b>${esc(d.retry || 0)}</b><span class="muted">待重试</span></div>
+        <div><b>${esc(d.missing || 0)}</b><span class="muted">找不到原帖</span></div>
+        <div><b>${esc(d.gone || 0)}</b><span class="muted">已消失</span></div>
+      </div>
+      <button class="btn primary" type="button" data-cc="sync-run">立即同步本城旧帖</button>
+      <button class="btn" type="button" data-cc="sync-retry"${failN ? "" : " disabled"}>重试失败</button>
+      ${table}
+    </div>`;
+  }
+  async function loadSync(city, force) {
+    if (!city) return;
+    if (!force && S.sync[city] && S.sync[city] !== "loading") return;
+    if (!S.sync[city]) S.sync[city] = "loading";
+    try {
+      const r = await rawFetch("/api/admin/label-sync?city=" + encodeURIComponent(city), { headers: { Authorization: "Bearer " + token() }, cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      S.sync[city] = r.ok ? d : { error: d.detail || "读取失败" };
+      renderCard();
+      if (d.status === "queued" || d.status === "running") {
+        clearTimeout(loadSync._t);
+        loadSync._t = setTimeout(() => loadSync(city, true), 2500);
+      }
+    } catch (e) { S.sync[city] = { error: e.message || String(e) }; renderCard(); }
+  }
   function renderCard() {
+
     const card = skeleton();
     if (!card || !S.sum) return;
     relayout();
@@ -468,6 +522,8 @@
       else {
         html += (cfg.keys || []).map((k) => fieldHtml(k, cfg)).join("");
         html += cfg.can_edit ? `<button class="btn primary cc-save" type="button" data-cc="save-cfg">保存${esc(S.sel)}设置</button>` : `<p class="muted">只能查看：只有超管或负责${esc(S.sel)}的运营能改</p>`;
+        html += syncHtml(S.sel);
+        if (!S.sync[S.sel] || S.sync[S.sel] === "loading") setTimeout(() => loadSync(S.sel), 0);
       }
       if (S.isSuper) html += `<p class="muted cc-foot">全站默认值和不分城市的设置在「全站默认」里改。</p>`;
     } else {
@@ -535,7 +591,7 @@
           if (String(v) !== String(cur)) overrides[k.key] = v;
         });
         if (!Object.keys(overrides).length) { alert("没有改动"); }
-        else { afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides })); S.feat = null; alert(`${S.sel} 设置已保存`); }
+        else { afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides })); S.feat = null; S.sync[S.sel] = "loading"; setTimeout(() => loadSync(S.sel, true), 400); alert(`${S.sel} 设置已保存`); }
       } else if (b.dataset.cc === "clear") {
         afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides: { [b.dataset.k]: null } }));
         S.feat = null;
@@ -548,6 +604,12 @@
         });
         S.feat = d; S.cfg = {}; S.featWarn = d.warnings || [];
         alert("已保存。按区目录将在" + (d.directory_applies_at || nextNoon()) + "生效" + (S.featWarn.length ? "；有 " + S.featWarn.length + " 个城市的频道需要检查，见下方" : ""));
+      } else if (b.dataset.cc === "sync-run") {
+        S.sync[S.sel] = await post("/api/admin/label-sync/run", { city: S.sel });
+        setTimeout(() => loadSync(S.sel, true), 1200);
+      } else if (b.dataset.cc === "sync-retry") {
+        S.sync[S.sel] = await post("/api/admin/label-sync/retry", { city: S.sel });
+        setTimeout(() => loadSync(S.sel, true), 800);
       } else if (b.dataset.cc === "save-ops") {
         const map = {};
         document.querySelectorAll("#cityCard [data-op]").forEach((inp) => {

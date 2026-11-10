@@ -227,3 +227,71 @@ async def api_admin_proxy_edit(
     except Exception:
         album = None
     return {"ok": True, "lamp": lamp, "album": album, "edited_in_place": bool(album), "by": admin_id}
+
+
+@router.post("/me/listings/{lamp_id}/unlist")
+async def api_me_unlist(lamp_id: str, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    from bot.services import listing_ops
+    try:
+        out = await listing_ops.teacher_unlist(lamp_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **out}
+
+
+@router.post("/me/listings/{lamp_id}/relist")
+async def api_me_relist(lamp_id: str, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    from bot.services import listing_ops
+    try:
+        out = await listing_ops.teacher_relist(lamp_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **out}
+
+
+@router.get("/me/todos")
+async def api_me_todos(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+    """「我的」顶部待办计数。客人：可用优惠券、收藏。老师：3 天内到期的上架、待核销优惠。"""
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, select
+    from bot.models_extra import Favorite
+    from bot.services import coupons, credit_service
+
+    u = await credit_service.ensure_user(user_id)
+    role = u.get("role") or "guest"
+    if role in ("teacher", "merchant"):
+        items = await listing_flow.list_my_lamps(user_id)
+        now = datetime.utcnow()
+        until = now + timedelta(days=3)
+        expiring = 0
+        for it in items:
+            if it.get("status") != "active":
+                continue
+            exp = it.get("expires_at")
+            if not exp:
+                continue
+            if getattr(exp, "tzinfo", None):
+                exp = exp.replace(tzinfo=None)
+            if now < exp <= until:
+                expiring += 1
+        pending = 0
+        try:
+            mine = await coupons.mine(user_id)
+            pending = int((mine.get("current") or {}).get("pending") or 0)
+            pending += sum(int(b.get("pending") or 0) for b in (mine.get("history") or []))
+        except Exception:
+            logger.exception("teacher coupon todos failed")
+        return {"ok": True, "role": "teacher", "expiring": expiring, "pending": pending}
+    favs = 0
+    usable = 0
+    try:
+        from bot.db import session_scope
+        async with session_scope() as s:
+            favs = int((await s.execute(select(func.count()).select_from(Favorite).where(Favorite.user_id == user_id))).scalar() or 0)
+    except Exception:
+        logger.exception("fav todos failed")
+    try:
+        usable = int((await coupons.my_claims(user_id)).get("usable") or 0)
+    except Exception:
+        logger.exception("coupon claim todos failed")
+    return {"ok": True, "role": "guest", "coupons": usable, "favs": favs}

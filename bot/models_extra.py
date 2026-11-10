@@ -1,9 +1,12 @@
 """收藏等补充表。"""
 from __future__ import annotations
 
+from typing import Optional
+
 from datetime import date, datetime
 
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bot.models import Base
@@ -108,3 +111,23 @@ class UserPlace(Base):
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class LabelSyncState(Base):
+    """Per-city progress of in-place channel link-label sync."""
+
+    __tablename__ = "label_sync_state"
+
+    city: Mapped[str] = mapped_column(String(32), primary_key=True)
+    status: Mapped[str] = mapped_column(String(16), default="idle", server_default="idle")
+    queued_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    retry: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    missing: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    gone: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    failed: Mapped[list] = mapped_column(JSONB, default=list)
+    reviews_stored: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    reviews_legacy: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    note: Mapped[str] = mapped_column(String(256), default="", server_default="")

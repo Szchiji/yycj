@@ -164,6 +164,36 @@ async def refresh(coupon_id: str) -> bool:
     return True
 
 
+async def sync_edit(coupon_id: str) -> str:
+    """Re-render an open coupon post for link-label sync. Returns updated/missing/gone/retry/skip."""
+    from bot.services.label_sync import classify_edit_error, retry_after_sec
+    async with session_scope() as s:
+        c, items = await _batch(s, coupon_id)
+        if not c or not c.post_mid or c.post_closed:
+            return "skip"
+        lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
+        text = render(items, lamp, await _bot_name(), detail_label=await _detail_label_for(c.city))
+        chat, mid = c.post_chat, int(c.post_mid)
+    try:
+        from bot.main import bot
+        await bot.edit_message_text(text, chat_id=chat, message_id=mid, disable_web_page_preview=True)
+        return "updated"
+    except Exception as exc:
+        kind = classify_edit_error(exc)
+        if kind == "updated":
+            return "updated"
+        if kind == "retry" and retry_after_sec(exc):
+            import asyncio
+            await asyncio.sleep(min(35, retry_after_sec(exc)))
+            try:
+                from bot.main import bot
+                await bot.edit_message_text(text, chat_id=chat, message_id=mid, disable_web_page_preview=True)
+                return "updated"
+            except Exception as exc2:
+                return classify_edit_error(exc2)
+        return kind
+
+
 async def job_close_due() -> int:
     """Every 10 min: close posts whose coupon expired / ended / was stopped / sold out."""
     now = datetime.utcnow()

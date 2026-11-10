@@ -72,6 +72,8 @@ _ALTER_STATEMENTS = [
     "UPDATE coupon_claims cc SET batch_id = COALESCE(c.batch_id, c.coupon_id) FROM coupons c WHERE c.coupon_id = cc.coupon_id AND cc.batch_id IS NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_coupon_claim_batch_user ON coupon_claims (batch_id, user_id)",
     "CREATE INDEX IF NOT EXISTS ix_coupon_claims_batch_id ON coupon_claims (batch_id)",
+    "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS post_chat VARCHAR(64)",
+    "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS post_mid INTEGER",
 ]
 
 
