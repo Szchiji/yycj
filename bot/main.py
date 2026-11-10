@@ -16,6 +16,7 @@ import asyncio
 import hmac
 import logging
 import os
+import re
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -70,9 +71,21 @@ MINIAPP_DIR = Path(__file__).resolve().parent.parent / "miniapp"
 from bot.api.static_cache import MiniappCache as NoCacheMiniapp, SelectiveGZip  # noqa: E402
 
 
+def _miniapp_asset_v() -> str:
+    """Cache-bust query from go.html, so Telegram refetches the Mini App after a deploy."""
+    html = MINIAPP_DIR / "go.html"
+    if not html.is_file():
+        return ""
+    m = re.search(r"app\.bundle\.js\?v=([A-Za-z0-9]+)", html.read_text("utf-8"))
+    return m.group(1) if m else ""
+
+
 def _menu_webapp_url(webapp: str) -> str:
     base = (webapp or "").rstrip("/")
-    return f"{base}/go.html" if base else ""
+    if not base:
+        return ""
+    ver = _miniapp_asset_v()
+    return f"{base}/go.html?v={ver}" if ver else f"{base}/go.html"
 
 
 async def job_expire_sessions() -> None:
