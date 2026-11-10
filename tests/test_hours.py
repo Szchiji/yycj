@@ -141,3 +141,20 @@ def test_remind_text():
     day = at(30, "19:00").date()
     txt = o.remind_text("小雅<b>", h, day, at(30, "20:00"), now=at(30, "19:00"))
     assert "今天 20:00 开课吗" in txt and "20:00–次日04:00" in txt and "&lt;b&gt;" in txt
+
+
+def test_lasting_rest_beats_auto_and_hours():
+    ex = {"_hours": H_DAY, "_lasting_rest": "1"}
+    s = st(ex, at(30, "12:00"))
+    assert s["code"] == "rest" and s["text"] == "休息中" and s.get("lasting") is True
+    # still shows hours; auto flag remains, but status is rest
+    assert "10:00" in (s.get("hours") or "")
+    # next day still rest until manually cleared
+    assert st(ex, at(31, "12:00"))["code"] == "rest"
+    # hidden / expired still off
+    assert o.shop_status(ex, "hidden")["code"] == "off"
+
+
+def test_due_prompt_skips_lasting_rest():
+    ex = {"_hours": H_NIGHT, "_auto_open": "0", "_lasting_rest": "1"}
+    assert o.due_prompt(ex, at(30, "19:30")) is None

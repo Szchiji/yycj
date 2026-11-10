@@ -218,6 +218,8 @@ def shop_status(
             exp = exp.replace(tzinfo=None)
         if isinstance(exp, datetime) and exp <= datetime.utcnow():
             return {**base, "code": "off", "text": ""}
+    if extras.get("_lasting_rest") == "1":
+        return {**base, "code": "rest", "text": "休息中", "lasting": True}
     if not hours:
         return {**base, "code": "unset", "text": "", "hours": ""}
 
@@ -268,7 +270,7 @@ def remind_text(title: str, hours, day: date, start: datetime, now: Optional[dat
     )
 
 
-_ACTIONS = {"open", "rest", "remind", "remind_on", "remind_off", "auto_on", "auto_off"}
+_ACTIONS = {"open", "rest", "remind", "remind_on", "remind_off", "auto_on", "auto_off", "pause", "resume"}
 
 
 async def apply_choice(
@@ -289,6 +291,18 @@ async def apply_choice(
             return "资料已到期"
         title = row.title
     extras = await load_extras(lamp_id)
+    if action == "pause":
+        extras["_lasting_rest"] = "1"
+        await save_extras(lamp_id, extras)
+        return f"已记：{title} · 持续休息，直到你点「恢复营业」。首页仍展示，显示休息。"
+    if action == "resume":
+        await save_extras(lamp_id, extras, drop=("_lasting_rest",))
+        return f"已记：{title} · 已恢复营业，按现在的营业时间显示"
+    if action in ("open", "rest") and extras.get("_lasting_rest") == "1":
+        if action == "rest":
+            return f"已在持续休息中：{title} · 若只想歇今天，请先点「恢复营业」再设今日休息"
+        await save_extras(lamp_id, extras, drop=("_lasting_rest",))
+        extras = await load_extras(lamp_id)
     if action in ("remind", "remind_on"):
         extras["_remind_off"] = "0"
         await save_extras(lamp_id, extras)
@@ -337,7 +351,7 @@ async def resume_remind(lamp_id: str, user_id: int) -> str:
 def due_prompt(extras: Dict[str, Any], now: datetime) -> Optional[Tuple[date, datetime]]:
     """(day, first_start) if this lamp should get its prompt now, else None."""
     hours = parse_hours(extras.get("_hours") or extras.get("hours"))
-    if not hours or auto_open(extras) or not reminders_on(extras):
+    if not hours or auto_open(extras) or not reminders_on(extras) or extras.get("_lasting_rest") == "1":
         return None
     today = now.astimezone(TZ).date()
     for d in (today, today + timedelta(days=1)):
@@ -412,6 +426,11 @@ async def expire_unanswered(now: Optional[datetime] = None) -> int:
     all_extras = await load_extras_bulk(ids)
     for lid in ids:
         extras = dict(all_extras.get(lid) or {})
+        if extras.get("_lasting_rest") == "1":
+            if extras.get("_remind_pending") == "1":
+                extras["_remind_pending"] = "0"
+                await save_extras(lid, extras)
+            continue
         if extras.get("_remind_pending") != "1":
             continue
         try:

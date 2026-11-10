@@ -78,7 +78,13 @@ async def api_admin_extra_ops(
         if raw and not norm:
             raise HTTPException(status_code=400, detail="管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名")
         ops["admin_contact"] = norm
+    before = await home_service.get_or_create_settings()
     settings = await home_service.update_settings(ops_config=ops or None)
+    try:
+        from bot.services import label_sync
+        await label_sync.schedule_after_save(before, settings, city=None)
+    except Exception:
+        logger.exception("schedule label sync after global save failed")
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
     return {"ok": True, "settings": settings}
 

@@ -14,6 +14,8 @@ from bot.services import home_service
 
 logger = logging.getLogger(__name__)
 
+TEACHER_UNLIST = "teacher"
+
 
 async def _listing_days(city: Optional[str] = None) -> int:
     from bot.services.home_feed import ops_for_city
@@ -187,6 +189,14 @@ async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
         city = lamp.city or ""
     if not was_live:   # 重新上架 = 上新
         await _directory_on_live(lamp_id, city)
+        try:
+            from bot.services import search_service
+            from bot.services.broadcast import update_broadcast
+            full = await search_service.get_lamp(lamp_id)
+            if full:
+                await update_broadcast(full, full.get("extras") if isinstance(full, dict) else None)
+        except Exception:
+            logger.exception("refresh channel after relist failed")
     return out
 
 
@@ -196,26 +206,31 @@ async def expire_due_lamps() -> int:
     async with session_scope() as s:
         res = await s.execute(
             select(Lamp).where(
-                Lamp.status == LampStatus.ACTIVE.value,
                 Lamp.expires_at.is_not(None),
                 Lamp.expires_at <= now,
+                or_(
+                    Lamp.status == LampStatus.ACTIVE.value,
+                    (Lamp.status == LampStatus.HIDDEN.value) & (Lamp.unlist_reason == TEACHER_UNLIST),
+                ),
             )
         )
         lamps = list(res.scalars().all())
-        ids = [x.lamp_id for x in lamps]
-        gone_cities = [x.city or "" for x in lamps]
+        live_ids = [x.lamp_id for x in lamps if x.status == LampStatus.ACTIVE.value]
+        gone_cities = [x.city or "" for x in lamps if x.status == LampStatus.ACTIVE.value]
         for lamp in lamps:
+            was_live = lamp.status == LampStatus.ACTIVE.value
             lamp.status = LampStatus.HIDDEN.value
             lamp.unlist_reason = "expired"
-            lamp.feed_pinned = False
+            if was_live:
+                lamp.feed_pinned = False
             lamp.updated_at = now
             n += 1
-        if ids:
-            pin_res = await s.execute(select(HomepagePin).where(HomepagePin.lamp_id.in_(ids)))
+        if live_ids:
+            pin_res = await s.execute(select(HomepagePin).where(HomepagePin.lamp_id.in_(live_ids)))
             for pin in pin_res.scalars().all():
                 s.delete(pin)
         await s.flush()
-    for lid in ids:
+    for lid in live_ids:
         try:
             from bot.services.broadcast import mark_unlist
             await mark_unlist(lid, reason="expired")
@@ -246,6 +261,7 @@ async def purge_old_hidden(days: int = 30) -> int:
             select(Lamp).where(
                 Lamp.status == LampStatus.HIDDEN.value,
                 Lamp.updated_at <= cutoff,
+                or_(Lamp.unlist_reason.is_(None), Lamp.unlist_reason != TEACHER_UNLIST),
             )
         )
         lamps = list(res.scalars().all())
@@ -259,6 +275,42 @@ async def purge_old_hidden(days: int = 30) -> int:
                 s.delete(pin)
         await s.flush()
     return n
+
+
+
+
+async def teacher_unlist(lamp_id: str, user_id: int) -> Dict[str, Any]:
+    """Teacher soft-unlist. Does not hard-delete. Reason is TEACHER_UNLIST so they can self-relist."""
+    async with session_scope() as s:
+        lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))).scalar_one_or_none()
+        if not lamp:
+            raise ValueError("资料不存在")
+        if int(lamp.user_id) != int(user_id):
+            raise ValueError("这不是你的资料")
+        if lamp.status == LampStatus.HIDDEN.value:
+            if lamp.unlist_reason == TEACHER_UNLIST:
+                return {"lamp_id": lamp.lamp_id, "status": lamp.status, "reason": lamp.unlist_reason}
+            raise ValueError("资料已下架，不能自己再下架")
+        if lamp.status != LampStatus.ACTIVE.value:
+            raise ValueError("资料未上架")
+    return await unlist_lamp(lamp_id, reason=TEACHER_UNLIST)
+
+
+async def teacher_relist(lamp_id: str, user_id: int) -> Dict[str, Any]:
+    """Self-restore only for a teacher-unlisted, still-valid listing. No re-review if materials are unchanged."""
+    async with session_scope() as s:
+        lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))).scalar_one_or_none()
+        if not lamp:
+            raise ValueError("资料不存在")
+        if int(lamp.user_id) != int(user_id):
+            raise ValueError("这不是你的资料")
+        if lamp.status == LampStatus.ACTIVE.value:
+            return {"lamp_id": lamp.lamp_id, "status": lamp.status, "expires_at": lamp.expires_at}
+        if lamp.unlist_reason != TEACHER_UNLIST:
+            raise ValueError("管理员或平台下架的条目，不能自己恢复")
+        if lamp.expires_at and lamp.expires_at <= datetime.utcnow():
+            raise ValueError("已过期，请联系管理员续期")
+    return await relist_lamp(lamp_id)
 
 
 async def list_listed(limit: int = 100, cities: Optional[set] = None) -> List[Dict[str, Any]]:

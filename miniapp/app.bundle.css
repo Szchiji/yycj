@@ -668,3 +668,18 @@ html body .tut-steps li:first-child{border-top:0;}
 html body .tut-n{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#13241F;background:linear-gradient(135deg,#C9A45C,#E3C88A);margin-top:1px;}
 html body .tut-steps b{display:block;font-size:14px;color:var(--t-accent);}
 html body .tut-steps p{margin:2px 0 0;font-size:13px;line-height:1.55;color:var(--t-text);}
+
+/* 待办 strip + confirm dialog */
+html body #view-me .me-todos{padding:13px 16px!important;}
+html body #view-me .me-todos > h3{margin:0 0 8px;font-size:15px;}
+html body #view-me .me-todo-row{display:flex;gap:8px;}
+html body #view-me .me-todo{flex:1;background:#102720;border:1px solid var(--t-line);border-radius:10px;padding:10px 8px;text-align:center;color:var(--t-text);cursor:pointer;}
+html body #view-me .me-todo b{display:block;color:var(--t-accent);font-size:18px;line-height:1.2;}
+html body #view-me .me-todo-hint{margin:8px 0 0;font-size:12px;}
+html body #view-me .ls-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+html body .yycj-dlg{position:fixed;inset:0;z-index:80;background:rgba(6,19,14,.6);display:flex;align-items:flex-start;justify-content:center;padding:80px 20px 20px;}
+html body .yycj-dlg.hidden{display:none;}
+html body .yycj-dlg-card{width:100%;max-width:340px;background:var(--t-card);border:1px solid rgba(212,178,106,.45);border-radius:14px;padding:16px;}
+html body .yycj-dlg-card h3{margin:0 0 8px;font-size:16px;}
+html body .yycj-dlg-card .muted{font-size:13px;margin:0 0 8px;}
+html body .yycj-dlg-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}

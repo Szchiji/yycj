@@ -392,6 +392,19 @@ async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Opti
         # text only: the public photo upload is gone and 约课凭证 never leave the admins
         msg = await bot.send_message(chat, body, disable_web_page_preview=True)
         mid = getattr(msg, "message_id", None)
+        if mid and review.get("review_id"):
+            try:
+                from bot.db import session_scope
+                from bot.models import Review
+                from sqlalchemy import select
+                async with session_scope() as s:
+                    row = (await s.execute(select(Review).where(Review.review_id == str(review["review_id"])))).scalar_one_or_none()
+                    if row:
+                        row.post_chat = str(chat)
+                        row.post_mid = int(mid)
+                        await s.flush()
+            except Exception:
+                logger.exception("remember review post failed")
         return album_link(chat, int(mid)) if mid else None
     except Exception:
         logger.exception("broadcast review failed")

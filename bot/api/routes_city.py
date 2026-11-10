@@ -1,6 +1,7 @@
 """城市分区：后台城市切换器的计数、分城市公告、运营负责城市。"""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
@@ -10,6 +11,8 @@ from bot.api.deps import get_admin_user_id, get_super_user_id
 from bot.api.routes_core import router
 from bot.services import city_scope, home_service
 from bot.services.admin_acl import extra_ids, is_super, warm
+
+logger = logging.getLogger(__name__)
 
 
 class CityAnnounceBody(BaseModel):
@@ -121,6 +124,7 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
     if not city:
         raise HTTPException(status_code=400, detail="缺少城市")
     settings = await home_service.get_or_create_settings()
+    before = settings
     if city not in (settings.get("enabled_cities") or []):
         raise HTTPException(status_code=400, detail="不是已开通的城市")
     rights = await _city_edit_rights(admin_id, city)
@@ -152,6 +156,11 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
     settings = await home_service.update_city_overrides(city, changes)
+    try:
+        from bot.services import label_sync
+        await label_sync.schedule_after_save(before, settings, city=city)
+    except Exception:
+        logger.exception("schedule label sync after city save failed")
     # 按区目录: no post / delete now — the daily 12:00 refresh applies it (posts, moves or retires the message)
     out = _city_settings_payload(settings, city, rights)
     out["directory_applies_at"] = channel_features.applies_at()
@@ -191,3 +200,38 @@ async def api_channel_features_save(body: ChannelFeaturesBody, _: int = Depends(
     warnings = await channel_features.inherited_warnings(settings)
     return {"ok": True, **channel_features.overview(settings), "warnings": warnings,
             "directory_applies_at": channel_features.applies_at()}
+
+
+class LabelSyncBody(BaseModel):
+    city: str
+
+
+@router.get("/admin/label-sync")
+async def api_label_sync_status(city: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    city = (city or "").strip()[:32]
+    if not city:
+        raise HTTPException(status_code=400, detail="缺少城市")
+    await city_scope.ensure_city(admin_id, city)
+    from bot.services import label_sync
+    return await label_sync.status(city)
+
+
+@router.post("/admin/label-sync/run")
+async def api_label_sync_run(body: LabelSyncBody, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    city = (body.city or "").strip()[:32]
+    if not city:
+        raise HTTPException(status_code=400, detail="缺少城市")
+    await city_scope.ensure_city(admin_id, city)
+    from bot.services import label_sync
+    await label_sync.queue_city(city, delay=0)
+    return await label_sync.status(city)
+
+
+@router.post("/admin/label-sync/retry")
+async def api_label_sync_retry(body: LabelSyncBody, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+    city = (body.city or "").strip()[:32]
+    if not city:
+        raise HTTPException(status_code=400, detail="缺少城市")
+    await city_scope.ensure_city(admin_id, city)
+    from bot.services import label_sync
+    return await label_sync.retry_failed(city)
