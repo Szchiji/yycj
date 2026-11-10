@@ -30,11 +30,11 @@
     else { ++request;show(back); }
   });
   async function fetchDetail(id) { try { const d=await api('/api/lamps/'+encodeURIComponent(id)); if(window.__yycjOpenLamp === id) window.__yycjRenderDetail?.(d,id); } catch(e) { window.__yycjToast?.(e.message); } }
-  // Homepage announcement remains an announcement, and gains a separate community action.
+  // One community action in the top-left header, with no duplicate homepage row.
   function mount() {
     const home=$('#view-home');if(!home) return;
-    if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='hub-home-entry';b.dataset.hub='community';b.textContent='本城社区 · 官方入口 ›'; const ann=$('#announce'); if(ann) ann.insertAdjacentElement('afterend',b); else home.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnArea') || $('#homeQ'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
+    if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
     if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='<p class="muted">同一套搜索 / 筛选 · 按区中心聚合，并非资料精确位置</p><div id="hubResultMap"></div><div id="hubMapRows"></div>';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
   function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }

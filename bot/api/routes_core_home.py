@@ -84,6 +84,17 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
     return card
 
 
+def entry_announcement(base_settings, settings, city, user_id):
+    """Only this authenticated reader's popup scope; no arbitrary HTML or other user info."""
+    text = str(settings.get("popup_announcement_text") or "").strip()[:3000]
+    if not settings.get("popup_announcement_enabled") or not text:
+        return None
+    own = (base_settings.get("city_overrides") or {}).get(city or "", {})
+    local = any(k.startswith("popup_announcement_") for k in own)
+    return {"title": str(settings.get("popup_announcement_title") or "本城公告")[:40],
+            "text": text, "scope_user": str(user_id), "scope_city": city if local else "*"}
+
+
 @router.get("/home")
 async def api_home(
     city: Optional[str] = None,
@@ -267,6 +278,7 @@ async def api_home(
         "city": use_city,
         "enabled_cities": enabled,
         "announcement": announcement,
+        "popup_announcement": entry_announcement(base_settings, settings, use_city, user_id),
         "pins": pins,
         "items": safe_items,
         "map_groups": district_groups(safe_items, use_city) if map_results else [],

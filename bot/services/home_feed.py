@@ -13,6 +13,9 @@ DEFAULT_OPS = {
     "home_feed_page_size": 3,
     "chat_cta_label": "想聊聊",
     "show_chat_cta": True,
+    "popup_announcement_enabled": False,
+    "popup_announcement_title": "本城公告",
+    "popup_announcement_text": "",
     "bot_welcome_text": "",
     "bot_welcome_buttons": [],
     "approve_attach_detail": True,
@@ -78,6 +81,9 @@ DEFAULT_OPS = {
 # Settings a city may override (key, label, type, extra). Everything else stays site-wide.
 # "super": only the super admin may set it (a scoped operator sees it read-only).
 CITY_KEYS = [
+    {"key": "popup_announcement_enabled", "label": "启用进入小程序弹窗公告", "type": "bool", "hint": "独立于普通公告；关闭本城开关可明确停用本城弹窗"},
+    {"key": "popup_announcement_title", "label": "弹窗公告标题", "type": "text", "max": 40},
+    {"key": "popup_announcement_text", "label": "弹窗公告内容", "type": "textarea", "max": 3000, "hint": "纯文字，最多3000字；空城市内容沿用全站。未启用或无内容不弹出"},
     *[{"key": "community_" + k + "_url", "label": label, "type": "text", "max": 512, "hint": "https:// 或 t.me/ 链接；空 = 沿用全站。关闭本城社区入口可隐藏。"} for k, label in (("discussion", "官方讨论群"), ("backup", "防失联导航"), ("location", "本城位置链接"))],
     {"key": "community_location_label", "label": "位置入口文案", "type": "text", "max": 16},
     {"key": "community_enabled", "label": "显示本城社区外链", "type": "bool", "hint": "关闭后隐藏本城群、防失联、位置入口，不影响官方频道"},
@@ -242,6 +248,9 @@ def merge_ops(raw) -> Dict[str, Any]:
     for key in ("community_discussion_url", "community_backup_url", "community_location_url"):
         out[key] = safe_url(out.get(key))
     out["community_location_label"] = str(out.get("community_location_label") or "位置")[:16]
+    out["popup_announcement_enabled"] = out.get("popup_announcement_enabled") is True
+    out["popup_announcement_title"] = str(out.get("popup_announcement_title") or "本城公告")[:40]
+    out["popup_announcement_text"] = str(out.get("popup_announcement_text") or "")[:3000]
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
     out["approve_promo_text"] = str(out.get("approve_promo_text") or DEFAULT_OPS["approve_promo_text"])[:2000]
     out["broadcast_channel"] = str(out.get("broadcast_channel") or "").strip()[:128]

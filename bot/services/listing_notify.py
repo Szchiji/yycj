@@ -68,7 +68,7 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
         logger.warning("no admin received post %s", post_id)
 
 
-async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None, lamp_id: str | None = None) -> None:
+async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None, lamp_id: str | None = None) -> bool:
     from bot.main import bot
     from bot.services import bot_info
 
@@ -101,5 +101,7 @@ async def notify_publisher_approved(user_id: int, title: str, album_url: str | N
         rows.append([InlineKeyboardButton(text="查看频道帖", url=album_url)])
     try:
         await bot.send_message(user_id, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows) if rows else None)
+        return True
     except Exception:
         logger.exception("notify publisher approved failed")
+        return False

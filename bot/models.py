@@ -282,3 +282,14 @@ class Review(Base):
     # 精选评价频道帖（从本功能上线后开始记；旧帖没有 id，不能回改）
     post_chat: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     post_mid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class ListingRenewal(Base):
+    """Durable at-most-once checkpoints for one administrator renewal request."""
+    __tablename__ = "listing_renewals"
+    operation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lamp_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    admin_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    result: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

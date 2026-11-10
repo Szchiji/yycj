@@ -247,13 +247,13 @@ async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]], *, li
     return chat, caption, bot_name, None
 
 
-async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None) -> Optional[str]:
+async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]] = None, *, force_new: bool = False) -> Optional[str]:
     """Post (or re-post) a listing card. Skip when this lamp already has a remembered channel message
-    — callers that want a fresh post (续期) should clear the ref first, or use update_broadcast."""
+    — only explicit future renewals use force_new=True; ordinary calls keep deduping."""
     from bot.services.extras_store import load_broadcast
     lid = str(lamp.get("lamp_id") or "")
     chat0, mid0 = await load_broadcast(lid)
-    if chat0 and str(mid0).isdigit():
+    if not force_new and chat0 and str(mid0).isdigit():
         # already posted: keep the original, just refresh caption/buttons
         return await update_broadcast(lamp, extras)
 
@@ -286,7 +286,13 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
             msg = await bot.send_message(chat, caption, disable_web_page_preview=True)
         mid = getattr(msg, "message_id", None)
         if mid:
-            await _remember(lid, chat, int(mid), card_mid=int(card_mid) if card_mid else None)
+            if force_new:
+                # Renewal must retain the NEW reference before claiming full success.
+                # Do not clear the old reference before sending, or delete any historical post.
+                from bot.services.extras_store import remember_broadcast
+                await remember_broadcast(lid, chat, int(mid), card_mid=None)
+            else:
+                await _remember(lid, chat, int(mid), card_mid=int(card_mid) if card_mid else None)
             return album_link(chat, int(mid))
         return None
     except Exception:
