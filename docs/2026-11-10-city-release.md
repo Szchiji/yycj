@@ -23,8 +23,8 @@
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt pytest
 pytest -q
-npm ci --ignore-scripts
-npm run test:ui
+npm --prefix tests ci --ignore-scripts
+npm --prefix tests run test:ui
 python scripts/build_miniapp.py --check
 ```
 
