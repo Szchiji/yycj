@@ -195,9 +195,6 @@ class Post(Base):
     status: Mapped[str] = mapped_column(String(16), default=PostStatus.PENDING.value)
     similarity_score: Mapped[float] = mapped_column(Float, default=0.0)
     review_note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
-    # 精选评价频道帖（从本功能上线后开始记；旧帖没有 id，不能回改）
-    post_chat: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    post_mid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
@@ -282,3 +279,6 @@ class Review(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     review_note: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # 精选评价频道帖（从本功能上线后开始记；旧帖没有 id，不能回改）
+    post_chat: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    post_mid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
