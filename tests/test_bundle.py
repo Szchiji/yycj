@@ -23,6 +23,17 @@ def test_pages_load_only_the_bundles():
         assert "<style>" not in html  # the inline block lives in home-inline.css, at the same cascade position
 
 
+def test_go_and_index_share_bundle_version():
+    vers = []
+    for page in ("go.html", "index.html"):
+        html = (ROOT / "miniapp" / page).read_text("utf-8")
+        js = re.search(r"app\.bundle\.js\?v=([A-Za-z0-9]+)", html)
+        css = re.search(r"app\.bundle\.css\?v=([A-Za-z0-9]+)", html)
+        assert js and css and js.group(1) == css.group(1), page
+        vers.append(js.group(1))
+    assert vers[0] == vers[1]
+
+
 def test_every_source_is_one_iife_and_wrapped():
     js = bm.build_js()
     for f in bm.JS:
