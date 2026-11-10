@@ -42,7 +42,7 @@
       tpl.parentNode.insertBefore(el, tpl.nextSibling);
     }
     if (!el) return;
-    el.innerHTML = "<label>上架栏（一行一个，删掉那一行即删栏）</label><textarea id=\"listingFieldsEditor\" rows=\"10\"></textarea><p class=\"muted\" style=\"margin:6px 0 0\">改完后必点保存全部设置。</p><div class=\"row\" style=\"margin-top:8px\"><button class=\"btn\" type=\"button\" id=\"btnResetFields\">恢复默认</button><button class=\"btn\" type=\"button\" id=\"btnTplPreview\">预览推送文案</button></div><pre id=\"tplPreview\" class=\"muted\" style=\"white-space:pre-wrap;background:rgba(0,0,0,.25);padding:10px;border-radius:10px;min-height:40px\">点预览看频道成品</pre>";
+    el.innerHTML = "<label>上架栏（一行一个，删掉那一行即删栏）</label><textarea id=\"listingFieldsEditor\" rows=\"10\"></textarea><p class=\"muted\" style=\"margin:6px 0 0\">改完后点保存全站设置。</p><div class=\"row\" style=\"margin-top:8px\"><button class=\"btn\" type=\"button\" id=\"btnResetFields\">恢复默认</button><button class=\"btn\" type=\"button\" id=\"btnTplPreview\">预览推送文案</button></div><pre id=\"tplPreview\" class=\"muted\" style=\"white-space:pre-wrap;background:rgba(0,0,0,.25);padding:10px;border-radius:10px;min-height:40px\">点预览看频道成品</pre>";
     const editor = document.getElementById("listingFieldsEditor");
     if (editor) editor.value = text || "";
     window.__listingFields = parse(editor ? editor.value : "");

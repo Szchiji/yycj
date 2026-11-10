@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 class ExtraOpsBody(BaseModel):
+    bot_welcome_text: Optional[str] = None
+    media_max_count: Optional[int] = None
+    review_require_audit: Optional[bool] = None
+    bot_welcome_buttons: Optional[List[Dict[str, Any]]] = None
+    approve_attach_detail: Optional[bool] = None
+    approve_attach_channel_btn: Optional[bool] = None
+    community_discussion_url: Optional[str] = None
+    community_backup_url: Optional[str] = None
+    community_location_url: Optional[str] = None
+    community_location_label: Optional[str] = None
+    community_enabled: Optional[bool] = None
     listing_days: Optional[int] = None
     carousel_interval_sec: Optional[int] = None
     show_bot_link: Optional[bool] = None
@@ -38,6 +49,7 @@ class ExtraOpsBody(BaseModel):
     listing_fields: Optional[List[Dict[str, Any]]] = None
     link_label_detail: Optional[str] = None
     link_label_reviews: Optional[str] = None
+    link_label_location: Optional[str] = None
     link_label_write: Optional[str] = None
     teacher_show_views: Optional[bool] = None
     teacher_show_favs: Optional[bool] = None
@@ -71,6 +83,10 @@ async def api_admin_extra_ops(
     _: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {k: v for k, v in body.model_dump().items() if v is not None}
+    from bot.services.community import safe_url
+    for key in ("community_discussion_url", "community_backup_url", "community_location_url"):
+        if ops.get(key) and not safe_url(ops[key]):
+            raise HTTPException(status_code=400, detail="社区入口只支持 https:// 或 t.me/ 链接")
     if "admin_contact" in ops:
         from bot.services import bot_info
         raw = str(ops.get("admin_contact") or "").strip()

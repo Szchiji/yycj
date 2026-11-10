@@ -245,6 +245,7 @@
   // Settings: reuse the existing #adSaveBar (admin-ux.js) but keep it on screen for the whole 站点设置 pane,
   // with a clear state line; the in-page "保存全部设置" at the very bottom is no longer needed.
   function venue() {
+    if ($("#ccGlobal")) return;
     const bar = $("#adSaveBar");
     const save = $("#btnOpsSave");
     if (!bar || !save) return;

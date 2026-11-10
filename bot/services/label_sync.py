@@ -82,8 +82,13 @@ def cities_whose_labels_changed(before: Dict[str, Any], after: Dict[str, Any], c
     else:
         names = [str(c).strip() for c in (after.get("enabled_cities") or before.get("enabled_cities") or [])]
     out: List[str] = []
+    from bot.services.home_feed import ops_for_city
+    def location_signature(settings, city):
+        site = ops_for_city(settings, city)
+        return tuple(site.get(k) for k in ("link_label_location", "community_location_url", "community_enabled"))
     for name in names:
-        if name and effective_labels(before, name) != effective_labels(after, name):
+        if name and (effective_labels(before, name) != effective_labels(after, name)
+                     or location_signature(before, name) != location_signature(after, name)):
             out.append(name)
     return out
 

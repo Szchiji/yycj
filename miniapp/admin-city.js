@@ -7,6 +7,9 @@
   const token = () => localStorage.getItem("yycj_token") || "";
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const S = { sel: localStorage.getItem(KEY) || "", sum: null, scope: null, isSuper: false, ops: null, sync: {} };
+  const drafts={};
+  document.addEventListener("input",ev=>{if(!S.sel || !ev.target.closest("#ccDyn"))return;const el=ev.target;if(!el.id)return;(drafts[S.sel] ||= {})[el.id]=el.type === "checkbox" ? el.checked : el.value;});
+  document.addEventListener("change",ev=>{if(!S.sel || !ev.target.closest("#ccDyn"))return;const el=ev.target;if(!el.id)return;(drafts[S.sel] ||= {})[el.id]=el.type === "checkbox" ? el.checked : el.value;});
   const reg = { post: {}, review: {}, report: {}, lamp: {}, pin: {}, user: {} };
   const palette = {};
   const tagClass = (c) => {
@@ -238,7 +241,7 @@
       <p class="cf-when">⏱ 按区目录的改动保存后不会马上发到频道，将在${esc(nextNoon())}生效。</p>
       ${row(g.broadcast_reviews, "cfRevOn", g.review_channel, "cfRevCh", "精选评价推送到频道", "审核通过的 4–5 星评价，只发文字，不发凭证。")}
       ${row(g.broadcast_coupons !== false, "cfCpnOn", g.coupon_channel, "cfCpnCh", "优惠推送到频道", "老师发优惠时发一条文字帖（查看详情 · 领取优惠）；结束 / 过期 / 停用 / 领完时改成「已结束」。默认开。")}
-      <button class="btn primary" type="button" data-cc="save-feat">保存这三项</button>
+      <p class="muted">随全站设置一起保存；目录改动仍等12:00。</p>
       ${warnHtml(S.featWarn)}
       ${table ? `<table class="cf-table"><thead><tr><th>城市</th><th>按区目录</th><th>精选评价</th><th>优惠推送</th><th></th></tr></thead><tbody>${table}</tbody></table>` : ""}`;
   }
@@ -275,9 +278,9 @@
       input = `<input id="${id}" data-k="${k.key}"${num} placeholder="${esc(ph)}" value="${esc(has ? k.override : "")}"${dis} />`;
     }
     const badge = has ? `<span class="cc-badge own">本城市</span>` : `<span class="cc-badge">沿用全站</span>`;
-    const clear = has && !lock ? `<button class="btn cc-clear" type="button" data-cc="clear" data-k="${k.key}">清除</button>` : "";
+    const clear = has && !lock ? `<button class="btn cc-clear" type="button" data-cc="clear" data-k="${k.key}">恢复全站</button>` : "";
     const note = k.super && !cfg.can_edit_super ? `<span class="cc-lock">只有超管能改</span>` : "";
-    return `<div class="cc-f${has ? " own" : ""}"><div class="cc-fh"><label for="${id}">${esc(k.label)}</label>${badge}${note}${clear}</div>${input}${k.hint ? `<p class="cc-hint">${esc(k.hint)}</p>` : ""}${k.key === "channel_directory" || k.key === "directory_channel" ? `<p class="cf-when">⏱ 保存后不会马上发到频道，将在${esc(nextNoon())}生效</p>` : ""}</div>`;
+    return `<div data-field="${esc(k.key)}" class="cc-f${has ? " own" : ""}"><div class="cc-fh"><label for="${id}">${esc(k.label)}</label>${badge}${note}${clear}</div>${input}${k.hint ? `<p class="cc-hint">${esc(k.hint)}</p>` : ""}${k.key === "channel_directory" || k.key === "directory_channel" ? `<p class="cf-when">⏱ 保存后不会马上发到频道，将在${esc(nextNoon())}生效</p>` : ""}</div>`;
   }
   // ---- merged 站点设置 layout -------------------------------------------------------
   // The 12 city-capable settings live in ONE place: the 城市设置 card. Under 全站默认 the card holds the
@@ -301,6 +304,80 @@
     { id: "opsCarouselSec", label: "轮播间隔（秒）" },
     { id: "opsListingDays", label: "上架天数" },
   ];
+  GLOBAL_FIELDS.push({id:"ship_link_label_location",label:"频道链接 · 位置",hint:"有本城位置目标时才显示；留空隐藏，不生成空链接。",make:()=>{const i=document.createElement("input");i.id="ship_link_label_location";i.maxLength=16;return i;}});
+  const NEW_FIELDS = {
+    link_label_location: ["频道链接 · 位置", "text"],
+    community_discussion_url: ["官方讨论群", "text"], community_backup_url: ["防失联导航", "text"],
+    community_location_url: ["本城位置链接", "text"], community_location_label: ["位置入口文案", "text"],
+    community_enabled: ["显示本城社区外链", "bool"],
+    approve_attach_detail: ["附带资料详情链接和小程序按钮", "bool"],
+    approve_attach_channel_btn: ["附带查看频道帖按钮（有相册时）", "bool"]
+  };
+  Object.entries(NEW_FIELDS).filter(([key])=>key!=="link_label_location").forEach(([key, [label, type]]) => GLOBAL_FIELDS.push({
+    id: "ship_" + key, label, row: type === "bool", make: () => {
+      const i = document.createElement("input"); i.id = "ship_" + key;
+      if (type !== "bool") { i.maxLength = 512; return i; }
+      i.type = "checkbox"; i.checked = true; const l = document.createElement("label"); l.className = "row"; l.append(i, " " + label); return i;
+    }
+  }));
+  [ ["opsWelcome", "Bot /start 欢迎语"], ["opsMediaMax", "上架媒体上限"], ["opsShowCta", "首页显示聊天按钮", true],
+    ["opsShowBot", "首页显示机器人", true], ["citiesInput", "开放城市（逗号分隔）"],
+    ["opsMediaChannel", "媒体存储频道 ID"], ["opsChats", "必订频道 / 群"],
+    ["opsTeachViews", "显示浏览", true], ["opsTeachFavs", "显示收藏", true], ["opsTeachContacts", "显示匿名联系", true]
+  ].forEach(([id, label, row]) => GLOBAL_FIELDS.push({id, label, row}));
+  const GROUPS = ["本城社区", "频道帖文案", "首页展示", "规则与通知", "老师「我的上架」数据", "系统"];
+  function groupOf(key) {
+    if (/^(community_|broadcast_channel|channel_directory|directory_channel|broadcast_reviews|review_channel|broadcast_coupons|coupon_channel)/.test(key)) return 0;
+    if (/^(link_label|broadcast_template|listing_fields)/.test(key)) return 1;
+    if (/^(approve_|review_require|listing_days|bot_welcome|media_max)/.test(key)) return 3;
+    if (/^teacher_/.test(key)) return 4;
+    if (/^(media_channel|required_chats|operator_cities)/.test(key)) return 5;
+    return 2;
+  }
+  const ID_KEYS = {annText:"announcement_text", opsChannel:"broadcast_channel", opsBroadcastTpl:"broadcast_template",
+    opsLinkDetail:"link_label_detail", opsLinkReviews:"link_label_reviews", opsLinkWrite:"link_label_write", opsPromo:"approve_promo_text",
+    opsCta:"chat_cta_label", opsAdminContact:"admin_contact", opsAdminLabel:"admin_btn_label", opsShowAdmin:"show_admin_link",
+    opsReviewAudit:"review_require_audit", opsPageSize:"home_feed_page_size", opsCarouselSec:"carousel_interval_sec", opsListingDays:"listing_days",
+    opsWelcome:"bot_welcome_text", opsMediaMax:"media_max_count", opsShowCta:"show_chat_cta", opsShowBot:"show_bot_link", citiesInput:"enabled_cities",
+    opsMediaChannel:"media_channel_id", opsChats:"required_chats", opsTeachViews:"teacher_show_views", opsTeachFavs:"teacher_show_favs", opsTeachContacts:"teacher_show_contacts"};
+  function sections(prefix) {
+    return GROUPS.map((title, i) => `<details class="ship-group" id="${prefix}${i}"${i < 2 ? " open" : ""}><summary>${title}</summary><div class="ship-fields"></div></details>`).join("");
+  }
+  function approvalPreview() {
+    const val = key => { const el = document.getElementById(S.sel ? "ccf_"+key : "ship_"+key); if(!el) return true; return el.tagName === "SELECT" ? el.value === "" ? (S.cfg[S.sel]?.keys || []).find(x=>x.key===key)?.global !== false : el.value === "1" : el.checked; };
+    const promo = document.getElementById(S.sel ? "ccf_approve_promo_text" : "opsPromo")?.value || "";
+    const box = document.getElementById(S.sel ? "shipCityApproval" : "shipApproval");if(!box)return;
+    const html=`<b>预览 · 老师私聊（示例，不发送）</b><p>你的资料「示例资料」已通过审核并上架。</p><p>${esc(promo)}</p>${val("approve_attach_detail") ? '<p>资料详情：自动生成本条资料的机器人深链</p><div class="ship-button-preview"><span>查看我的资料 ↗</span></div>' : ''}<p>频道相册、机器人文字链接保留；无频道相册不显示相册入口。</p>${val("approve_attach_channel_btn") ? '<div class="ship-button-preview"><span>查看频道帖 ↗（有相册时）</span></div>':''}`;
+    if(box.innerHTML !== html) box.innerHTML=html;
+  }
+  document.addEventListener("input", approvalPreview); document.addEventListener("change", approvalPreview);
+  function groupHtml(keys, cfg, announcement) {
+    return GROUPS.map((title, i) => `<details class="ship-group"${i < 2 ? " open" : ""}><summary>${title}</summary><div class="ship-fields">${i === 2 ? announcement : ""}${keys.filter(k => groupOf(k.key) === i).map(k => fieldHtml(k, cfg)).join("")}${i === 1 ? syncHtml(S.sel) : ""}${i === 3 ? '<div id="shipCityApproval" class="ship-preview"></div>' : ""}${i > 3 ? '<p class="muted">全站专用，在全站默认中设置。</p>' : ''}</div></details>`).join("");
+  }
+  let welcomeButtons = [];
+  function welcomeEditor() {
+    const box = document.getElementById("shipWelcome"); if (!box) return;
+    box.innerHTML = `<h4>欢迎语消息按钮</h4><p class="muted">最多6个，每行2个；仅私聊。常驻菜单「首页」不变。</p>` + welcomeButtons.map((b, i) => `<div class="ship-welcome-row" data-wrow="${i}"><select data-w="type"><option value="webapp"${b.type === "webapp" ? " selected" : ""}>小程序</option><option value="url"${b.type === "url" ? " selected" : ""}>链接</option></select><input data-w="label" maxlength="32" placeholder="按钮文字" value="${esc(b.label)}"/>${b.type === "webapp" ? `<select data-w="target"><option value="home">首页</option><option value="me"${b.target === "me" ? " selected" : ""}>我的</option></select>` : `<input data-w="target" placeholder="https:// 或 t.me/" value="${esc(b.target)}"/>`}<button type="button" class="btn" data-wremove="${i}">移除</button></div>`).join("") + `<button type="button" class="btn" data-wadd="1"${welcomeButtons.length >= 6 ? " disabled" : ""}>添加按钮</button> <button type="button" class="btn" data-wpreset="1">预设：打开小程序</button><div id="shipWelcomePreview" class="ship-preview"></div>`;
+    previewWelcome();
+  }
+  function previewWelcome() {
+    const p = document.getElementById("shipWelcomePreview"); if (p) p.innerHTML = `<b>/start 预览</b><p>${esc(document.getElementById("opsWelcome")?.value || "欢迎使用月影车姬")}</p><div class="ship-button-preview">${welcomeButtons.map(b=>`<span>${esc(b.label || "按钮")}${b.type === "webapp" ? " ↗" : ""}</span>`).join("")}</div>`;
+  }
+  document.addEventListener("input", ev => {
+    const row = ev.target.closest("[data-wrow]");
+    if (row) { welcomeButtons[+row.dataset.wrow][ev.target.dataset.w] = ev.target.value; previewWelcome(); }
+    if (ev.target.id === "opsWelcome") previewWelcome();
+  });
+  document.addEventListener("change", ev => {
+    const row = ev.target.closest("[data-wrow]"); if (row && ev.target.dataset.w === "type") { const b = welcomeButtons[+row.dataset.wrow]; b.type = ev.target.value; b.target = b.type === "webapp" ? "home" : ""; welcomeEditor(); }
+  });
+  document.addEventListener("click", ev => {
+    const b = ev.target.closest("[data-wremove],[data-wadd],[data-wpreset]"); if (!b) return;
+    if (b.dataset.wremove !== undefined) welcomeButtons.splice(+b.dataset.wremove,1);
+    else if (b.dataset.wpreset) welcomeButtons = [{type:"webapp",label:"进入小程序",target:"home"}];
+    else if(welcomeButtons.length < 6) welcomeButtons.push({type:"webapp", label:"",target:"home"});
+    welcomeEditor();
+  });
   // labels the old cards used for the moved inputs (removed so nothing is shown twice / mislabelled)
   const OLD_LABELS = new Set(["公告", "首页每次加载条数", "轮播间隔秒", "聊天按钮文案", "管理员联系链接", "首页管理员按钮文案",
     "审核通过推送频道（@频道名 或 -100…）", "推送文案模板", "上架有效天数"]);
@@ -313,7 +390,7 @@
       card = document.createElement("div");
       card.id = "cityCard";
       card.className = "ops-card";
-      card.innerHTML = `<h4>城市设置</h4><div id="ccTabs" class="cc-tabs"></div><div id="ccGlobal" class="cc-hide"><p class="muted cc-lead">全站默认：所有城市都用这里的值（城市单独设的项除外）。</p><div id="ccGlobalFields"></div><button class="btn primary cc-save" type="button" data-cc="save-global">保存全站设置</button></div><div id="ccDyn"></div>`;
+      card.innerHTML = `<h4>城市设置</h4><div id="ccTabs" class="cc-tabs"></div><div id="ccGlobal" class="cc-hide"><p class="muted cc-lead">全站默认：所有城市都用这里的值（城市单独设的项除外）。</p><div id="ccGlobalFields">${sections("shipG")}</div><button class="btn primary cc-save" type="button" data-cc="save-global">保存全站设置</button></div><div id="ccDyn"></div>`;
       const h = pane.querySelector("h3");
       if (h) h.insertAdjacentElement("afterend", card); else pane.prepend(card);
       card.addEventListener("click", onCardClick);
@@ -357,9 +434,10 @@
         wrap.className = "cc-f";
         wrap.dataset.gf = f.id;
         wrap.innerHTML = f.row ? "" : `<div class="cc-fh"><label for="${f.id}">${esc(f.label)}</label></div>`;
-        host.appendChild(wrap);
+        const key = ID_KEYS[f.id] || f.id.replace(/^ship_/, "");
+        host.querySelector("#shipG" + groupOf(key) + " > .ship-fields").appendChild(wrap);
         // keep the GLOBAL_FIELDS order even when fields arrive late
-        [...host.children].sort((a, b) => GLOBAL_FIELDS.findIndex((x) => x.id === a.dataset.gf) - GLOBAL_FIELDS.findIndex((x) => x.id === b.dataset.gf)).forEach((n) => host.appendChild(n));
+
       }
       const node = f.row ? el.closest("label.row") || el : el;
       if (node.parentNode !== wrap) {
@@ -382,17 +460,13 @@
     site.querySelectorAll(".ops-card > label:not(.row)").forEach((l) => { if (OLD_LABELS.has(l.textContent.trim())) l.remove(); });
     // other scripts insert their own label next to an input that already moved (e.g. 管理员按钮文案): drop it
     host.querySelectorAll(".cc-f > label:not(.row)").forEach((l) => l.remove());
-    const showCta = document.getElementById("opsShowCta")?.closest("label.row");
-    const entry = document.getElementById("opsWelcome")?.closest(".ops-card");
-    if (showCta && entry && host.contains(showCta)) {
-      const hint = showCta.nextElementSibling && showCta.nextElementSibling.tagName === "P" ? showCta.nextElementSibling : null;
-      const h4 = entry.querySelector("h4");
-      (h4 || entry.firstChild).insertAdjacentElement("afterend", showCta);
-      if (hint) showCta.insertAdjacentElement("afterend", hint);
-    }
-    const lfb = document.getElementById("listingFieldBox");
-    const media = document.getElementById("opsMediaChannel")?.closest(".ops-card");
-    if (lfb && media && host.contains(lfb)) media.appendChild(lfb);
+    const move = (node, group) => { const target = host.querySelector("#shipG" + group + " > .ship-fields"); if(node && target && node.parentNode !== target) target.appendChild(node); };
+    move(document.getElementById("listingFieldBox"), 1);
+    move(document.getElementById("btnSyncBot"), 5);
+    move(document.getElementById("opsAdminBox"), 5);
+    for(const [id, group] of [["shipFeatures",0],["shipOperators",5]]) if(!document.getElementById(id)) { const w=document.createElement("div");w.id=id;move(w,group); }
+    if (!document.getElementById("shipApproval")) { const w=document.createElement("div");w.id="shipApproval";w.className="ship-preview";move(w,3); }
+    if (!document.getElementById("shipWelcome")) { const w = document.createElement("div"); w.id = "shipWelcome"; move(w, 3); welcomeEditor(); }
     // cards left empty after the move (only a heading) are hidden
     site.querySelectorAll(".ops-card").forEach((c) => c.classList.toggle("cc-hide", !c.querySelector("input, textarea, select, button")));
     showMode();
@@ -404,7 +478,7 @@
     if (g) g.classList.toggle("cc-hide", !globalMode);
     if (site) site.classList.toggle("cc-hide", !globalMode);
     // the bottom 保存全部设置 bar only saves site-wide values: hide it unless they are on screen
-    document.body.classList.toggle("cc-no-sitebar", !globalMode);
+    document.body.classList.add("cc-no-sitebar");
   }
   async function hydratePromo() {
     if (promoReady || !S.isSuper) return;
@@ -414,6 +488,8 @@
       const r = await rawFetch("/api/admin/homepage", { headers: { Authorization: "Bearer " + token() } });
       if (!r.ok) return;
       const st = ((await r.json()).settings) || {};
+      Object.keys(NEW_FIELDS).forEach(key => { const el = document.getElementById("ship_" + key); if (!el) return; if (el.type === "checkbox") el.checked = st[key] !== false; else el.value = st[key] || ""; });
+      welcomeButtons = st.bot_welcome_buttons || []; welcomeEditor(); approvalPreview();
       if (typeof st.approve_promo_text === "string") { el.value = st.approve_promo_text; promoReady = true; }
     } catch (e) {}
   }
@@ -515,39 +591,32 @@
         <div class="cc-f${a.text ? " own" : ""}"><div class="cc-fh"><label for="ccAnnText">首页公告</label>${a.text ? `<span class="cc-badge own">本城市</span>` : `<span class="cc-badge">沿用全站</span>`}</div>
         <textarea id="ccAnnText" rows="2" placeholder="全站：${esc(S.sum.global_announcement || "")}"${canEdit(S.sel) ? "" : " disabled"}>${esc(a.text || "")}</textarea>
         <label class="row"><input type="checkbox" id="ccAnnOn"${a.text ? (a.enabled ? " checked" : "") : " checked"}${canEdit(S.sel) ? "" : " disabled"} /> 显示${esc(S.sel)}公告</label>
-        ${canEdit(S.sel) ? `<button class="btn" type="button" data-cc="save-ann">保存${esc(S.sel)}公告</button>` : ""}</div>`;
+        </div>`;
       const cfg = S.cfg[S.sel];
       if (!cfg || cfg === "loading") { html += `<p class="muted">读取${esc(S.sel)}设置…</p>`; if (!cfg) setTimeout(() => loadCfg(S.sel), 0); }
       else if (cfg.error !== undefined) html += `<p class="muted">读不到${esc(S.sel)}设置（${esc(cfg.error)}）</p>`;
       else {
-        html += (cfg.keys || []).map((k) => fieldHtml(k, cfg)).join("");
+        const announcement = html; html = `<p class="muted cc-lead">当前编辑：${esc(S.sel)} · 空值沿用全站；频道链接文案留空则隐藏。恢复全站请点对应按钮。</p>` + groupHtml(cfg.keys || [], cfg, announcement);
         html += cfg.can_edit ? `<button class="btn primary cc-save" type="button" data-cc="save-cfg">保存${esc(S.sel)}设置</button>` : `<p class="muted">只能查看：只有超管或负责${esc(S.sel)}的运营能改</p>`;
-        html += syncHtml(S.sel);
+
         if (!S.sync[S.sel] || S.sync[S.sel] === "loading") setTimeout(() => loadSync(S.sel), 0);
       }
       if (S.isSuper) html += `<p class="muted cc-foot">全站默认值和不分城市的设置在「全站默认」里改。</p>`;
     } else {
-      if (S.isSuper) html += featHtml();
-      html += `<h4 style="margin-top:14px">各城市</h4>` + cities.map((c) => {
-        const a = anns[c];
-        const n = counts[c] || 0;
-        return `<div class="cc-row">${tagHtml(c)}<span class="cc-ann">${n ? `单独设置 ${n} 项` : "全部沿用全站"}${a && a.enabled ? " · 有城市公告" : ""}</span></div>`;
-      }).join("") + `<p class="muted" style="margin:6px 0 0">点上面的城市，可以给它单独设；没设的项沿用全站。</p>`;
       if (S.isSuper) {
-        const ops = (S.ops && S.ops.extra_admin_ids) || [];
-        const map = (S.ops && S.ops.operator_cities) || {};
-        html += `<h4 style="margin-top:14px">运营负责城市</h4><p class="muted" style="margin:0 0 6px">空着 = 全部城市（和现在一样）。可选：${esc(cities.join("、"))}</p>` +
-          (ops.length ? ops.map((uid) => `<div class="cc-op"><code>${esc(uid)}</code><input data-op="${esc(uid)}" placeholder="全部城市" value="${esc((map[String(uid)] || []).join("，"))}" /></div>`).join("") +
-            `<button class="btn" type="button" data-cc="save-ops">保存负责城市</button>` : `<p class="muted">还没有运营管理员</p>`);
-      } else {
-        html += `<p class="muted cc-foot">全站设置只有超管能改；点城市可以查看它的设置。</p>`;
-      }
+        const update=(id, content)=>{const el=document.getElementById(id);if(el && el._content !== content){el.innerHTML=content;el._content=content;}};
+        update("shipFeatures", featHtml() + `<h4>各城市</h4>` + cities.map(c=>`<div class="cc-row">${tagHtml(c)}<span class="cc-ann">${counts[c] ? "单独设置 "+counts[c]+" 项" : "全部沿用全站"}</span></div>`).join(""));
+        const ops=(S.ops && S.ops.extra_admin_ids) || [], map=(S.ops && S.ops.operator_cities) || {};
+        update("shipOperators", `<h4>运营负责城市</h4><p class="muted">空着 = 全部城市。随全站设置保存。</p>` + ops.map(uid=>`<div class="cc-op"><code>${esc(uid)}</code><input data-op="${esc(uid)}" placeholder="全部城市" value="${esc((map[String(uid)] || []).join("，"))}"/></div>`).join(""));
+      } else html += `<p class="muted">全站设置只有超管能改；点城市查看本城设置。</p>`;
     }
     const dyn = document.getElementById("ccDyn");
     const active = document.activeElement;
     showMode();
     if (active && dyn.contains(active) && /TEXTAREA|INPUT|SELECT/.test(active.tagName)) return; // don't clobber typing
     if (dyn.innerHTML !== html) dyn.innerHTML = html;
+    Object.entries(drafts[S.sel] || {}).forEach(([id,v])=>{const el=document.getElementById(id);if(el){if(el.type === "checkbox") el.checked=v;else el.value=v;}});
+    approvalPreview();
     if (S.isSuper && !S.ops) loadOps();
   }
   async function post(path, body) {
@@ -565,15 +634,29 @@
     const b = ev.target.closest("[data-cc]");
     if (!b) return;
     if (b.dataset.cc === "city") { setSel(b.dataset.city, true); return; }
-    if (b.dataset.cc === "save-global") {
-      // same pipeline as the old 保存全部设置 (writes the same site-wide keys)
-      document.getElementById("btnOpsSave")?.click();
-      setTimeout(scheduleSummary, 800);
-      return;
-    }
     b.disabled = true;
     try {
-      if (b.dataset.cc === "save-ann") {
+      if (b.dataset.cc === "save-global") {
+        if (!promoReady || !S.feat) throw new Error("设置尚未加载完成，请稍后重试");
+        const val = id => document.getElementById(id)?.value || "";
+        const checked = id => !!document.getElementById(id)?.checked;
+        const ops = {bot_welcome_buttons: welcomeButtons};
+        Object.entries(ID_KEYS).forEach(([id,key]) => {
+          const el=document.getElementById(id); if(!el || ["announcement_text","enabled_cities"].includes(key)) return;
+          ops[key]=el.type === "checkbox" ? el.checked : el.type === "number" ? +el.value : el.value;
+        });
+        Object.entries(NEW_FIELDS).forEach(([key, [,type]]) => ops[key]=type === "bool" ? checked("ship_"+key) : val("ship_"+key));
+        ops.required_chats = val("opsChats").split("\n").map(line => { const p=line.split("|").map(x=>x.trim()); return p[0] ? {chat_id:p[0], title:p[1]||"",url:p[2]||"",required:true} : null; }).filter(Boolean);
+        if(window.__listingFields) ops.listing_fields=window.__listingFields;
+        await post("/api/admin/settings/extra", ops);
+        await post("/api/admin/homepage/ops", {announcement_text: val("annText"),announcement_enabled:checked("annOn"), cities:val("citiesInput").split(/[,，\s]+/).filter(Boolean),home_feed_page_size:+val("opsPageSize"),chat_cta_label:val("opsCta"),bot_welcome_text:val("opsWelcome"),media_max_count:+val("opsMediaMax"),review_require_audit:checked("opsReviewAudit")});
+        const d = await post("/api/admin/channel-features", {channel_directory:checked("cfDirOn"), directory_channel:val("cfDirCh"), broadcast_reviews:checked("cfRevOn"),review_channel:val("cfRevCh"), broadcast_coupons:checked("cfCpnOn"),coupon_channel:val("cfCpnCh")});
+        S.feat=d; S.featWarn=d.warnings || [];
+        const map={}; document.querySelectorAll("#cityCard [data-op]").forEach(el=>{ const list=el.value.split(/[,，、\s]+/).filter(Boolean); if(list.length) map[el.dataset.op]=list; });
+        if(S.ops) { const d=await post("/api/admin/operators/cities",{operator_cities:map}); S.ops=Object.assign({},S.ops,d); }
+        document.body.classList.remove("ops-dirty"); alert("全站设置已保存。目录改动在下一次12:00生效。" + (S.featWarn.length ? "有频道配置警告，请查看概览。" : ""));
+        S.cfg={};
+      } else if (b.dataset.cc === "save-ann") {
         const d = await post("/api/admin/cities/announcement", { city: S.sel, text: document.getElementById("ccAnnText").value, enabled: document.getElementById("ccAnnOn").checked });
         S.sum.city_announcements = d.city_announcements || {};
         alert(`${S.sel} 公告已保存`);
@@ -584,15 +667,20 @@
           if (el.disabled) return;
           const k = (cfg.keys || []).find((x) => x.key === el.dataset.k);
           if (!k) return;
+          if(k.allow_blank && k.override == null && el.value === "" && !Object.prototype.hasOwnProperty.call(drafts[S.sel] || {},el.id)) return;
           let v = el.value;
           if (k.type === "bool") v = v === "" ? null : v === "1";
           else if (String(v).trim() === "") v = k.allow_blank ? "" : null;
           const cur = k.override === undefined ? null : k.override;
           if (String(v) !== String(cur)) overrides[k.key] = v;
         });
-        if (!Object.keys(overrides).length) { alert("没有改动"); }
-        else { afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides })); S.feat = null; S.sync[S.sel] = "loading"; setTimeout(() => loadSync(S.sel, true), 400); alert(`${S.sel} 设置已保存`); }
+        if (Object.keys(overrides).length) afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides }));
+        const a = await post("/api/admin/cities/announcement", {city:S.sel, text:document.getElementById("ccAnnText").value, enabled:document.getElementById("ccAnnOn").checked});
+        delete drafts[S.sel];
+        S.sum.city_announcements=a.city_announcements || {}; S.feat=null; S.sync[S.sel]="loading";
+        setTimeout(()=>loadSync(S.sel,true),400); alert(`${S.sel} 设置已保存`);
       } else if (b.dataset.cc === "clear") {
+        if(drafts[S.sel]) delete drafts[S.sel]["ccf_"+b.dataset.k];
         afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides: { [b.dataset.k]: null } }));
         S.feat = null;
       } else if (b.dataset.cc === "save-feat") {

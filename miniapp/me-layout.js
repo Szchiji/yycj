@@ -14,11 +14,12 @@
   const LAYOUT = {
     guest: [
       ["我的", ["meTodos", "meRowFav", "myClaims", "meRevCard"]],
-      ["本城", ["cityCoupons"]],
+      ["本城", ["meRowCommunity", "meRowRanking", "cityCoupons"]],
       ["设置", ["placeCard", "meNickCard"]],
       ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
     ],
     teacher: [
+      ["本城", ["meRowCommunity", "meRowRanking"]],
       ["经营", ["meTodos", "meListCard", "myCoupon"]],
       ["设置", ["placeCard", "meNickCard", "meRevCard"]],
       ["帮助", ["meRowTut", "meRowContact", "meRowAdmin"]],
@@ -69,6 +70,8 @@
     const home = window.__yycjHomeData || {};
     const ct = home.contacts || {};
     const out = {
+      meRowCommunity: row("meRowCommunity", "◈", "城市社区", {"data-hub":"community"}),
+      meRowRanking: row("meRowRanking", "☆", "本城评价榜", {"data-hub":"ranking"}),
       meRowFav: !isTeacher() ? row("meRowFav", "♡", "我的收藏", { "data-me-fav": "1" }) : null,
       meRowTut: row("meRowTut", "?", "使用教程", { "data-tutorial": "1" }),
       meRowContact: ct.show_admin ? row("meRowContact", "✉", "联系" + (ct.admin_label || "管理员"), { "data-me-contact": "1" }) : null,

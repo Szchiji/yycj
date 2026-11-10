@@ -137,6 +137,10 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
             raise HTTPException(status_code=400, detail=f"这一项不能按城市设置：{k}")
         if meta.get("super") and not rights["can_edit_super"]:
             raise HTTPException(status_code=403, detail=f"「{meta['label']}」只有超管能改")
+        if k.startswith("community_") and k.endswith("_url") and v not in (None, ""):
+            from bot.services.community import safe_url
+            if not safe_url(v):
+                raise HTTPException(status_code=400, detail="社区入口只支持 https:// 或 t.me/ 链接")
         if k == "admin_contact" and v not in (None, ""):
             from bot.services import bot_info
             norm = bot_info.normalize_contact(str(v).strip())
