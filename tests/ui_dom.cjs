@@ -67,4 +67,15 @@ async function guest() {
  d.querySelector('[data-hub="ranking"]').click();await wait(30);assert(d.querySelector('#hubBody').textContent.includes('不编造榜单'));
 
 }
-(async()=>{await admin();await guest();console.log('DOM contracts passed: admin six groups, scoped saves, welcome editor, city hub/map/ranking');process.exit(0);})().catch(e=>{console.error(e);process.exit(1);});
+async function detail() {
+ const dom=new JSDOM(fs.readFileSync('miniapp/go.html','utf8'),{url:'https://test.invalid/go.html',runScripts:'outside-only',pretendToBeVisual:true});const w=dom.window,d=w.document;
+ w.localStorage.setItem('yycj_token','test');w.fetch=async()=>response({show_chat_cta:true,chat_cta_label:'想聊聊'});
+ let mutations=0;const Native=w.MutationObserver;w.MutationObserver=class extends Native{constructor(cb){super((m,o)=>{if(++mutations>50){o.disconnect();return;}cb(m,o);});}};
+ w.eval(fs.readFileSync('miniapp/detail-kit.js','utf8'));
+ const lamp={lamp_id:'rest_test',city:'深圳',title:'休息资料',open_code:'rest',status:'active',extras:{}};
+ w.__yycjRenderDetail({lamp,reviews:[{stars:5,text:'真实评价',audit_verified:true,proof_count:0}],reputation:{review_count:1},community_links:[]},lamp.lamp_id);
+ await wait(40);
+ assert(mutations<50,'detail mutation observer did not settle');assert(d.querySelector('#detailChat').disabled);assert(d.querySelector('#detailChat').textContent.includes('暂不联系'));
+ assert(d.querySelector('#detailTrust').textContent.includes('1 条评价'));assert(d.querySelector('#yycjReviews').textContent.includes('已审核'));assert(!d.querySelector('#yycjReviews').textContent.includes('凭证'));
+}
+(async()=>{await admin();await guest();await detail();console.log('DOM contracts passed: admin six groups, scoped saves, welcome editor, city hub/map/ranking');process.exit(0);})().catch(e=>{console.error(e);process.exit(1);});

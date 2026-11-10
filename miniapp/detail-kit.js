@@ -63,8 +63,9 @@
     const text = ctaLabel();
     document.querySelectorAll("#detailChat, [data-cta='chat']").forEach((btn) => {
       const rest = last?.data?.lamp?.open_code === "rest";
-      btn.disabled = rest;
-      if(rest) btn.textContent = "休息中 · 暂不联系";
+      if(rest) { btn.disabled = true; btn.dataset.restBlocked = "1"; }
+      else if(btn.dataset.restBlocked) { btn.disabled = false; delete btn.dataset.restBlocked; }
+      if(rest && btn.textContent !== "休息中 · 暂不联系") btn.textContent = "休息中 · 暂不联系";
       if (!rest && on && btn.textContent !== text) btn.textContent = text;
       const disp = on ? "" : "none";
       if (btn.style.display !== disp) btn.style.display = disp;
@@ -293,6 +294,7 @@
     if (!btn) return;
     ev.preventDefault();
     ev.stopPropagation();
+    if(last?.data?.lamp?.open_code === "rest") return toast("休息中，暂不联系");
     const id = window.__yycjOpenLamp || btn.getAttribute("data-lamp") || "";
     if (!id) return toast("找不到这条资料", true);
     btn.disabled = true;
@@ -311,7 +313,7 @@
     } catch (e) {
       toast(e.message || String(e), true);
     } finally {
-      btn.disabled = false;
+      btn.disabled = last?.data?.lamp?.open_code === "rest";
     }
   }, true);
   const view = document.getElementById("view-detail");
