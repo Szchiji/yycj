@@ -26,23 +26,8 @@ def safe_url(value) -> str:
 
 
 def clean_welcome_buttons(raw) -> list:
-    out = []
-    if not isinstance(raw, list):
-        return out
-    for x in raw[:30]:
-        if not isinstance(x, dict):
-            continue
-        kind, label = x.get("type"), str(x.get("label") or "").strip()[:32]
-        target = str(x.get("target") or "").strip()
-        if kind == "url":
-            target = safe_url(target)
-        elif kind != "webapp" or target not in ("home", "me"):
-            continue
-        if label and target:
-            out.append({"type": kind, "label": label, "target": target})
-        if len(out) == 6:
-            break
-    return out
+    from bot.services.message_buttons import clean
+    return clean(raw,'welcome')
 
 
 def channel_url(chat, message_id=0):

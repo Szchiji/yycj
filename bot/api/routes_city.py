@@ -159,7 +159,7 @@ async def api_city_settings_save(body: CitySettingsBody, admin_id: int = Depends
             changes = await channel_features.validate(changes, city=city)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-    settings = await home_service.update_city_overrides(city, changes)
+    settings = await home_service.update_city_overrides(city, changes,actor_id=admin_id)
     try:
         from bot.services import label_sync
         await label_sync.schedule_after_save(before, settings, city=city)

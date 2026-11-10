@@ -103,6 +103,7 @@
         ${extrasLine(d)}
         <p>${escapeHtml(d.description || "")}</p>
         ${mediaHtml}
+        ${d.edit_workflow_v2 ? `<p class="edit-review-note">${d.edit_workflow_v2==="media"?"媒体整组替换待审；当前上架与原媒体保留。此处文字仅作提交时参考，审批不覆盖较新文字。":"未上架资料整份待审；通过只修改资料，不自动上架或延长有效期。"}</p>` : ""}
         <div class="row">
           <button class="btn primary" data-admin="post-ok" data-id="${escapeHtml(p.post_id)}">通过</button>
           <button class="btn" data-admin="post-pin" data-id="${escapeHtml(p.post_id)}">通过并上轮播</button>
@@ -202,11 +203,12 @@
     const id = btn.dataset.id;
     const act = btn.dataset.admin;
     try {
-      if (act === "post-ok") await api(`/api/admin/posts/${encodeURIComponent(id)}/approve`, { method: "POST", body: "{}" });
-      if (act === "post-pin") await api(`/api/admin/posts/${encodeURIComponent(id)}/approve-pin`, {
+      let processed;
+      if (act === "post-ok") processed = await api(`/api/admin/posts/${encodeURIComponent(id)}/approve`, { method: "POST", body: "{}" });
+      if (act === "post-pin") processed = await api(`/api/admin/posts/${encodeURIComponent(id)}/approve-pin`, {
         method: "POST", body: JSON.stringify({ expires_hours: 72 }),
       });
-      if (act === "post-no") await api(`/api/admin/posts/${encodeURIComponent(id)}/reject`, { method: "POST", body: "{}" });
+      if (act === "post-no") processed = await api(`/api/admin/posts/${encodeURIComponent(id)}/reject`, { method: "POST", body: "{}" });
       if (act === "rev-ok") await api(`/api/admin/reviews/${encodeURIComponent(id)}/approve`, { method: "POST", body: "{}" });
       if (act === "rev-no") await api(`/api/admin/reviews/${encodeURIComponent(id)}/reject`, { method: "POST", body: "{}" });
       if (act === "rev-brush") await api(`/api/admin/reviews/${encodeURIComponent(id)}/brush`, { method: "POST", body: "{}" });
@@ -216,7 +218,11 @@
       if (act === "feed-unpin") await api("/api/admin/homepage/feed-pins", {
         method: "POST", body: JSON.stringify({ lamp_id: id, pinned: false }),
       });
-      toast("已处理");
+      if(processed?.operation){
+        let box=document.getElementById('lastEditReviewResult');if(!box){box=document.createElement('div');box.id='lastEditReviewResult';document.getElementById('adminPosts').before(box);}
+        box.innerHTML=window.__yycjEditUI.html(processed.operation,'admin');
+        toast('审核决定已保存；频道和通知状态请看处理结果');
+      }else toast("已处理");
       await refresh();
     } catch (e) { toast(e.message || String(e), true); }
   });

@@ -1,10 +1,10 @@
-"""审核通过：改稿覆盖原帖，新上架才发新帖。"""
+"""审核接线：新编辑工作流原子审批；普通新上架沿用既有路径。"""
 from bot.db import session_scope
 from bot.models import Post, PostStatus
 from bot.services import admin_ops, listing_flow, search_service
 from bot.services.listing_notify import notify_publisher_approved
 from bot.services.extras_store import save_extras
-from bot.services.broadcast import update_broadcast
+from fastapi import HTTPException
 from sqlalchemy import select
 
 _orig = admin_ops.approve_post
@@ -20,7 +20,12 @@ def _extras(data: dict) -> dict:
     return out
 
 
-async def approve_post(post_id: str, *, notify: bool = True):
+async def approve_post(post_id: str, *, notify: bool = True, actor_id=None):
+    from bot.services import listing_edits
+    try:edit_result=await listing_edits.review(post_id,True,notify=notify,actor_id=actor_id)
+    except ValueError as exc:raise admin_ops.AdminActionError(str(exc),code="conflict") from exc
+    except HTTPException as exc:raise admin_ops.AdminActionError(str(exc.detail),code="forbidden") from exc
+    if edit_result is not None:return edit_result
     async with session_scope() as s:
         res = await s.execute(select(Post).where(Post.post_id == post_id))
         post = res.scalar_one_or_none()
@@ -29,23 +34,6 @@ async def approve_post(post_id: str, *, notify: bool = True):
         edit_id = data.get("edit_lamp_id")
         status = post.status if post else None
     extras = _extras(data)
-    if edit_id and post and status == PostStatus.PENDING.value:
-        async with session_scope() as s:
-            res = await s.execute(select(Post).where(Post.post_id == post_id))
-            row = res.scalar_one_or_none()
-            if row:
-                row.status = PostStatus.APPROVED.value
-                from datetime import datetime
-                row.reviewed_at = datetime.utcnow()
-        lamp = await listing_flow.apply_edit(edit_id, data, owner_id=user_id)
-        full = await search_service.get_lamp(edit_id)
-        album = None
-        if full:
-            await save_extras((full or {}).get("lamp_id") or edit_id, extras)
-            album = await update_broadcast(full, extras)
-        if notify:
-            await notify_publisher_approved(user_id, lamp.get("title") or "资料", album, city=(full or lamp or {}).get("city"), lamp_id=edit_id)
-        return {"ok": True, "post_id": post_id, "status": "approved", "lamp_id": edit_id, "user_id": user_id, "edited": True, "edited_in_place": bool(album)}
     result = await _orig(post_id, notify=False)
     if data.get("hours") and result.get("lamp_id"):
         from bot.services.extras_store import save_user_fields
@@ -62,3 +50,18 @@ async def approve_post(post_id: str, *, notify: bool = True):
 
 
 admin_ops.approve_post = approve_post  # type: ignore[assignment]
+
+
+_orig_reject = admin_ops.reject_post
+
+
+async def reject_post(post_id: str, *, notify: bool = True, actor_id=None):
+    from bot.services import listing_edits
+    try:result=await listing_edits.review(post_id,False,notify=notify,actor_id=actor_id)
+    except ValueError as exc:raise admin_ops.AdminActionError(str(exc),code="conflict") from exc
+    except HTTPException as exc:raise admin_ops.AdminActionError(str(exc.detail),code="forbidden") from exc
+    if result is not None:return result
+    return await _orig_reject(post_id,notify=notify)
+
+
+admin_ops.reject_post = reject_post

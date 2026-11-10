@@ -24,6 +24,9 @@ class ExtraOpsBody(BaseModel):
     popup_announcement_title: Optional[str] = None
     popup_announcement_text: Optional[str] = None
     bot_welcome_text: Optional[str] = None
+    bot_welcome_enabled: Optional[bool] = None
+    approval_notify_enabled: Optional[bool] = None
+    approval_buttons: Optional[Dict[str,Any]] = None
     media_max_count: Optional[int] = None
     review_require_audit: Optional[bool] = None
     bot_welcome_buttons: Optional[List[Dict[str, Any]]] = None
@@ -83,7 +86,7 @@ class PreviewBody(BaseModel):
 @router.post("/admin/settings/extra")
 async def api_admin_extra_ops(
     body: ExtraOpsBody,
-    _: int = Depends(get_super_user_id),
+    admin_id: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {k: v for k, v in body.model_dump().items() if v is not None}
     from bot.services.community import safe_url
@@ -98,7 +101,7 @@ async def api_admin_extra_ops(
             raise HTTPException(status_code=400, detail="管理员联系链接格式不对，示例 https://t.me/用户名 或 @用户名")
         ops["admin_contact"] = norm
     before = await home_service.get_or_create_settings()
-    settings = await home_service.update_settings(ops_config=ops or None)
+    settings = await home_service.update_settings(ops_config=ops or None,actor_id=admin_id)
     try:
         from bot.services import label_sync
         await label_sync.schedule_after_save(before, settings, city=None)
@@ -187,6 +190,9 @@ async def api_admin_listings(
     for it in items:
         it["expires_at"] = _ser_dt(it.get("expires_at"))
         it["updated_at"] = _ser_dt(it.get("updated_at"))
+    from bot.services.listing_edits import latest
+    states=await latest([x["lamp_id"] for x in items])
+    for it in items:it["edit_state"]=states.get(it["lamp_id"])
     return {"ok": True, "items": items}
 
 
@@ -235,7 +241,9 @@ async def api_admin_renew(
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", operation_id):
         raise HTTPException(status_code=400, detail="请刷新后台后重试续期（缺少防重复操作编号）")
     try:
-        return await renewal.renew_listing(lamp_id, admin_id, body.days, operation_id)
+        from bot.services.listing_lock import listing_lock
+        async with listing_lock(lamp_id):
+            return await renewal.renew_listing(lamp_id, admin_id, body.days, operation_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

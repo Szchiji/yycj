@@ -258,10 +258,14 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
         return await update_broadcast(lamp, extras)
 
     chat, caption, _bot, _kb = await _caption(lamp, extras)
+    from bot.services import execution_log
+    record=await execution_log.begin('listing_broadcast','repost' if force_new else 'new_post',city=lamp.get('city'),listing_id=lid,operation_id=lamp.get('_renew_operation_id'),target='channel')
     if not chat:
+        await execution_log.finish(record,'not_configured','not_configured')
         return None
     from bot.main import bot
     items = _media_items(lamp)
+    acknowledged=False
     try:
         msg = None
         card_mid = None
@@ -284,6 +288,7 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
                 msg = await bot.send_photo(chat, raw, caption=caption)
         else:
             msg = await bot.send_message(chat, caption, disable_web_page_preview=True)
+        acknowledged=True
         mid = getattr(msg, "message_id", None)
         if mid:
             if force_new:
@@ -293,9 +298,13 @@ async def broadcast_listing(lamp: Dict[str, Any], extras: Optional[Dict[str, Any
                 await remember_broadcast(lid, chat, int(mid), card_mid=None)
             else:
                 await _remember(lid, chat, int(mid), card_mid=int(card_mid) if card_mid else None)
+            await execution_log.finish(record,"sent")
             return album_link(chat, int(mid))
+        await execution_log.finish(record,"unknown","delivery_unknown")
         return None
-    except Exception:
+    except Exception as exc:
+        code="delivery_unknown" if acknowledged else execution_log.reason(exc)
+        await execution_log.finish(record,"unknown" if code=="delivery_unknown" else "failed",code)
         logger.exception("broadcast to %s failed", chat)
         return None
 

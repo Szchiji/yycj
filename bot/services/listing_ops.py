@@ -14,6 +14,8 @@ from bot.services import home_service
 
 logger = logging.getLogger(__name__)
 
+from bot.services.listing_lock import serialized
+
 TEACHER_UNLIST = "teacher"
 
 
@@ -65,6 +67,7 @@ async def _directory_on_live(lamp_id: str, city: str = "") -> None:
         logger.exception("directory auto-refresh hook failed")
 
 
+@serialized
 async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
@@ -172,6 +175,7 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
 
 
 
+@serialized
 async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
     async with session_scope() as s:
         res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))

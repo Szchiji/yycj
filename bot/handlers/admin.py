@@ -94,13 +94,14 @@ async def post_ok(cb: CallbackQuery, bot: Bot) -> None:
     if not await _in_scope(cb, "post", post_id):
         return
     try:
-        await admin_ops.approve_post(post_id, notify=True)
+        result = await admin_ops.approve_post(post_id, notify=True, actor_id=cb.from_user.id)
     except AdminActionError as exc:
         await cb.answer(str(exc))
         return
-    await cb.answer("已通过")
+    await cb.answer("审核决定已保存" if result.get('operation') else "已通过")
     if cb.message:
-        await cb.message.edit_text((cb.message.text or "") + "\n\n✅ 已通过上架")
+        suffix=edit_result_summary(result) if result.get('operation') else "✅ 已通过上架"
+        await cb.message.edit_text((cb.message.text or "") + "\n\n"+suffix)
 
 
 @router.callback_query(F.data.startswith("admin_post_no:"))
@@ -112,13 +113,14 @@ async def post_no(cb: CallbackQuery, bot: Bot) -> None:
     if not await _in_scope(cb, "post", post_id):
         return
     try:
-        await admin_ops.reject_post(post_id, notify=True)
+        result = await admin_ops.reject_post(post_id, notify=True, actor_id=cb.from_user.id)
     except AdminActionError as exc:
         await cb.answer(str(exc))
         return
-    await cb.answer("已拒绝")
+    await cb.answer("审核决定已保存" if result.get('operation') else "已拒绝")
     if cb.message:
-        await cb.message.edit_text((cb.message.text or "") + "\n\n❌ 已拒绝")
+        suffix=edit_result_summary(result) if result.get('operation') else "❌ 已拒绝"
+        await cb.message.edit_text((cb.message.text or "") + "\n\n"+suffix)
 
 
 @router.callback_query(F.data.startswith("admin_report_ok:"))
@@ -201,3 +203,11 @@ async def review_action(cb: CallbackQuery, bot: Bot) -> None:
         return
     await cb.answer(label)
     await review_notify.sync_handled([review_id], status, cb.from_user.id)
+
+
+def edit_result_summary(result):
+    op=result['operation']
+    review={'approved':'修改审核通过（状态与有效期不变）','rejected':'修改拒绝（原媒体保留）'}
+    channel={'synced':'频道已同步','not_required':'无需频道推送','not_configured':'频道未配置','failed':'频道同步明确失败，可在后台仅重试频道','unknown':'频道送达不明，不可盲目重发','sending':'频道处理中或结果待核对','no_post':'无原频道帖，未自动新发'}
+    notice={'sent':'老师通知已发送','failed':'老师通知明确失败，可在后台仅重试通知','unknown':'通知送达不明，不可盲目重发','not_required':'无需老师通知','pending':'等待频道步骤完成后通知','sending':'通知处理中或结果待核对'}
+    return '\n'.join([review.get(op['review_status'],'审核决定已保存'),channel.get(op['channel_status'],'频道状态请查看后台'),notice.get(op['notification_status'],'通知状态请查看后台')])

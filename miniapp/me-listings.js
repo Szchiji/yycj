@@ -187,7 +187,7 @@
             ? `<p class="shift-note muted">已到期，请联系管理员续期后再上架。</p>`
             : (x.status === "hidden" ? `<p class="shift-note muted">管理员或平台下架的条目，不能自己恢复。</p>` : ""));
         const acts = `<div class="ls-acts">${x.status === "active" ? `<button class="btn danger" type="button" data-unlist="${esc(x.lamp_id)}">下架</button>` : ""}${canRelist ? `<button class="btn primary" type="button" data-relist="${esc(x.lamp_id)}">重新上架</button>` : ""}
-          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">改资料</button></div>`;
+          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state)||""}`;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${exp}</div>${statsHtml(x, show)}${hiddenNote}${acts}</div>
@@ -239,7 +239,9 @@
             if (k && extras[k] != null) inp.value = extras[k];
           });
           const t = document.getElementById("publishTitle");
-          if (t) t.textContent = "改资料（需再审）";
+          if (t) t.textContent = "修改资料";
+          let note=form.querySelector('.edit-review-note');if(!note){note=document.createElement('p');note.className='edit-review-note';form.prepend(note);}
+          note.textContent=(item.status==='active' && item.shop?.code!=='off')?'文字保存立即生效；新图片/视频整组替换须审核，审核前原媒体继续展示。修改不续期。':'当前未上架：修改须审核，通过后仍保持原状态，不自动上架或续期。';
         });
       });
     } catch (e) {

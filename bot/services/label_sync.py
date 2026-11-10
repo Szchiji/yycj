@@ -169,7 +169,15 @@ async def run_city(city: str, *, only_failed: bool = False) -> Dict[str, Any]:
     if not city:
         return {"ok": False, "error": "缺少城市"}
     async with _lock(city):
-        return await _run_city_locked(city, only_failed=only_failed)
+        from bot.services import execution_log
+        record=await execution_log.begin('label_sync','edit_existing',city=city,target='channel',retry_kind='label_sync')
+        try:
+            result=await _run_city_locked(city, only_failed=only_failed)
+            await execution_log.finish(record,'failed' if result.get('failed') else 'synced','failed' if result.get('failed') else None)
+            return result
+        except Exception:
+            await execution_log.finish(record,'unknown','delivery_unknown')
+            raise
 
 
 async def _run_city_locked(city: str, *, only_failed: bool) -> Dict[str, Any]:

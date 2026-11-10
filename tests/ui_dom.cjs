@@ -14,7 +14,7 @@ async function admin() {
  let overrides={};
  w.fetch=async(path,opt={})=>{
    const u=new URL(typeof path==='string'?path:path.url,'https://test.invalid'); const p=u.pathname;
-   if(opt.method==='POST'){const b=JSON.parse(opt.body);posts.push([p,b]);if(p==='/api/admin/cities/settings') {overrides={...overrides,...b.overrides};return response(cfg());} if(p==='/api/admin/cities/announcement')return response({city_announcements:{'深圳':b}}); if(p==='/api/admin/settings/extra')settings={...settings,...b}; if(p==='/api/admin/operators/cities')return response({operator_cities:b.operator_cities});return response({settings,global:settings});}
+   if(opt.method==='POST'){const b=JSON.parse(opt.body);if(p==='/api/admin/buttons/preview'){const items=b.items||b.config?.items||[];const rows=[];for(let i=0;i<items.length;i++){const x=items[i];if(x.enabled===false)continue;if(!rows.length || (x.new_row??i%2===0)||rows.at(-1).length>=4)rows.push([]);rows.at(-1).push({label:x.label,type:x.type,url:'https://example.invalid/'});}return response({rows});}posts.push([p,b]);if(p==='/api/admin/cities/settings') {overrides={...overrides,...b.overrides};return response(cfg());} if(p==='/api/admin/cities/announcement')return response({city_announcements:{'深圳':b}}); if(p==='/api/admin/settings/extra')settings={...settings,...b}; if(p==='/api/admin/operators/cities')return response({operator_cities:b.operator_cities});return response({settings,global:settings});}
    if(p==='/api/admin/cities/summary')return response({cities:[{city:'深圳',pending:0},{city:'广州',pending:0}],total:{},is_super:true,scope:null,city_announcements:{},city_override_counts:{}});
    if(p==='/api/admin/cities/settings')return response(cfg());
    if(p==='/api/admin/homepage')return response({settings});
@@ -25,7 +25,7 @@ async function admin() {
  };
  function cfg(){return {can_edit:true,can_edit_super:true,overrides,keys:fixtures.keys.map(k=>({...k,global:settings[k.key],override:overrides[k.key]??null}))};}
  // Same relevant execution order as the live desk, without its login / Telegram glue.
- for(const f of ['admin-cta.js','admin-kit.js','admin-proposal.js','admin-city.js','admin-ops-users.js']) w.eval(fs.readFileSync('miniapp/'+f,'utf8'));
+ for(const f of ['admin-cta.js','admin-kit.js','admin-proposal.js','admin-buttons.js','admin-city.js','admin-ops-users.js']) w.eval(fs.readFileSync('miniapp/'+f,'utf8'));
  await wait(1000);
  assert.equal(d.querySelectorAll('#ccGlobalFields > .ship-group').length,6);
  for(const [id,group] of [['opsWelcome',3],['opsChats',5],['opsTeachViews',4],['opsChannel',0],['opsLinkDetail',1],['opsShowCta',2]]) {

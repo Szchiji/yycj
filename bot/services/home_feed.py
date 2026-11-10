@@ -17,6 +17,9 @@ DEFAULT_OPS = {
     "popup_announcement_title": "本城公告",
     "popup_announcement_text": "",
     "bot_welcome_text": "",
+    "bot_welcome_enabled": True,
+    "approval_notify_enabled": True,
+    "approval_buttons": {"mode":"default","items":[]},
     "bot_welcome_buttons": [],
     "approve_attach_detail": True,
     "approve_attach_channel_btn": True,
@@ -81,6 +84,8 @@ DEFAULT_OPS = {
 # Settings a city may override (key, label, type, extra). Everything else stays site-wide.
 # "super": only the super admin may set it (a scoped operator sees it read-only).
 CITY_KEYS = [
+    {"key":"approval_notify_enabled","label":"发送老师上架成功通知","type":"bool","hint":"后续审核、续期和媒体审核成功通知；关闭不影响续期频道重发。"},
+    {"key":"approval_buttons","label":"老师成功通知按钮","type":"buttons","hint":"空城市设置沿用全站；自定义空列表只隐藏按钮，不关闭通知。"},
     {"key": "popup_announcement_enabled", "label": "启用进入小程序弹窗公告", "type": "bool", "hint": "独立于普通公告；关闭本城开关可明确停用本城弹窗"},
     {"key": "popup_announcement_title", "label": "弹窗公告标题", "type": "text", "max": 40},
     {"key": "popup_announcement_text", "label": "弹窗公告内容", "type": "textarea", "max": 3000, "hint": "纯文字，最多3000字；空城市内容沿用全站。未启用或无内容不弹出"},
@@ -141,6 +146,10 @@ def clean_override_value(key: str, value: Any) -> Any:
     if meta is None or value is None:
         return None
     t = meta["type"]
+    if t == "buttons":
+        if not isinstance(value,dict) or not value:return None
+        from bot.services.message_buttons import approval_config
+        return approval_config(value)
     if t == "bool":
         if isinstance(value, str):
             v = value.strip().lower()
@@ -243,6 +252,10 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["show_chat_cta"] = bool(out.get("show_chat_cta", True))
     from bot.services.community import clean_welcome_buttons, safe_url
     out["bot_welcome_buttons"] = clean_welcome_buttons(out.get("bot_welcome_buttons"))
+    from bot.services.message_buttons import approval_config
+    out["approval_buttons"] = approval_config(out.get("approval_buttons"))
+    for key in ("bot_welcome_enabled","approval_notify_enabled"):
+        out[key]=out.get(key) is not False
     for key in ("approve_attach_detail", "approve_attach_channel_btn", "community_enabled"):
         out[key] = audit_on(out.get(key))
     for key in ("community_discussion_url", "community_backup_url", "community_location_url"):

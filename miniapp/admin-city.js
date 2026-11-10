@@ -271,6 +271,8 @@
     if (k.type === "bool") {
       const v = has ? (k.override ? "1" : "0") : "";
       input = `<select id="${id}" data-k="${k.key}"${dis}><option value=""${v === "" ? " selected" : ""}>沿用全站（${shortVal(k.global)}）</option><option value="1"${v === "1" ? " selected" : ""}>开</option><option value="0"${v === "0" ? " selected" : ""}>关</option></select>`;
+    } else if (k.type === "buttons") {
+      input=`<input type="hidden" id="${id}" data-k="${k.key}" value="${esc(has?JSON.stringify(k.override):'')}"${dis}/><div data-city-button-editor="${k.key}"></div>`;
     } else if (k.type === "textarea") {
       input = `<textarea id="${id}" data-k="${k.key}" rows="3" maxlength="${k.max || 3000}" placeholder="${esc("全站：" + String(k.global ?? ""))}"${dis}>${esc(has ? k.override : "")}</textarea>`;
     } else {
@@ -313,6 +315,8 @@
     community_discussion_url: ["官方讨论群", "text"], community_backup_url: ["防失联导航", "text"],
     community_location_url: ["本城位置链接", "text"], community_location_label: ["位置入口文案", "text"],
     community_enabled: ["显示本城社区外链", "bool"],
+    bot_welcome_enabled: ["发送欢迎消息（普通/start）", "bool"],
+    approval_notify_enabled: ["发送老师上架成功通知", "bool"],
     approve_attach_detail: ["附带资料详情链接和小程序按钮", "bool"],
     approve_attach_channel_btn: ["附带查看频道帖按钮（有相册时）", "bool"]
   };
@@ -351,37 +355,21 @@
     const val = key => { const el = document.getElementById(S.sel ? "ccf_"+key : "ship_"+key); if(!el) return true; return el.tagName === "SELECT" ? el.value === "" ? (S.cfg[S.sel]?.keys || []).find(x=>x.key===key)?.global !== false : el.value === "1" : el.checked; };
     const promo = document.getElementById(S.sel ? "ccf_approve_promo_text" : "opsPromo")?.value || "";
     const box = document.getElementById(S.sel ? "shipCityApproval" : "shipApproval");if(!box)return;
-    const html=`<b>预览 · 老师私聊（示例，不发送）</b><p>你的资料「示例资料」已通过审核并上架。</p><p>${esc(promo)}</p>${val("approve_attach_detail") ? '<p>资料详情：自动生成本条资料的机器人深链</p><div class="ship-button-preview"><span>查看我的资料 ↗</span></div>' : ''}<p>频道相册、机器人文字链接保留；无频道相册不显示相册入口。</p>${val("approve_attach_channel_btn") ? '<div class="ship-button-preview"><span>查看频道帖 ↗（有相册时）</span></div>':''}`;
+    const html=val('approval_notify_enabled')?`<b>预览 · 老师私聊（示例，不发送）</b><p>你的资料「示例资料」已通过审核并上架。</p><p>${esc(promo)}</p><p>按钮布局请看下方统一编辑器的示例预览；默认模式兼容原附加按钮开关。</p><p>频道相册、机器人文字链接保留；无频道相册不显示相册入口。</p>`:'<b>老师成功通知已关闭</b><p>后续审核、续期和媒体通过不发送成功通知；续期频道重发仍照常执行。</p>';
     if(box.innerHTML !== html) box.innerHTML=html;
   }
-  document.addEventListener("input", approvalPreview); document.addEventListener("change", approvalPreview);
+  document.addEventListener("input", approvalPreview); document.addEventListener("change",()=>{approvalPreview();document.getElementById("shipApprovalButtons")?._buttonEditor?.preview();document.querySelectorAll("[data-city-button-editor]").forEach(b=>b._buttonEditor?.preview());});
   function groupHtml(keys, cfg, announcement) {
     return GROUPS.map((title, i) => `<details class="ship-group"${i < 2 ? " open" : ""}><summary>${title}</summary><div class="ship-fields">${i === 2 ? announcement : ""}${keys.filter(k => groupOf(k.key) === i).map(k => fieldHtml(k, cfg)).join("")}${i === 1 ? syncHtml(S.sel) : ""}${i === 3 ? '<div id="shipCityApproval" class="ship-preview"></div>' : ""}${i > 3 ? '<p class="muted">全站专用，在全站默认中设置。</p>' : ''}</div></details>`).join("");
   }
   let welcomeButtons = [];
-  function welcomeEditor() {
-    const box = document.getElementById("shipWelcome"); if (!box) return;
-    box.innerHTML = `<h4>欢迎语消息按钮</h4><p class="muted">最多6个，每行2个；仅私聊。常驻菜单「首页」不变。</p>` + welcomeButtons.map((b, i) => `<div class="ship-welcome-row" data-wrow="${i}"><select data-w="type"><option value="webapp"${b.type === "webapp" ? " selected" : ""}>小程序</option><option value="url"${b.type === "url" ? " selected" : ""}>链接</option></select><input data-w="label" maxlength="32" placeholder="按钮文字" value="${esc(b.label)}"/>${b.type === "webapp" ? `<select data-w="target"><option value="home">首页</option><option value="me"${b.target === "me" ? " selected" : ""}>我的</option></select>` : `<input data-w="target" placeholder="https:// 或 t.me/" value="${esc(b.target)}"/>`}<button type="button" class="btn" data-wremove="${i}">移除</button></div>`).join("") + `<button type="button" class="btn" data-wadd="1"${welcomeButtons.length >= 6 ? " disabled" : ""}>添加按钮</button> <button type="button" class="btn" data-wpreset="1">预设：打开小程序</button><div id="shipWelcomePreview" class="ship-preview"></div>`;
-    previewWelcome();
+  function welcomeEditor(){const box=document.getElementById('shipWelcome');if(!box)return;window.yycjButtons?.mount(box,{context:'welcome',value:welcomeButtons,onChange:v=>{welcomeButtons=v;}});}
+  function previewWelcome(){document.getElementById('shipWelcome')?._buttonEditor?.preview();}
+  function mountApprovalEditor(box,input,value,inherited,city,disabled){
+    if(!box||box._buttonEditor)return;
+    window.yycjButtons?.mount(box,{context:'approval',value,inherited,city,disabled,getFlags:()=>{const get=(key)=>{const el=document.getElementById(city?'ccf_'+key:'ship_'+key);if(!el)return undefined;return el.tagName==='SELECT'?(el.value===''?(S.cfg[city]?.keys||[]).find(x=>x.key===key)?.global!==false:el.value==='1'):el.checked;};return{attach_detail:get('approve_attach_detail'),attach_channel:get('approve_attach_channel_btn')};},onChange:v=>{input.value=v===null?'':JSON.stringify(v);input.dispatchEvent(new Event('input',{bubbles:true}));}});
   }
-  function previewWelcome() {
-    const p = document.getElementById("shipWelcomePreview"); if (p) p.innerHTML = `<b>/start 预览</b><p>${esc(document.getElementById("opsWelcome")?.value || "欢迎使用月影车姬")}</p><div class="ship-button-preview">${welcomeButtons.map(b=>`<span>${esc(b.label || "按钮")}${b.type === "webapp" ? " ↗" : ""}</span>`).join("")}</div>`;
-  }
-  document.addEventListener("input", ev => {
-    const row = ev.target.closest("[data-wrow]");
-    if (row) { welcomeButtons[+row.dataset.wrow][ev.target.dataset.w] = ev.target.value; previewWelcome(); }
-    if (ev.target.id === "opsWelcome") previewWelcome();
-  });
-  document.addEventListener("change", ev => {
-    const row = ev.target.closest("[data-wrow]"); if (row && ev.target.dataset.w === "type") { const b = welcomeButtons[+row.dataset.wrow]; b.type = ev.target.value; b.target = b.type === "webapp" ? "home" : ""; welcomeEditor(); }
-  });
-  document.addEventListener("click", ev => {
-    const b = ev.target.closest("[data-wremove],[data-wadd],[data-wpreset]"); if (!b) return;
-    if (b.dataset.wremove !== undefined) welcomeButtons.splice(+b.dataset.wremove,1);
-    else if (b.dataset.wpreset) welcomeButtons = [{type:"webapp",label:"进入小程序",target:"home"}];
-    else if(welcomeButtons.length < 6) welcomeButtons.push({type:"webapp", label:"",target:"home"});
-    welcomeEditor();
-  });
+
   // labels the old cards used for the moved inputs (removed so nothing is shown twice / mislabelled)
   const OLD_LABELS = new Set(["公告", "首页每次加载条数", "轮播间隔秒", "聊天按钮文案", "管理员联系链接", "首页管理员按钮文案",
     "审核通过推送频道（@频道名 或 -100…）", "推送文案模板", "上架有效天数"]);
@@ -470,6 +458,7 @@
     move(document.getElementById("opsAdminBox"), 5);
     for(const [id, group] of [["shipFeatures",0],["shipOperators",5]]) if(!document.getElementById(id)) { const w=document.createElement("div");w.id=id;move(w,group); }
     if (!document.getElementById("shipApproval")) { const w=document.createElement("div");w.id="shipApproval";w.className="ship-preview";move(w,3); }
+    if (!document.getElementById('shipApprovalButtons')){const w=document.createElement('div');w.innerHTML='<h4>老师成功通知按钮</h4><input type="hidden" id="ship_approval_buttons"/><div id="shipApprovalButtons"></div>';move(w,3);}
     if (!document.getElementById("shipWelcome")) { const w = document.createElement("div"); w.id = "shipWelcome"; move(w, 3); welcomeEditor(); }
     // cards left empty after the move (only a heading) are hidden
     site.querySelectorAll(".ops-card").forEach((c) => c.classList.toggle("cc-hide", !c.querySelector("input, textarea, select, button")));
@@ -494,6 +483,8 @@
       const st = ((await r.json()).settings) || {};
       Object.keys(NEW_FIELDS).forEach(key => { const el = document.getElementById("ship_" + key); if (!el) return; if (el.type === "checkbox") el.checked = st[key] !== false; else el.value = st[key] || ""; });
       welcomeButtons = st.bot_welcome_buttons || []; welcomeEditor(); approvalPreview();
+      const approvalInput=document.getElementById('ship_approval_buttons'),approvalBox=document.getElementById('shipApprovalButtons');
+      if(approvalInput && approvalBox){approvalInput.value=JSON.stringify(st.approval_buttons||{mode:'default',items:[]});approvalBox._buttonEditor=null;mountApprovalEditor(approvalBox,approvalInput,JSON.parse(approvalInput.value),null,null,false);}
       if (typeof st.approve_promo_text === "string") { el.value = st.approve_promo_text; promoReady = true; }
     } catch (e) {}
   }
@@ -618,8 +609,9 @@
     const active = document.activeElement;
     showMode();
     if (active && dyn.contains(active) && /TEXTAREA|INPUT|SELECT/.test(active.tagName)) return; // don't clobber typing
-    if (dyn.innerHTML !== html) dyn.innerHTML = html;
+    if (dyn._template !== html) {dyn.innerHTML = html;dyn._template=html;}
     Object.entries(drafts[S.sel] || {}).forEach(([id,v])=>{const el=document.getElementById(id);if(el){if(el.type === "checkbox") el.checked=v;else el.value=v;}});
+    dyn.querySelectorAll('[data-city-button-editor]').forEach(box=>{const k=(S.cfg[S.sel]?.keys||[]).find(k=>k.key===box.dataset.cityButtonEditor),input=document.getElementById('ccf_'+k?.key);if(k && input){let value=null;try{value=input.value?JSON.parse(input.value):null;}catch{}mountApprovalEditor(box,input,value,k.global,S.sel,input.disabled);}});
     approvalPreview();
     if (S.isSuper && !S.ops) loadOps();
   }
@@ -644,7 +636,7 @@
         if (!promoReady || !S.feat) throw new Error("设置尚未加载完成，请稍后重试");
         const val = id => document.getElementById(id)?.value || "";
         const checked = id => !!document.getElementById(id)?.checked;
-        const ops = {bot_welcome_buttons: welcomeButtons};
+        const ops = {bot_welcome_buttons: welcomeButtons,approval_buttons:JSON.parse(document.getElementById("ship_approval_buttons")?.value||'{"mode":"default","items":[]}')};
         Object.entries(ID_KEYS).forEach(([id,key]) => {
           const el=document.getElementById(id); if(!el || ["announcement_text","enabled_cities"].includes(key)) return;
           ops[key]=el.type === "checkbox" ? el.checked : el.type === "number" ? +el.value : el.value;
@@ -673,10 +665,11 @@
           if (!k) return;
           if(k.allow_blank && k.override == null && el.value === "" && !Object.prototype.hasOwnProperty.call(drafts[S.sel] || {},el.id)) return;
           let v = el.value;
-          if (k.type === "bool") v = v === "" ? null : v === "1";
+          if (k.type === "buttons") v = v ? JSON.parse(v) : null;
+          else if (k.type === "bool") v = v === "" ? null : v === "1";
           else if (String(v).trim() === "") v = k.allow_blank ? "" : null;
           const cur = k.override === undefined ? null : k.override;
-          if (String(v) !== String(cur)) overrides[k.key] = v;
+          if (k.type === "buttons" ? JSON.stringify(v)!==JSON.stringify(cur) : String(v) !== String(cur)) overrides[k.key] = v;
         });
         if (Object.keys(overrides).length) afterCfg(await post("/api/admin/cities/settings", { city: S.sel, overrides }));
         const a = await post("/api/admin/cities/announcement", {city:S.sel, text:document.getElementById("ccAnnText").value, enabled:document.getElementById("ccAnnOn").checked});

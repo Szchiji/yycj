@@ -45,7 +45,7 @@ def test_future_renewal_explicit_repost_and_correct_teacher_notify_once(monkeypa
     asyncio.run(run())
     assert expiry.await_count == post.await_count == notify.await_count == 1
     assert post.call_args.kwargs == {"force_new":True}
-    notify.assert_awaited_once_with(77,"老师","https://t.me/test/501",city="深圳",lamp_id="lamp1")
+    notify.assert_awaited_once_with(77,"老师","https://t.me/test/501",city="深圳",lamp_id="lamp1",raise_errors=True,operation_id="operation-12345678",actor_id=123)
 
 
 @pytest.mark.parametrize("album,notified,channel,notification",[(None,True,"failed_or_unknown","not_attempted"),("https://t.me/test/501",False,"sent","failed_or_unknown")])
@@ -138,8 +138,8 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
     import httpx
     import bot.main as main
     from pathlib import Path
-    assert main._miniapp_asset_v() == "20261110e"
-    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261110e"
+    assert main._miniapp_asset_v() == "20261110h"
+    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261110h"
     async def run():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url="http://test") as client:
             for path in ("/preview-fixtures.js","/scripts/preview_review.py","/scripts/preview/fixtures.js","/app/preview-fixtures.js"):
@@ -149,5 +149,5 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
         text=Path("miniapp",page).read_text()
         assert "preview-fixtures" not in text and "LOCAL_PREVIEW" not in text
     desk=Path("miniapp/desk.html").read_text()
-    for asset,version in (("admin.js","20261110d"),("admin-city.js","20261110e"),("admin-ops.js","20261110f"),("admin-list.js","20261110f")):
+    for asset,version in (("admin.js","20261110g"),("admin-city.js","20261110h"),("admin-ops.js","20261110g"),("admin-list.js","20261110f")):
         assert f"{asset}?v={version}" in desk

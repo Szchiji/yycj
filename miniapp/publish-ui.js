@@ -189,9 +189,10 @@
     if (digits) body.price = parseInt(digits, 10);
     const url = editId ? `/api/me/listings/${editId}/edit` : "/api/posts";
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() }, body: JSON.stringify(body) });
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() }, body: JSON.stringify(editId && window.__yycjEditUI ? window.__yycjEditUI.request(body,editId) : body) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || "提交失败");
+      if(editId)window.__yycjEditUI?.clear(editId);
       uploaded = [];
       try { window.__yycjPubPinDone && window.__yycjPubPinDone(); } catch (e) {}
       if ($("#editLampId")) $("#editLampId").value = "";
@@ -205,7 +206,7 @@
       } catch (e) {}
       const done = document.createElement("div");
       done.className = "card";
-      done.innerHTML = `<h3>已提交</h3><p>${editId ? "资料已更新。" : "资料已交给平台审核。"}</p><p class="muted">${editId ? "已上架的会直接改原帖。" : "请联系"+esc(admin)+"开通/续期上架。"}</p><button class="btn block" type="button" id="pubAgain">返回上架</button>`;
+      done.innerHTML = editId ? `<h3>修改已受理</h3>${window.__yycjEditUI?.html(data.operation)||"请到我的上架查看处理状态"}<button class="btn block" type="button" id="pubAgain">返回上架</button>` : `<h3>已提交</h3><p>资料已交给平台审核。</p><p class="muted">请联系${esc(admin)}开通/续期上架。</p><button class="btn block" type="button" id="pubAgain">返回上架</button>`;
       form.classList.add("hidden");
       form.parentNode.insertBefore(done, form.nextSibling);
       $("#pubAgain")?.addEventListener("click", () => { done.remove(); form.classList.remove("hidden"); loadFields(); });

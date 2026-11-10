@@ -50,7 +50,7 @@ async def api_admin_approve_post(
 ) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "post", post_id)
     try:
-        result = await admin_ops.approve_post(post_id, notify=True)
+        result = await admin_ops.approve_post(post_id, notify=True, actor_id=admin_id)
     except AdminActionError as exc:
         raise _admin_http_error(exc) from exc
     result["reviewed_by"] = admin_id
@@ -85,7 +85,7 @@ async def api_admin_reject_post(
 ) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "post", post_id)
     try:
-        result = await admin_ops.reject_post(post_id, notify=True)
+        result = await admin_ops.reject_post(post_id, notify=True, actor_id=admin_id)
     except AdminActionError as exc:
         raise _admin_http_error(exc) from exc
     result["reviewed_by"] = admin_id
@@ -371,7 +371,7 @@ async def api_admin_set_feed_pin(
 @router.post("/admin/homepage/ops")
 async def api_admin_ops_settings(
     body: OpsSettingsBody,
-    _: int = Depends(get_super_user_id),
+    admin_id: int = Depends(get_super_user_id),
 ) -> Dict[str, Any]:
     ops = {}
     if body.home_feed_page_size is not None:
@@ -388,7 +388,7 @@ async def api_admin_ops_settings(
         announcement_text=body.announcement_text,
         announcement_enabled=body.announcement_enabled,
         enabled_cities=body.cities,
-        ops_config=ops or None,
+        ops_config=ops or None,actor_id=admin_id,
     )
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
     return {"ok": True, "settings": settings}
