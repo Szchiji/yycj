@@ -45,7 +45,7 @@
     let data = null;
     try { data = await res.json(); } catch (_) {}
     if (!res.ok) {
-      const detail = (data && (data.detail || data.message)) || res.statusText;
+      const detail = (data && (data.detail || data.message)) || `${path.split("?")[0]} 请求失败（HTTP ${res.status}）`;
       throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
     }
     return data;
