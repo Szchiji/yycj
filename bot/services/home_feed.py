@@ -14,6 +14,14 @@ DEFAULT_OPS = {
     "chat_cta_label": "想聊聊",
     "show_chat_cta": True,
     "bot_welcome_text": "",
+    "bot_welcome_buttons": [],
+    "approve_attach_detail": True,
+    "approve_attach_channel_btn": True,
+    "community_discussion_url": "",
+    "community_backup_url": "",
+    "community_location_url": "",
+    "community_location_label": "位置",
+    "community_enabled": True,
     "media_max_count": 6,
     "review_require_audit": True,
     "listing_days": 30,
@@ -47,6 +55,7 @@ DEFAULT_OPS = {
     "link_label_detail": "查看详情",
     "link_label_reviews": "查看评价",
     "link_label_write": "写评价",
+    "link_label_location": "",
     # 老师「我的上架」是否显示三项统计（全站；默认开）
     "teacher_show_views": True,
     "teacher_show_favs": True,
@@ -69,6 +78,11 @@ DEFAULT_OPS = {
 # Settings a city may override (key, label, type, extra). Everything else stays site-wide.
 # "super": only the super admin may set it (a scoped operator sees it read-only).
 CITY_KEYS = [
+    *[{"key": "community_" + k + "_url", "label": label, "type": "text", "max": 512, "hint": "https:// 或 t.me/ 链接；空 = 沿用全站。关闭本城社区入口可隐藏。"} for k, label in (("discussion", "官方讨论群"), ("backup", "防失联导航"), ("location", "本城位置链接"))],
+    {"key": "community_location_label", "label": "位置入口文案", "type": "text", "max": 16},
+    {"key": "community_enabled", "label": "显示本城社区外链", "type": "bool", "hint": "关闭后隐藏本城群、防失联、位置入口，不影响官方频道"},
+    {"key": "approve_attach_detail", "label": "附带资料详情链接和小程序按钮", "type": "bool"},
+    {"key": "approve_attach_channel_btn", "label": "附带查看频道帖按钮（有相册时）", "type": "bool"},
     {"key": "broadcast_channel", "label": "推送频道", "type": "text", "max": 128, "super": True,
      "hint": "新上架资料推送到这个频道（@频道名 或 -100…）；空 = 用全站频道"},
     {"key": "broadcast_template", "label": "推送文案模板", "type": "textarea", "max": 2000},
@@ -76,6 +90,7 @@ CITY_KEYS = [
      "hint": "频道帖末尾「详情」链接文字；默认「查看详情」。留空 = 不显示这一项"},
     {"key": "link_label_reviews", "label": "频道链接 · 评价", "type": "text", "max": 16, "allow_blank": True,
      "hint": "默认「查看评价」。留空 = 不显示"},
+    {"key": "link_label_location", "label": "频道链接 · 位置", "type": "text", "max": 16, "allow_blank": True, "hint": "本城位置链接有有效目标时才显示；留空隐藏"},
     {"key": "link_label_write", "label": "频道链接 · 写评价", "type": "text", "max": 16, "allow_blank": True,
      "hint": "默认「写评价」。留空 = 不显示"},
     {"key": "channel_directory", "label": "频道按区目录", "type": "bool",
@@ -135,6 +150,9 @@ def clean_override_value(key: str, value: Any) -> Any:
         except (TypeError, ValueError):
             return None
         return max(meta["min"], min(meta["max"], n))
+    if key.endswith("_url") and key.startswith("community_"):
+        from bot.services.community import safe_url
+        return safe_url(value) or None
     text = str(value)
     if t in ("text", "textarea"):
         text = text.strip() if t == "text" else text
@@ -217,6 +235,13 @@ def merge_ops(raw) -> Dict[str, Any]:
         out["media_max_count"] = 9
     out["chat_cta_label"] = str(out.get("chat_cta_label") or "想聊聊")[:32]
     out["show_chat_cta"] = bool(out.get("show_chat_cta", True))
+    from bot.services.community import clean_welcome_buttons, safe_url
+    out["bot_welcome_buttons"] = clean_welcome_buttons(out.get("bot_welcome_buttons"))
+    for key in ("approve_attach_detail", "approve_attach_channel_btn", "community_enabled"):
+        out[key] = audit_on(out.get(key))
+    for key in ("community_discussion_url", "community_backup_url", "community_location_url"):
+        out[key] = safe_url(out.get(key))
+    out["community_location_label"] = str(out.get("community_location_label") or "位置")[:16]
     out["bot_welcome_text"] = str(out.get("bot_welcome_text") or "")[:2000]
     out["approve_promo_text"] = str(out.get("approve_promo_text") or DEFAULT_OPS["approve_promo_text"])[:2000]
     out["broadcast_channel"] = str(out.get("broadcast_channel") or "").strip()[:128]
@@ -231,7 +256,7 @@ def merge_ops(raw) -> Dict[str, Any]:
     out["coupon_display"] = ",".join(dict.fromkeys(disp)) or "badge,filter,list"
     out["review_channel"] = str(out.get("review_channel") or "").strip()[:128]
     out["directory_channel"] = str(out.get("directory_channel") or "").strip()[:128]
-    for _lk, _ld in (("link_label_detail", "查看详情"), ("link_label_reviews", "查看评价"), ("link_label_write", "写评价")):
+    for _lk, _ld in (("link_label_detail", "查看详情"), ("link_label_reviews", "查看评价"), ("link_label_write", "写评价"), ("link_label_location", "")):
         if isinstance(raw, dict) and _lk in raw:
             out[_lk] = str(raw.get(_lk) if raw.get(_lk) is not None else "")[:16]
         else:

@@ -41,7 +41,7 @@ def test_me_layout_sections_by_role():
     js = _read("me-layout.js")
     for k in ("meRowFav", "myClaims", "cityCoupons", "placeCard", "meNickCard", "meListCard", "myCoupon", "meRowTut", "meRowContact"):
         assert k in js
-    assert '["经营", ["meListCard", "myCoupon"]]' in js
+    assert '["经营", ["meTodos", "meListCard", "myCoupon"]]' in js
     assert 'data-nav": "fav"' not in js  # must not shadow the bottom-nav button for role-nav.js
 
 
@@ -60,7 +60,7 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261104b"}
+    assert vs == {"20261110b"}
 
 
 def test_filter_reset_applies_immediately_and_keeps_facets():

@@ -237,6 +237,12 @@ async def _caption(lamp: Dict[str, Any], extras: Optional[Dict[str, Any]], *, li
     plain = fill_template(str(site.get("broadcast_template") or ""), lamp, merged, link)
     plain = re.sub(r"\n{3,}", "\n\n", plain)
     link_line = links_html(bot_name, lid, labels=link_labels_from_site(site)) if links else ""
+    from bot.services.community import safe_url
+    location = safe_url(site.get("community_location_url")) if site.get("community_enabled", True) else ""
+    label = str(site.get("link_label_location") or "").strip()[:16]
+    if links and location and label:
+        location_link = f'<a href="{html.escape(location, quote=True)}">{html.escape(label)}</a>'
+        link_line = LINK_SEP_HTML.join(x for x in (link_line, location_link) if x)
     caption = caption_html(plain, link_line)
     return chat, caption, bot_name, None
 

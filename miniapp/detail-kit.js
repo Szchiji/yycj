@@ -62,7 +62,10 @@
     const on = ctaOn();
     const text = ctaLabel();
     document.querySelectorAll("#detailChat, [data-cta='chat']").forEach((btn) => {
-      if (on && btn.textContent !== text) btn.textContent = text;
+      const rest = last?.data?.lamp?.open_code === "rest";
+      btn.disabled = rest;
+      if(rest) btn.textContent = "休息中 · 暂不联系";
+      if (!rest && on && btn.textContent !== text) btn.textContent = text;
       const disp = on ? "" : "none";
       if (btn.style.display !== disp) btn.style.display = disp;
     });
@@ -137,7 +140,7 @@
       const body = L.some(([k]) => sec[k])
         ? `<dl class="rv-sec">${L.filter(([k]) => sec[k]).map(([k, l]) => `<dt>${l}</dt><dd>${clean(sec[k])}</dd>`).join("")}</dl>`
         : `<p>${clean(t.text)}</p>`;
-      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}</div>${body}${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
+      return `<div class="card" style="margin:8px 0"><div class="muted">${stars}${t.audit_verified ? " · 已审核" : ""}${t.proof_count > 0 ? " · 已提交凭证" : ""}</div>${body}${ph ? `<div class="rv-phs">${ph}</div>` : ""}</div>`;
     }).join("") : "<p class='muted'>暂无评价</p>";
     box.innerHTML = `<h3 style="font-size:1rem;margin:12px 0 6px">评价</h3>${rows}`;
     placeShare(id);
@@ -165,6 +168,13 @@
     paintExtras(lamp.extras || data.extras || {});
     paintReviews(data.reviews || data.approved_reviews || lamp.reviews || [], id);
     applyCta();
+    const card = document.querySelector("#detail > .card");
+    if(card) {
+      let trust=document.getElementById("detailTrust");if(!trust){trust=document.createElement("div");trust.id="detailTrust";trust.className="detail-trust";card.querySelector("h3")?.insertAdjacentElement("afterend",trust);}
+      trust.textContent = "资料已审核 · " + (data.reputation?.review_count ?? (data.reviews || []).length) + " 条评价 · 审核不代表体验担保";
+      let links=document.getElementById("detailCommunity");if(!links){links=document.createElement("div");links.id="detailCommunity";links.className="detail-community";card.appendChild(links);}
+      links.innerHTML=(data.community_links || []).filter(x=>["discussion","backup","location"].includes(x.key)).map(x=>`<button class="btn" type="button" data-hub-url="${esc(x.url)}">${esc(x.label)}</button>`).join("");
+    }
     paintedCard = document.querySelector("#detail > .card");
   }
   function repaintIfNewCard() {

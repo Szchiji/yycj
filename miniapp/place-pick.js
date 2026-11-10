@@ -57,6 +57,7 @@
     });
     return leaflet;
   }
+  window.__yycjLoadLeaflet = loadLeaflet;
   const centers = {};
   async function centerFor(city, district) {
     if (!centers[city]) { try { centers[city] = await api("/api/geo/centers?city=" + encodeURIComponent(city || "")); } catch (e) { centers[city] = { districts: {}, center: null }; } }

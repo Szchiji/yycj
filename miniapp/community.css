@@ -1,0 +1,7 @@
+/* New surfaces only: homepage's 117x224 cards and three-column grid remain untouched. */
+.hub-home-entry{display:block;width:100%;background:#16302A;color:#D4B26A;border:1px solid #355247;border-radius:10px;padding:10px 12px;text-align:left;margin:6px 0 10px;font-size:13px}
+.hub-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:15px 10px;background:#16302A;color:#F1EEE4;border:0;border-bottom:1px solid #355247;text-align:left;border-radius:0;font-size:14px}
+.hub-row span{font-size:12px;color:#D4B26A}.hub-row b{font-weight:600}.hub-map-toggle{white-space:nowrap;flex-shrink:0}
+#hubResultMap{height:330px;width:100%;border-radius:14px;z-index:1;background:#16302A}#hubMapWrap{margin:10px 0}.hub-cluster{background:#16302A;border:1px solid #D4B26A;border-radius:15px;color:#F1EEE4;text-align:center;box-shadow:0 3px 12px #0005}.hub-cluster b{display:block;font-size:18px;color:#D4B26A}.hub-cluster span{font-size:11px}
+#view-community{padding-bottom:85px}#view-community h2{font-size:20px}.detail-trust{font-size:12px;color:#D4B26A;margin:10px 0}.detail-community{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.detail-community button{font-size:12px}
+#hubResultMap .leaflet-tile-pane{filter:grayscale(.45) invert(.9) hue-rotate(110deg) brightness(.7) saturate(.65)}#hubResultMap .leaflet-control-attribution{background:#16302Add;color:#F1EEE4}#hubResultMap .leaflet-control-attribution a{color:#D4B26A}

@@ -68,7 +68,7 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
         logger.warning("no admin received post %s", post_id)
 
 
-async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None) -> None:
+async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None, lamp_id: str | None = None) -> None:
     from bot.main import bot
     from bot.services import bot_info
 
@@ -78,14 +78,28 @@ async def notify_publisher_approved(user_id: int, title: str, album_url: str | N
     ident = await bot_info.get_bot_identity()
     uname = ident.get("username") or ""
     link = bot_info.bot_tme_url(uname)
-    text = f"你的资料「{title}」已通过审核并上架。"
+    text = f"你的资料「{_h(title)}」已通过审核并上架。"
     if promo:
         text = f"{text}\n\n{promo}"
     if album_url:
         text += f"\n\n频道相册：{album_url}"
     if link:
         text += f"\n\n机器人：{link}"
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    from bot.services.share_gate import open_card_kb
+    from bot.services.broadcast import start_url
+    rows = []
+    if lamp_id and site.get("approve_attach_detail", True):
+        detail = start_url(uname, lamp_id)
+        if detail:
+            text += f"\n\n资料详情：{detail}"
+        kb = open_card_kb(lamp_id)
+        if kb:
+            kb.inline_keyboard[0][0].text = "查看我的资料"
+            rows.extend(kb.inline_keyboard)
+    if album_url and site.get("approve_attach_channel_btn", True):
+        rows.append([InlineKeyboardButton(text="查看频道帖", url=album_url)])
     try:
-        await bot.send_message(user_id, text)
+        await bot.send_message(user_id, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows) if rows else None)
     except Exception:
         logger.exception("notify publisher approved failed")

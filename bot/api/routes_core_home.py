@@ -14,6 +14,7 @@ from bot.api.routes_core_base import (
     router,
 )
 from bot.services import anti_brush, credit_service, home_service, search_service, session_service
+from bot.services.community import district_groups
 from bot.services import pin_query
 from bot.services.extras_store import load_extras, load_extras_bulk
 from bot.services.open_shift import normalize_hours, shop_status
@@ -98,6 +99,7 @@ async def api_home(
     at: Optional[str] = Query(default=None, max_length=32),
     coupon: int = Query(default=0, ge=0, le=1),
     place: int = Query(default=1, ge=0, le=1),
+    map_results: int = Query(default=0, ge=0, le=1),
     limit: int = Query(default=3, ge=1, le=50),
     offset: int = Query(default=0, ge=0, le=500),
     user_id: int = Depends(get_current_user_id),
@@ -113,6 +115,9 @@ async def api_home(
     page_size = int(settings.get("home_feed_page_size") or 3)
     if limit == 3 and page_size != 3:
         limit = page_size
+
+    if map_results:
+        limit, offset = 600, 0
 
     area_key = search_service.district_key(district) if district else ""
     from bot.services.feed_filters import Filter, distance_label
@@ -172,6 +177,7 @@ async def api_home(
         logger.exception("list pins failed")
 
     items = []
+    scanned_count = 0
     computed = flt.needs_python
     try:
         items = await search_service.search_lamps(
@@ -186,6 +192,7 @@ async def api_home(
             sort="reviews" if sort == "reviews" else "new",
             flt=flt,
         )
+        scanned_count = len(items)
         if computed:
             await _prefill_extras(items)
             shop = [await _with_shop(x) for x in items]
@@ -262,6 +269,8 @@ async def api_home(
         "announcement": announcement,
         "pins": pins,
         "items": safe_items,
+        "map_groups": district_groups(safe_items, use_city) if map_results else [],
+        "map_truncated": bool(map_results and scanned_count >= 600),
         "district": search_service.district_key(district) if district else "",
         "sort": sort,
         "districts": districts,
@@ -384,6 +393,7 @@ async def api_lamp_detail(
     rep = await home_service.reputation_for_lamp(lamp_id)
     reviews = await home_service.list_reviews_for_lamp(lamp_id, approved_only=True)
     for r in reviews:
+        r["audit_verified"] = bool(r.get("reviewed_at") and r.get("review_note") != "免审直接发布")
         r["created_at"] = _ser_dt(r.get("created_at"))
         r.pop("guest_id", None)
         r.pop("target_user_id", None)
@@ -393,7 +403,11 @@ async def api_lamp_detail(
     if isinstance(out.get("extras"), dict):
         # internal state (_open_today, _remind_*, _bc_*) is not for the public detail page
         out["extras"] = {k: v for k, v in out["extras"].items() if not str(k).startswith("_")}
-    return {"ok": True, "lamp": out, "reputation": rep, "reviews": reviews}
+    from bot.services.community import public_links
+    from bot.services.home_feed import ops_for_city
+    site = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
+    return {"ok": True, "lamp": out, "reputation": rep, "reviews": reviews,
+            "community_links": public_links(site)}
 
 
 @router.post("/sessions/request")
@@ -404,6 +418,8 @@ async def api_session_request(
     lamp = await search_service.get_lamp(body.lamp_id)
     if not lamp or lamp.get("status") != "active":
         raise HTTPException(status_code=404, detail="资料不存在或未上架")
+    if (await _with_shop(lamp)).get("open_code") == "rest":
+        raise HTTPException(status_code=409, detail="休息中，暂不联系")
     if lamp["user_id"] == user_id:
         raise HTTPException(status_code=400, detail="不能与自己发起会话")
     u = await credit_service.ensure_user(user_id)

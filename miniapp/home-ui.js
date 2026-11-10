@@ -193,7 +193,7 @@
   }
   function paint() {
     const feed = $("#feed");
-    if (feed) {
+    if (feed && !window.__yycjMapMode) {
       feed.classList.add("has-cover");
       feed.innerHTML = lastItems.length ? lastItems.map((t, i) => cardHtml(t, i)).join("") : "<p class='muted'>" + (activeFiltCount() ? "没有符合筛选的上架" : "暂无上架") + "</p>";
     }
@@ -217,22 +217,25 @@
     lastItems = reset || offset === 0 ? batch : lastItems.concat(batch);
     offset = lastItems.length;
     paint();
-    $("#btnLoadMore")?.classList.toggle("hidden", !data.has_more);
+    $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
+    window.dispatchEvent(new CustomEvent("yycj:home-data", {detail:data}));
     const ann = $("#announce");
     if (ann && data.announcement && data.announcement.text) {
       ann.classList.remove("hidden");
       ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
     }
   }
+  let loadSequence = 0;
   async function loadFeed(reset) {
     if (!token() || document.hidden) return;
+    const seq = ++loadSequence, mapMode = !!window.__yycjMapMode;
     paused = false;
     arm();
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
       q = (($("#homeQ") && $("#homeQ").value.trim()) || q || "");
-      if (reset) {
+      if (reset && !window.__yycjMapMode) {
         const cached = readCache(city, q);
         if (cached && (cached.items || cached.pins)) applyData(cached, true);
       }
@@ -250,10 +253,12 @@
       if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
       else if (f.at) params.set("at", f.at);
       if (f.np) params.set("place", "0");
+      if(window.__yycjMapMode) params.set("map_results", "1");
       appliedSig = filtSig();
       const data = await api("/api/home?" + params.toString());
+      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
       applyData(data, reset);
-      writeCache(data.city || city, q, data);
+      if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
