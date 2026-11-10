@@ -208,7 +208,7 @@
       return;
     }
     if (tg.closest && tg.closest("[data-me-fav]")) { const b = $("nav [data-nav='fav']"); if (b) b.click(); return; }
-    if (tg.closest && tg.closest("[data-me-contact]")) { const a = $("#topAdmin"); if (a) a.click(); return; }
+    if (tg.closest && tg.closest("[data-me-contact]")) { window.__yycjContactAdmin?.(); return; }
     if (tg.closest && tg.closest("[data-me-admin]")) { const a = $("#adminEntry a"); if (a) location.href = a.href; return; }
     if (tg.closest && tg.closest("[data-switch],#btnSaveNick")) setTimeout(arrange, 400);
   });

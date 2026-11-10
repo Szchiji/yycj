@@ -258,6 +258,7 @@
       const data = await api("/api/home?" + params.toString());
       if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
       applyData(data, reset);
+      window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
       const feed = $("#feed");

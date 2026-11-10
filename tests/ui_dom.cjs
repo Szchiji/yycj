@@ -38,19 +38,24 @@ async function admin() {
  assert(d.querySelector('#shipWelcomePreview').textContent.includes('进入小程序'));
  d.querySelector('[data-wadd]').click();assert.equal(d.querySelectorAll('[data-wrow]').length,2);
  d.querySelector('[data-wremove="1"]').click();
+ assert.equal(d.querySelector('#ship_popup_announcement_text').tagName,'TEXTAREA');
+ d.querySelector('#ship_popup_announcement_enabled').checked=true;
+ d.querySelector('#ship_popup_announcement_text').value='独立弹窗内容';
  d.querySelector('#ship_community_discussion_url').value='https://t.me/city_test';
  d.querySelector('[data-cc="save-global"]').click();await wait(80);
  const extra=posts.find(x=>x[0]==='/api/admin/settings/extra')[1];
- assert.equal(extra.community_discussion_url,'https://t.me/city_test');assert.equal(extra.bot_welcome_buttons.length,1);assert.equal(extra.approve_attach_detail,true);
+ assert.equal(extra.community_discussion_url,'https://t.me/city_test');assert.equal(extra.bot_welcome_buttons.length,1);assert.equal(extra.approve_attach_detail,true);assert.equal(extra.popup_announcement_text,'独立弹窗内容');assert.equal(extra.popup_announcement_enabled,true);
  assert(posts.some(x=>x[0]==='/api/admin/channel-features'));
  assert(posts.some(x=>x[0]==='/api/admin/operators/cities'));
  d.querySelector('#ccTabs [data-city="深圳"]').click();await wait(150);
  assert.equal(d.querySelectorAll('#ccDyn > .ship-group').length,6);
+ d.querySelector('#ccf_popup_announcement_enabled').value='0';
+ d.querySelector('#ccf_popup_announcement_text').value='深圳专属弹窗';
  assert(!d.querySelector('#ccDyn [data-cc="save-ann"]'));
  d.querySelector('#ccAnnText').value='城市公告';d.querySelector('#ccf_community_discussion_url').value='https://t.me/shenzhen_test';
  d.querySelector('#ccf_link_label_detail').value='';d.querySelector('#ccf_link_label_detail').dispatchEvent(new w.Event('input',{bubbles:true}));d.querySelector('[data-cc="save-cfg"]').click();await wait(100);
  assert(posts.some(x=>x[0]==='/api/admin/cities/announcement'&&x[1].text==='城市公告'));
- const cityPost=posts.findLast(x=>x[0]==='/api/admin/cities/settings')[1];assert.equal(cityPost.overrides.community_discussion_url,'https://t.me/shenzhen_test');assert.equal(cityPost.overrides.link_label_detail,'');assert(!('link_label_reviews' in cityPost.overrides));assert(!('link_label_write' in cityPost.overrides));
+ const cityPost=posts.findLast(x=>x[0]==='/api/admin/cities/settings')[1];assert.equal(cityPost.overrides.community_discussion_url,'https://t.me/shenzhen_test');assert.equal(cityPost.overrides.link_label_detail,'');assert.equal(cityPost.overrides.popup_announcement_enabled,false);assert.equal(cityPost.overrides.popup_announcement_text,'深圳专属弹窗');assert(!('link_label_reviews' in cityPost.overrides));assert(!('link_label_write' in cityPost.overrides));
  assert(alerts.some(x=>x.includes('深圳 设置已保存')));
 
 }
@@ -58,7 +63,7 @@ async function guest() {
  const dom=new JSDOM(fs.readFileSync('miniapp/go.html','utf8'),{url:'https://test.invalid/go.html',runScripts:'outside-only',pretendToBeVisual:true});const w=dom.window,d=w.document;w.localStorage.setItem('yycj_token','test');w.localStorage.setItem('yycj_city','深圳');
  w.fetch=async path=>response(String(path).includes('ranking')?{items:[],rule:'测试规则',city:'深圳'}:{city:'深圳',links:[{key:'discussion',label:'官方讨论群',url:'https://t.me/city_test'}]});
  w.eval(fs.readFileSync('miniapp/community-ui.js','utf8'));
- assert(d.querySelector('#hubHomeEntry'));assert(d.querySelector('#hubMapToggle'));let loads=0;w.__yycjLoadHome=()=>loads++;
+ assert(d.querySelector('.topbar > #hubHomeEntry'));assert.equal(d.querySelectorAll('#hubHomeEntry').length,1);assert(!d.querySelector('#topAdmin'));assert.equal(d.querySelector('#btnSearch').nextElementSibling.id,'hubMapToggle');assert(d.querySelector('#pins').compareDocumentPosition(d.querySelector('.search-row')) & 4);assert(d.querySelector('#hubMapToggle'));let loads=0;w.__yycjLoadHome=()=>loads++;
  d.querySelector('#hubMapToggle').click();assert(w.__yycjMapMode);assert.equal(loads,1);
  w.dispatchEvent(new w.CustomEvent('yycj:home-data',{detail:{items:[{lamp_id:'x',title:'测试',district:'南山'}],map_groups:[]}}));
  assert(d.querySelector('#feed').classList.contains('hidden'));assert(d.querySelector('#hubMapRows').textContent.includes('测试'));
@@ -78,4 +83,22 @@ async function detail() {
  assert(mutations<50,'detail mutation observer did not settle');assert(d.querySelector('#detailChat').disabled);assert(d.querySelector('#detailChat').textContent.includes('暂不联系'));
  assert(d.querySelector('#detailTrust').textContent.includes('1 条评价'));assert(d.querySelector('#yycjReviews').textContent.includes('已审核'));assert(!d.querySelector('#yycjReviews').textContent.includes('凭证'));
 }
-(async()=>{await admin();await guest();await detail();console.log('DOM contracts passed: admin six groups, scoped saves, welcome editor, city hub/map/ranking');process.exit(0);})().catch(e=>{console.error(e);process.exit(1);});
+async function popup() {
+ const source=fs.readFileSync('miniapp/entry-announcement.js','utf8');
+ const data={title:'公告 <b>不是HTML</b>',text:'<img src=x onerror=alert(1)>\n纯文字公告',scope_user:'900001',scope_city:'深圳'};
+ function setup(storage={},at='2026-11-10T15:59:00Z',hidden=false) {
+  const dom=new JSDOM('<div id="app" class="'+(hidden?'hidden':'')+'"><button id="origin">入口</button></div>',{url:'https://test.invalid',runScripts:'outside-only',pretendToBeVisual:true});
+  const w=dom.window;const NativeDate=w.Date;w.Date=class extends NativeDate{constructor(...a){super(...(a.length?a:[at]));}static now(){return +new NativeDate(at);}};
+  for(const [k,v] of Object.entries(storage))w.localStorage.setItem(k,v);w.eval(source);
+  return {w,d:w.document,emit:p=>w.dispatchEvent(new w.CustomEvent('yycj:entry-announcement',{detail:p}))};
+ }
+ let t=setup();t.emit(null);assert(!t.d.querySelector('#entryAnnouncement'));t.emit({...data,text:' '});assert(!t.d.querySelector('#entryAnnouncement'));
+ t.d.querySelector('#origin').focus();t.emit(data);assert(t.d.querySelector('[role="dialog"]'));assert(!t.d.querySelector('#entryAnnouncement img'));assert(t.d.querySelector('#entryAnnouncementText').textContent.includes('<img'));
+ t.d.querySelector('[data-popup-close]').click();assert(!t.d.querySelector('#entryAnnouncement'));assert.equal(t.d.activeElement.id,'origin');t.emit(data);assert(!t.d.querySelector('#entryAnnouncement'),'internal navigation must not reopen');
+ t=setup();t.emit(data);assert(t.d.querySelector('#entryAnnouncement'),'new opening after close must show');t.d.querySelector('[data-popup-today]').click();const saved={...t.w.localStorage};
+ t=setup(saved);t.emit(data);assert(!t.d.querySelector('#entryAnnouncement'),'same Shanghai calendar day suppressed');t.emit({...data,scope_city:'广州'});assert(t.d.querySelector('#entryAnnouncement'),'city override has separate daily scope');
+ t=setup(saved,'2026-11-10T16:01:00Z');t.emit(data);assert(t.d.querySelector('#entryAnnouncement'),'Shanghai midnight resets today suppression');
+ t=setup(saved);t.emit({...data,scope_user:'900002'});assert(t.d.querySelector('#entryAnnouncement'),'different viewer never shares suppression');
+ t=setup({},undefined,true);t.emit(data);assert(!t.d.querySelector('#entryAnnouncement'));t.d.querySelector('#app').classList.remove('hidden');await wait(10);assert(t.d.querySelector('#entryAnnouncement'));t.d.querySelector('[role="dialog"]').dispatchEvent(new t.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert(!t.d.querySelector('#entryAnnouncement'));
+}
+(async()=>{await admin();await guest();await detail();await popup();console.log('DOM contracts passed: admin six groups, scoped saves, welcome editor, city hub/map/ranking');process.exit(0);})().catch(e=>{console.error(e);process.exit(1);});

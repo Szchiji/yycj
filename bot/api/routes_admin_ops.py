@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class ExtraOpsBody(BaseModel):
+    popup_announcement_enabled: Optional[bool] = None
+    popup_announcement_title: Optional[str] = None
+    popup_announcement_text: Optional[str] = None
     bot_welcome_text: Optional[str] = None
     media_max_count: Optional[int] = None
     review_require_audit: Optional[bool] = None

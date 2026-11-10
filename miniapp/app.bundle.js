@@ -534,6 +534,7 @@ try {
       const data = await api("/api/home?" + params.toString());
       if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
       applyData(data, reset);
+      window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
       const feed = $("#feed");
@@ -3653,9 +3654,13 @@ try {
     if (!ev.target.closest("#topAdmin")) return;
     ev.preventDefault();
     ev.stopPropagation();
+    await contactAdmin();
+  }
+  async function contactAdmin() {
     const c = await contacts();
     if (!openUrl(c.admin_url)) toast("后台还没填管理员联系");
   }
+  window.__yycjContactAdmin = contactAdmin;
   document.addEventListener("click", go, true);
   document.addEventListener("click", topAdmin, true);
   document.addEventListener("click", (ev) => {
@@ -4489,7 +4494,7 @@ try {
       return;
     }
     if (tg.closest && tg.closest("[data-me-fav]")) { const b = $("nav [data-nav='fav']"); if (b) b.click(); return; }
-    if (tg.closest && tg.closest("[data-me-contact]")) { const a = $("#topAdmin"); if (a) a.click(); return; }
+    if (tg.closest && tg.closest("[data-me-contact]")) { window.__yycjContactAdmin?.(); return; }
     if (tg.closest && tg.closest("[data-me-admin]")) { const a = $("#adminEntry a"); if (a) location.href = a.href; return; }
     if (tg.closest && tg.closest("[data-switch],#btnSaveNick")) setTimeout(arrange, 400);
   });
@@ -4530,11 +4535,11 @@ try {
     else { ++request;show(back); }
   });
   async function fetchDetail(id) { try { const d=await api('/api/lamps/'+encodeURIComponent(id)); if(window.__yycjOpenLamp === id) window.__yycjRenderDetail?.(d,id); } catch(e) { window.__yycjToast?.(e.message); } }
-  // Homepage announcement remains an announcement, and gains a separate community action.
+  // One community action in the top-left header, with no duplicate homepage row.
   function mount() {
     const home=$('#view-home');if(!home) return;
-    if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='hub-home-entry';b.dataset.hub='community';b.textContent='本城社区 · 官方入口 ›'; const ann=$('#announce'); if(ann) ann.insertAdjacentElement('afterend',b); else home.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnArea') || $('#homeQ'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
+    if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
     if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='<p class="muted">同一套搜索 / 筛选 · 按区中心聚合，并非资料精确位置</p><div id="hubResultMap"></div><div id="hubMapRows"></div>';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
   function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
@@ -4564,3 +4569,41 @@ try {
   if(new URLSearchParams(location.search).get('page')==='me') { let tries=0;const go=()=>{if($('#app')&&!$('#app').classList.contains('hidden')) {$('[data-nav="me"]')?.click();} else if(++tries<80) setTimeout(go,150);};go(); }
 })();
 ;} catch (e) { try { console.error("community-ui.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "community-ui.js" }); } catch (x) {} }
+/* ---- entry-announcement.js ---- */
+try {
+// Entry-only popup: configured independently from the ordinary inline announcement.
+(() => {
+  const shown = new Set();
+  const $ = s => document.querySelector(s);
+  const day = () => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  let pending=null, active=null, before=null;
+  function key(p) { return 'yycj_popup_day_v1:'+encodeURIComponent(p.scope_user)+':'+encodeURIComponent(p.scope_city || '*'); }
+  function storageRead(k) { try {return localStorage.getItem(k);} catch {return null;} }
+  function close(today) {
+    if(!active)return;
+    if(today) {try {localStorage.setItem(key(active),day());} catch { /* still dismiss this opening */ }}
+    $('#entryAnnouncement')?.remove();document.body.classList.remove('entry-announcement-open');
+    active=null;before?.focus?.();
+  }
+  function attempt() {
+    const p=pending;
+    if(!p || !p.scope_user || !String(p.text || '').trim() || $('#app')?.classList.contains('hidden'))return;
+    if(active)return;
+    pending=null;const k=key(p);
+    if(shown.has(k) || storageRead(k) === day())return;
+    shown.add(k);active=p;before=document.activeElement;
+    const overlay=document.createElement('div');overlay.id='entryAnnouncement';overlay.className='entry-announcement';
+    overlay.innerHTML='<section class="entry-announcement-panel" role="dialog" aria-modal="true" aria-labelledby="entryAnnouncementTitle" tabindex="-1"><header><h2 id="entryAnnouncementTitle"></h2><button class="btn" type="button" data-popup-close aria-label="关闭公告">关闭</button></header><div id="entryAnnouncementText" class="entry-announcement-text"></div><footer><button class="btn" type="button" data-popup-today>今日不再弹出</button><button class="btn primary" type="button" data-popup-close>关闭</button></footer></section>';
+    // Server/admin text is always text, never HTML; keep newlines without interpreting tags.
+    overlay.querySelector('h2').textContent=String(p.title || '本城公告');overlay.querySelector('#entryAnnouncementText').textContent=String(p.text);
+    overlay.addEventListener('click',ev=>{if(ev.target.closest('[data-popup-today]'))close(true);else if(ev.target.closest('[data-popup-close]'))close(false);});
+    overlay.addEventListener('keydown',ev=>{
+      if(ev.key==='Escape'){ev.preventDefault();close(false);}
+      if(ev.key==='Tab') {const buttons=[...overlay.querySelectorAll('button')];const first=buttons[0],last=buttons.at(-1);if(ev.shiftKey && (document.activeElement===first || document.activeElement===overlay.firstElementChild)){ev.preventDefault();last.focus();}else if(!ev.shiftKey && document.activeElement===last){ev.preventDefault();first.focus();}}
+    });
+    document.body.appendChild(overlay);document.body.classList.add('entry-announcement-open');overlay.querySelector('[data-popup-close]').focus();
+  }
+  window.addEventListener('yycj:entry-announcement',ev=>{const p=ev.detail;if(!p){pending=null;return;}pending=p;attempt();});
+  const app=$('#app');if(app)new MutationObserver(attempt).observe(app,{attributes:true,attributeFilter:['class']});
+})();
+;} catch (e) { try { console.error("entry-announcement.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "entry-announcement.js" }); } catch (x) {} }

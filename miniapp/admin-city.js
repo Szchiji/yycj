@@ -272,7 +272,7 @@
       const v = has ? (k.override ? "1" : "0") : "";
       input = `<select id="${id}" data-k="${k.key}"${dis}><option value=""${v === "" ? " selected" : ""}>沿用全站（${shortVal(k.global)}）</option><option value="1"${v === "1" ? " selected" : ""}>开</option><option value="0"${v === "0" ? " selected" : ""}>关</option></select>`;
     } else if (k.type === "textarea") {
-      input = `<textarea id="${id}" data-k="${k.key}" rows="3" placeholder="${esc("全站：" + String(k.global ?? ""))}"${dis}>${esc(has ? k.override : "")}</textarea>`;
+      input = `<textarea id="${id}" data-k="${k.key}" rows="3" maxlength="${k.max || 3000}" placeholder="${esc("全站：" + String(k.global ?? ""))}"${dis}>${esc(has ? k.override : "")}</textarea>`;
     } else {
       const num = k.type === "int" ? ` type="number" min="${k.min}" max="${k.max}" inputmode="numeric"` : ` maxlength="${k.max || 128}"`;
       input = `<input id="${id}" data-k="${k.key}"${num} placeholder="${esc(ph)}" value="${esc(has ? k.override : "")}"${dis} />`;
@@ -306,6 +306,9 @@
   ];
   GLOBAL_FIELDS.push({id:"ship_link_label_location",label:"频道链接 · 位置",hint:"有本城位置目标时才显示；留空隐藏，不生成空链接。",make:()=>{const i=document.createElement("input");i.id="ship_link_label_location";i.maxLength=16;return i;}});
   const NEW_FIELDS = {
+    popup_announcement_enabled: ["启用进入小程序弹窗公告", "bool"],
+    popup_announcement_title: ["弹窗公告标题（独立于普通公告）", "text"],
+    popup_announcement_text: ["弹窗公告内容 · 纯文字，最多3000字", "textarea"],
     link_label_location: ["频道链接 · 位置", "text"],
     community_discussion_url: ["官方讨论群", "text"], community_backup_url: ["防失联导航", "text"],
     community_location_url: ["本城位置链接", "text"], community_location_label: ["位置入口文案", "text"],
@@ -315,9 +318,10 @@
   };
   Object.entries(NEW_FIELDS).filter(([key])=>key!=="link_label_location").forEach(([key, [label, type]]) => GLOBAL_FIELDS.push({
     id: "ship_" + key, label, row: type === "bool", make: () => {
-      const i = document.createElement("input"); i.id = "ship_" + key;
-      if (type !== "bool") { i.maxLength = 512; return i; }
-      i.type = "checkbox"; i.checked = true; const l = document.createElement("label"); l.className = "row"; l.append(i, " " + label); return i;
+      const i = document.createElement(type === "textarea" ? "textarea" : "input"); i.id = "ship_" + key;
+      if(type === "textarea") { i.rows=6; i.maxLength=3000; return i; }
+      if (type !== "bool") { i.maxLength = key === "popup_announcement_title" ? 40 : 512; return i; }
+      i.type = "checkbox"; i.checked = key !== "popup_announcement_enabled"; const l = document.createElement("label"); l.className = "row"; l.append(i, " " + label); return i;
     }
   }));
   [ ["opsWelcome", "Bot /start 欢迎语"], ["opsMediaMax", "上架媒体上限"], ["opsShowCta", "首页显示聊天按钮", true],

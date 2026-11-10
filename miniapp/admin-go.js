@@ -86,9 +86,13 @@
     if (!ev.target.closest("#topAdmin")) return;
     ev.preventDefault();
     ev.stopPropagation();
+    await contactAdmin();
+  }
+  async function contactAdmin() {
     const c = await contacts();
     if (!openUrl(c.admin_url)) toast("后台还没填管理员联系");
   }
+  window.__yycjContactAdmin = contactAdmin;
   document.addEventListener("click", go, true);
   document.addEventListener("click", topAdmin, true);
   document.addEventListener("click", (ev) => {
