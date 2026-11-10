@@ -187,6 +187,9 @@ async def api_admin_listings(
     for it in items:
         it["expires_at"] = _ser_dt(it.get("expires_at"))
         it["updated_at"] = _ser_dt(it.get("updated_at"))
+    from bot.services.listing_edits import latest
+    states=await latest([x["lamp_id"] for x in items])
+    for it in items:it["edit_state"]=states.get(it["lamp_id"])
     return {"ok": True, "items": items}
 
 
@@ -235,7 +238,9 @@ async def api_admin_renew(
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}", operation_id):
         raise HTTPException(status_code=400, detail="请刷新后台后重试续期（缺少防重复操作编号）")
     try:
-        return await renewal.renew_listing(lamp_id, admin_id, body.days, operation_id)
+        from bot.services.listing_lock import listing_lock
+        async with listing_lock(lamp_id):
+            return await renewal.renew_listing(lamp_id, admin_id, body.days, operation_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -271,7 +271,7 @@ async def approve_post_and_pin(
     """通过投稿并置顶到首页精选。"""
     from bot.services import home_service
 
-    result = await approve_post(post_id, notify=notify)
+    result = await approve_post(post_id, notify=notify, actor_id=admin_id)
     pin = await home_service.add_pin(
         result["lamp_id"],
         sort_order=sort_order,

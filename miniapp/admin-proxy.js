@@ -38,7 +38,7 @@
     const box = document.createElement("div");
     box.id = "editBox";
     box.className = "card";
-    box.innerHTML = `<h3>代修改资料（免审）</h3>
+    box.innerHTML = `<h3>代修改资料（免审）</h3><p class="edit-review-note">授权城市内免审保存。文字同步原帖；替换媒体后，仍上架的资料重新推送完整帖并通知老师。未上架仅保存，不续期、不恢复上架。</p><div id="editOperationState"></div>
       <p class="muted">从下方资料列表点「代改」填入，保存后覆盖资料并更新频道文案。</p>
       <input id="editLampId" type="hidden" />
       <label>资料</label><input id="editLampLabel" readonly placeholder="先在列表点代改" />
@@ -183,7 +183,7 @@
       const r = await fetch("/api/admin/listings/" + encodeURIComponent(id) + "/proxy-edit", {
         method: "POST",
         headers: { Authorization: "Bearer " + token(), "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(window.__yycjEditUI.request({
           title: val("editTitle"),
           city: val("editCity"),
           price_text: val("editPrice"),
@@ -194,11 +194,12 @@
           extras: collectExtras("editBox"),
           hours: hoursOf("editHours"),
           media: mediaOf(uploadedE),
-        }),
+        },"admin:"+id)),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || "失败");
-      alert(data.edited_in_place ? "已保存并改了原频道帖" : "已保存修改");
+      window.__yycjEditUI.clear("admin:"+id);
+      document.getElementById("editOperationState").innerHTML=window.__yycjEditUI.html(data.operation,"admin");
       uploadedE.length = 0; preview("editPreview", uploadedE);
       dirty();
     } catch (e) { alert(e.message || String(e)); }
@@ -207,6 +208,8 @@
     if (!item) return;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
     const extras = item.extras || {};
+    const resultBox=document.getElementById('editOperationState');if(resultBox)resultBox.innerHTML=window.__yycjEditUI?.html(item.edit_state,'admin')||'';
+    fetch('/api/admin/listings/'+encodeURIComponent(item.lamp_id)+'/edit-state',{headers:{Authorization:'Bearer '+token()}}).then(r=>r.ok?r.json():null).then(d=>{if(d && val('editLampId')===item.lamp_id && resultBox)resultBox.innerHTML=window.__yycjEditUI.html(d.operation,'admin');}).catch(()=>{});
     set("editLampId", item.lamp_id);
     set("editLampLabel", (item.title || "") + " · " + (item.city || ""));
     set("editTitle", item.title);
@@ -222,6 +225,16 @@
     if (window.yycjHours) window.yycjHours.set(document.getElementById("editHours"), (item.hours && item.hours.length ? item.hours : null) || extras._hours || item.hours_text || extras["营业时间"] || []);
     document.getElementById("editBox")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+  // Desk and legacy console share the same reliable editor selection path.
+  document.addEventListener('click',async ev=>{
+    const btn=ev.target.closest('[data-fill-proxy]');if(!btn)return;
+    ev.preventDefault();ev.stopImmediatePropagation();
+    const id=btn.dataset.fillProxy;
+    let item=[...(window.__yycjListings||[]),...(window.__yycjListingCache||[])].find(x=>x.lamp_id===id)||{lamp_id:id};
+    try{const r=await fetch('/api/lamps/'+encodeURIComponent(id),{headers:{Authorization:'Bearer '+token()}});if(r.ok)item=(await r.json()).lamp||item;}catch{}
+    window.yycjFillProxy(item);
+    document.querySelector('#adminSide [data-pane="listings"]')?.click();
+  },true);
   syncExtras();
   setTimeout(syncExtras, 1200);
 })();

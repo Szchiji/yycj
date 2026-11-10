@@ -138,8 +138,8 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
     import httpx
     import bot.main as main
     from pathlib import Path
-    assert main._miniapp_asset_v() == "20261110e"
-    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261110e"
+    assert main._miniapp_asset_v() == "20261110g"
+    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261110g"
     async def run():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url="http://test") as client:
             for path in ("/preview-fixtures.js","/scripts/preview_review.py","/scripts/preview/fixtures.js","/app/preview-fixtures.js"):
@@ -149,5 +149,5 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
         text=Path("miniapp",page).read_text()
         assert "preview-fixtures" not in text and "LOCAL_PREVIEW" not in text
     desk=Path("miniapp/desk.html").read_text()
-    for asset,version in (("admin.js","20261110d"),("admin-city.js","20261110e"),("admin-ops.js","20261110f"),("admin-list.js","20261110f")):
+    for asset,version in (("admin.js","20261110g"),("admin-city.js","20261110e"),("admin-ops.js","20261110g"),("admin-list.js","20261110f")):
         assert f"{asset}?v={version}" in desk

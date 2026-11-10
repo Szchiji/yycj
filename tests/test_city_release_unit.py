@@ -332,7 +332,9 @@ def test_no_home_card_trust_badges_and_correct_approval_wiring():
     card = js[js.index("function cardHtml") : js.index("function pinHtml")]
     assert "已审核" not in card and "review_count" not in card
     wire = (root / "bot/services/admin_ops_wire.py").read_text()
-    assert "lamp_id=edit_id" in wire and 'lamp_id=result.get("lamp_id")' in wire
+    assert "listing_edits.review(post_id,True" in wire and 'lamp_id=result.get("lamp_id")' in wire
+    delivery = Path("bot/services/edit_delivery.py").read_text()
+    assert 'lamp_id=lamp["lamp_id"]' in delivery
 
 
 def test_resting_listing_rejects_contact_before_session_creation(monkeypatch):

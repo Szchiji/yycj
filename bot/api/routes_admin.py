@@ -50,7 +50,7 @@ async def api_admin_approve_post(
 ) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "post", post_id)
     try:
-        result = await admin_ops.approve_post(post_id, notify=True)
+        result = await admin_ops.approve_post(post_id, notify=True, actor_id=admin_id)
     except AdminActionError as exc:
         raise _admin_http_error(exc) from exc
     result["reviewed_by"] = admin_id
@@ -85,7 +85,7 @@ async def api_admin_reject_post(
 ) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "post", post_id)
     try:
-        result = await admin_ops.reject_post(post_id, notify=True)
+        result = await admin_ops.reject_post(post_id, notify=True, actor_id=admin_id)
     except AdminActionError as exc:
         raise _admin_http_error(exc) from exc
     result["reviewed_by"] = admin_id

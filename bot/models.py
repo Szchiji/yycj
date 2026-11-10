@@ -128,6 +128,8 @@ class Lamp(Base):
     approx_lng: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     approx_label: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     media: Mapped[list] = mapped_column(JSONB, default=list)
+    edit_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    media_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     publisher_role: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     feed_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     feed_pin_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -293,3 +295,16 @@ class ListingRenewal(Base):
     days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     result: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ListingEditOperation(Base):
+    """Operational checkpoints, not a version-history / restore feature."""
+    __tablename__ = "listing_edit_operations"
+    operation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    actor_id: Mapped[int] = mapped_column(BigInteger)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    post_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    state: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -24,6 +24,9 @@ _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
 _ALTER_STATEMENTS = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_pending_edit_v2 ON posts ((lamp_data->>'edit_lamp_id')) WHERE status='pending' AND lamp_data->>'edit_workflow_v2' IS NOT NULL",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS edit_revision INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS media_revision INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS district VARCHAR(64)",
     "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS approx_lat DOUBLE PRECISION",
@@ -114,6 +117,12 @@ async def close_db() -> None:
         await _engine.dispose()
     _engine = None
     _session_factory = None
+
+
+def get_engine():
+    if _engine is None:
+        raise RuntimeError("数据库尚未连接")
+    return _engine
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:

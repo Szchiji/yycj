@@ -35,6 +35,9 @@ def test_home_no_n_plus_one():
             assert idx is not None
         m._ready = True
         tok = {"Authorization": "Bearer " + issue_access_token(9301, get_settings().bot_token)}
+        # Seed site defaults outside steady-state query budget on a fresh isolated DB.
+        from bot.services import home_service
+        await home_service.get_or_create_settings()
         stmts = []
 
         def count(conn, cursor, statement, *a):

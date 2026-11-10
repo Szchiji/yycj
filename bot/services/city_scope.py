@@ -153,6 +153,13 @@ async def guard(admin_id: int, kind: str, target: Any) -> None:
         "session": city_of_session,
     }[kind]
     city = await resolver(target)
+    if kind == "post":
+        async with session_scope() as s:
+            data=(await s.execute(select(Post.lamp_data).where(Post.post_id==target))).scalar_one_or_none() or {}
+        if data.get("edit_workflow_v2") and data.get("edit_lamp_id"):
+            current_city=await city_of_lamp(data["edit_lamp_id"])
+            if (current_city or UNKNOWN) not in scope:
+                raise HTTPException(status_code=403,detail=OUT_OF_SCOPE)
     if (city or UNKNOWN) not in scope:
         raise HTTPException(status_code=403, detail=OUT_OF_SCOPE)
 

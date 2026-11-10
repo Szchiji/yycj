@@ -68,7 +68,7 @@ async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str
         logger.warning("no admin received post %s", post_id)
 
 
-async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None, lamp_id: str | None = None) -> bool:
+async def notify_publisher_approved(user_id: int, title: str, album_url: str | None = None, city: str | None = None, lamp_id: str | None = None, *, raise_errors: bool = False, listing_active: bool = True) -> bool:
     from bot.main import bot
     from bot.services import bot_info
 
@@ -78,7 +78,7 @@ async def notify_publisher_approved(user_id: int, title: str, album_url: str | N
     ident = await bot_info.get_bot_identity()
     uname = ident.get("username") or ""
     link = bot_info.bot_tme_url(uname)
-    text = f"你的资料「{_h(title)}」已通过审核并上架。"
+    text = f"你的资料「{_h(title)}」已通过审核并上架。" if listing_active else f"你的资料「{_h(title)}」修改已通过审核，仍保持当前未上架状态；有效期不变。"
     if promo:
         text = f"{text}\n\n{promo}"
     if album_url:
@@ -104,4 +104,6 @@ async def notify_publisher_approved(user_id: int, title: str, album_url: str | N
         return True
     except Exception:
         logger.exception("notify publisher approved failed")
+        if raise_errors:
+            raise
         return False

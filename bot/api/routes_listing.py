@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class EditBody(BaseModel):
+    operation_id: Optional[str] = None
     city: str
     title: str
     price: Optional[int] = None
@@ -81,6 +82,9 @@ async def api_me_listings(user_id: int = Depends(get_current_user_id)) -> Dict[s
         }
     except Exception:
         logger.exception("teacher stats flags failed")
+    from bot.services.listing_edits import latest
+    states=await latest([x["lamp_id"] for x in items])
+    for x in items:x["edit_state"]=states.get(x["lamp_id"])
     return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN, "stats_show": show}
 
 
@@ -98,8 +102,6 @@ async def api_me_edit(
     current = next((x for x in mine if x.get("lamp_id") == lamp_id), None)
     if not current:
         raise HTTPException(status_code=404, detail="找不到你的这条资料")
-    if not media:
-        media = list(current.get("media") or [])
     payload = {
         "city": body.city.strip()[:32],
         "title": body.title.strip()[:64],
@@ -114,35 +116,13 @@ async def api_me_edit(
         "extras": dict(body.extras or {}),
         "hours": body.hours,
     }
-    if current.get("status") == LampStatus.ACTIVE.value:
-        lamp = await listing_flow.apply_edit(lamp_id, payload, owner_id=user_id)
-        album = None
-        try:
-            await save_extras(lamp_id, body.extras)
-            full = await search_service.get_lamp(lamp_id) or lamp or {}
-            extras = dict((full or {}).get("extras") or {})
-            extras.update(body.extras or {})
-            if isinstance(full, dict):
-                full["extras"] = extras
-            album = await update_broadcast(full if isinstance(full, dict) else {}, extras)
-        except Exception:
-            album = None
-        return {"ok": True, "instant": True, "lamp": lamp, "album": album, "edited_in_place": bool(album)}
-    import uuid
-    from bot.db import session_scope
-    from bot.models import Post, PostStatus
-
-    lamp_data = dict(payload)
-    lamp_data["edit_lamp_id"] = lamp_id
-    lamp_data["publisher_role"] = u.get("role") or UserRole.TEACHER.value
-    post_id = str(uuid.uuid4())
-    async with session_scope() as s:
-        s.add(Post(post_id=post_id, user_id=user_id, lamp_data=lamp_data, status=PostStatus.PENDING.value))
+    from bot.services import listing_edits
     try:
-        await listing_notify.notify_admins_new_post(post_id, user_id, lamp_data)
-    except Exception:
-        pass
-    return {"ok": True, "post_id": post_id, "status": "pending", "edit_lamp_id": lamp_id, "instant": False}
+        result = await listing_edits.submit(lamp_id,user_id,payload,body.operation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409,detail=str(exc)) from exc
+    return {"ok":True,"operation":result,"instant":result["text_saved"],"post_id":result.get("post_id")}
+
 
 
 @router.post("/admin/listings/proxy")
@@ -211,22 +191,13 @@ async def api_admin_proxy_edit(
     if media:
         payload["media"] = media
         payload["photos"] = [m["url"] for m in media if m["type"] == "image"]
+    from bot.services import listing_edits
     try:
-        lamp = await listing_flow.apply_admin_edit(lamp_id, payload)
+        result = await listing_edits.submit(lamp_id,admin_id,payload,body.operation_id,admin=True)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    album = None
-    try:
-        await save_extras(lamp_id, body.extras)
-        full = await search_service.get_lamp(lamp_id) or lamp or {}
-        if isinstance(full, dict):
-            extras = dict(full.get("extras") or {})
-            extras.update(body.extras or {})
-            full["extras"] = extras
-            album = await update_broadcast(full, extras)
-    except Exception:
-        album = None
-    return {"ok": True, "lamp": lamp, "album": album, "edited_in_place": bool(album), "by": admin_id}
+        raise HTTPException(status_code=409,detail=str(exc)) from exc
+    return {"ok":True,"operation":result,"by":admin_id}
+
 
 
 @router.post("/me/listings/{lamp_id}/unlist")
@@ -295,3 +266,48 @@ async def api_me_todos(user_id: int = Depends(get_current_user_id)) -> Dict[str,
     except Exception:
         logger.exception("coupon claim todos failed")
     return {"ok": True, "role": "guest", "coupons": usable, "favs": favs}
+
+
+class EditRetryBody(BaseModel):
+    step: str
+
+
+@router.get("/me/listings/{lamp_id}/edit-state")
+async def api_me_edit_state(lamp_id: str, user_id: int = Depends(get_current_user_id)):
+    from bot.services import listing_edits
+    lamp=await search_service.get_lamp(lamp_id)
+    if not lamp or int(lamp.get("user_id") or 0)!=user_id:raise HTTPException(status_code=404,detail="找不到你的资料")
+    return {"operation":(await listing_edits.latest([lamp_id])).get(lamp_id)}
+
+
+@router.get("/admin/listings/{lamp_id}/edit-state")
+async def api_admin_edit_state(lamp_id: str, admin_id: int = Depends(get_admin_user_id)):
+    from bot.services import listing_edits,city_scope
+    await city_scope.guard(admin_id,"lamp",lamp_id)
+    return {"operation":(await listing_edits.latest([lamp_id])).get(lamp_id)}
+
+
+async def _retry_edit(key,body,actor,admin):
+    from bot.services import listing_edits,city_scope
+    from bot.models import ListingEditOperation
+    from bot.db import session_scope
+    async with session_scope() as s:
+        op=await s.get(ListingEditOperation,key)
+        if not op:raise HTTPException(status_code=404,detail="修改记录不存在")
+        lamp_id=op.lamp_id
+    if admin:await city_scope.guard(actor,"lamp",lamp_id)
+    elif (await credit_service.ensure_user(actor)).get("is_shadowed"):
+        raise HTTPException(status_code=403,detail="月影遮蔽中，暂时无法重试修改同步")
+    try:result=await listing_edits.retry(key,body.step,actor,admin=admin)
+    except ValueError as exc:raise HTTPException(status_code=409,detail=str(exc)) from exc
+    return {"operation":result}
+
+
+@router.post("/me/edit-operations/{operation_id}/retry")
+async def api_me_edit_retry(operation_id: str,body: EditRetryBody,user_id: int=Depends(get_current_user_id)):
+    return await _retry_edit(operation_id,body,user_id,False)
+
+
+@router.post("/admin/edit-operations/{operation_id}/retry")
+async def api_admin_edit_retry(operation_id: str,body: EditRetryBody,admin_id: int=Depends(get_admin_user_id)):
+    return await _retry_edit(operation_id,body,admin_id,True)

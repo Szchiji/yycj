@@ -44,7 +44,7 @@ def test_hours_flow():
             today = o.today_str()
             # client-sent "_" keys are ignored; hours parsed leniently and stored canonical
             r = await c.post("/api/me/listings/H1/edit", headers=tok, json={
-                "city": "深圳", "title": "小雅", "hours": "10：00~22：00",
+                "operation_id":"hours-save-first-0001", "city": "深圳", "title": "小雅", "hours": "10：00~22：00",
                 "extras": {"_open_today": "1", "_open_date": today, "_auto_open": "1", "微信": "w"}})
             assert r.status_code == 200, r.text
             ex = await load_extras("H1")
@@ -87,7 +87,7 @@ def test_hours_flow():
             assert r.status_code == 400
 
             # clearing hours removes _hours
-            r = await c.post("/api/me/listings/H1/edit", headers=tok, json={"city": "深圳", "title": "小雅", "hours": []})
+            r = await c.post("/api/me/listings/H1/edit", headers=tok, json={"operation_id":"hours-clear-second-0002", "city": "深圳", "title": "小雅", "hours": []})
             assert r.status_code == 200 and "_hours" not in await load_extras("H1")
 
         # scheduler: night shift, prompt 1h before start, once

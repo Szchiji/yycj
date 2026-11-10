@@ -1,1 +1,1 @@
-{"name":"yycj-ui-regression","private":true,"scripts":{"test:ui":"cd .. && node tests/ui_dom.cjs"},"devDependencies":{"jsdom":"26.1.0"}}
+{"name":"yycj-ui-regression","private":true,"scripts":{"test:ui":"cd .. && node tests/ui_dom.cjs && node tests/edit_ui_dom.cjs"},"devDependencies":{"jsdom":"26.1.0"}}
