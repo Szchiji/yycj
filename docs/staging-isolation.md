@@ -37,7 +37,7 @@
 - 已知生产环境 ID `95d049a1-3156-4a57-8287-b3ddad73b7c2`
 - 已知生产 Web 服务 ID `37c189b7-2717-4a7b-aee8-153d71f3ff37`
 
-这些标识来自此前只读核对，不是 secret。生产若重建，需要更新代码中的名单，或用 `STAGING_BLOCKED_HOSTS`、`STAGING_BLOCKED_RAILWAY_ENV_IDS`、`STAGING_BLOCKED_RAILWAY_SERVICE_IDS` 补充。未列入名单的新生产域名无法被自动发现。不要在同一 Railway 生产环境或生产 Web 服务上设置 `ENV=staging` / `STAGING_*`，否则会拒绝启动。
+这些标识来自此前只读核对，不是 secret。生产若重建，需要更新代码中的名单，或用 `STAGING_BLOCKED_HOSTS`、`STAGING_BLOCKED_RAILWAY_ENV_IDS`、`STAGING_BLOCKED_RAILWAY_SERVICE_IDS` 补充。未列入名单的新生产域名无法被自动发现。若进程已运行在已知生产 Railway 环境或生产 Web 服务上，即使误设 `ENV=staging` 或 `STAGING_*`，也不会进入 staging 模式，以免生产拒启；staging 必须使用独立环境和服务。
 
 ## 无法自动证明的隔离项
 

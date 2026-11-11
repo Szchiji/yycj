@@ -49,8 +49,27 @@ def is_truthy(value: Optional[str]) -> bool:
     return str(value or "").strip().lower() in _TRUTHY
 
 
+def on_known_production_runtime(environ: Optional[Mapping[str, str]] = None) -> bool:
+    """True when this process is clearly the known production Railway env or web service."""
+    env = environ if environ is not None else os.environ
+    railway_name = (env.get("RAILWAY_ENVIRONMENT_NAME") or "").strip().lower()
+    railway_env_id = (env.get("RAILWAY_ENVIRONMENT_ID") or "").strip().lower()
+    railway_service_id = (env.get("RAILWAY_SERVICE_ID") or "").strip().lower()
+    if railway_name in PRODUCTION_RAILWAY_ENV_NAMES:
+        return True
+    if railway_env_id and railway_env_id in blocked_railway_env_ids(env):
+        return True
+    if railway_service_id and railway_service_id in blocked_railway_service_ids(env):
+        return True
+    return False
+
+
 def staging_requested(environ: Optional[Mapping[str, str]] = None) -> bool:
     env = environ if environ is not None else os.environ
+    # Never activate staging mode on the known production runtime. A mistaken
+    # ENV=staging or STAGING_* on production must not refuse to start.
+    if on_known_production_runtime(env):
+        return False
     if is_truthy(env.get("STAGING_ISOLATION")):
         return True
     app_env = (env.get("ENV") or "").strip().lower()

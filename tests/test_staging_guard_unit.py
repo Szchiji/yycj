@@ -64,6 +64,39 @@ def test_production_and_local_defaults_do_not_require_new_flags():
     }
 
 
+def test_known_production_runtime_never_enters_staging_mode():
+    """A mistaken ENV=staging / STAGING_* on production must keep the production path."""
+    env = {
+        "ENV": "staging",
+        "STAGING_ISOLATION": "1",
+        "STAGING_CONFIRMED_ISOLATED": "1",
+        "BOT_TOKEN": TEST_TOKEN,
+        "WEBHOOK_HOST": "https://{0}".format(PROD_HOST),
+        "WEBAPP_URL": "https://{0}/app".format(PROD_HOST),
+        "RAILWAY_ENVIRONMENT_NAME": "production",
+        "RAILWAY_ENVIRONMENT_ID": PROD_ENV_ID,
+        "RAILWAY_SERVICE_ID": PROD_SERVICE_ID,
+    }
+    assert guard.on_known_production_runtime(env) is True
+    assert guard.staging_requested(env) is False
+    guard.assert_startup_isolation(env)
+    assert guard.job_policy(env) == {
+        "staging": False,
+        "db_jobs": True,
+        "telegram_jobs": True,
+        "bot_hooks": True,
+        "demo_purge": True,
+    }
+    # Each production identifier alone is enough.
+    for key, value in (
+        ("RAILWAY_ENVIRONMENT_NAME", "production"),
+        ("RAILWAY_ENVIRONMENT_ID", PROD_ENV_ID),
+        ("RAILWAY_SERVICE_ID", PROD_SERVICE_ID),
+    ):
+        one = {"ENV": "staging", "STAGING_ISOLATION": "1", key: value}
+        assert guard.staging_requested(one) is False
+
+
 def test_env_staging_alone_is_not_isolation():
     with pytest.raises(StagingIsolationError) as exc:
         guard.assert_startup_isolation({"ENV": "staging", "BOT_TOKEN": TEST_TOKEN})
@@ -119,19 +152,17 @@ def test_bot_id_from_token_is_prefix_only():
     assert guard.bot_id_from_token("") is None
 
 
-def test_known_production_host_and_railway_ids_are_blocked():
+def test_known_production_host_is_blocked_on_real_staging():
     cases = [
         _staging(WEBHOOK_HOST="https://{0}".format(PROD_HOST)),
         _staging(WEBAPP_URL="https://{0}/app".format(PROD_HOST)),
-        _staging(RAILWAY_ENVIRONMENT_NAME="production"),
-        _staging(RAILWAY_ENVIRONMENT_ID=PROD_ENV_ID),
-        _staging(RAILWAY_SERVICE_ID=PROD_SERVICE_ID),
         _staging(
             STAGING_BLOCKED_HOSTS="other-prod.example.test",
             WEBHOOK_HOST="https://other-prod.example.test",
         ),
     ]
     for env in cases:
+        assert guard.on_known_production_runtime(env) is False
         with pytest.raises(StagingIsolationError):
             guard.assert_startup_isolation(env)
 
