@@ -8,11 +8,14 @@
   const welcome=opt.context==='welcome',limit=welcome?12:16;
   const items=()=>welcome?value:(value?.items||[]),mode=()=>welcome?'custom':value?.mode||'inherit';
   function changed(){opt.onChange?.(structuredClone(value));preview();}
+  function compactRow(b,i,editable){const disabled=!editable?' disabled':'';return `<div class="message-button-row ws-button-card" data-brow="${i}"${welcome?` data-wrow="${i}"`:''}>
+   <div class="ws-button-head"><strong>按钮 ${String(i+1).padStart(2,'0')}</strong><label><input type="checkbox" data-bkey="enabled"${b.enabled!==false?' checked':''}${disabled}>启用</label><label><input type="checkbox" data-bkey="new_row"${(b.new_row??i%2===0)?' checked':''}${disabled}>另起一行</label><div class="ws-button-actions"><button class="btn small" type="button" data-bup="${i}" aria-label="上移按钮${i+1}"${!editable||!i?' disabled':''}>↑</button><button class="btn small" type="button" data-bdown="${i}" aria-label="下移按钮${i+1}"${!editable||i===items().length-1?' disabled':''}>↓</button><button class="btn small" type="button" data-bremove="${i}"${welcome?` data-wremove="${i}"`:''}${disabled}>删除</button></div></div>
+   <div class="ws-button-fields"><label>按钮文字<input data-bkey="label" maxlength="32" value="${esc(b.label)}" placeholder="按钮文字"${disabled}></label><label>类型<select data-bkey="type"${disabled}><option value="webapp"${b.type==='webapp'?' selected':''}>小程序</option><option value="url"${b.type==='url'?' selected':''}>链接</option></select></label><label>目标${b.type==='webapp'?`<select data-bkey="target"${disabled}>${['home','me',...(welcome?[]:['detail'])].map(t=>`<option value="${t}"${b.target===t?' selected':''}>${({home:'首页',me:'我的',detail:'本条资料'})[t]}</option>`).join('')}</select>`:`<input data-bkey="target" value="${esc(b.target)}" placeholder="https:// 或 t.me/${welcome?'':'；{album}/{detail}'}"${disabled}>`}</label></div></div>`;}
   function render(){
    const m=mode(),editable=!opt.disabled && m==='custom';
    box.innerHTML=`<p class="muted">私聊按钮：${limit}个以内，每行最多4个；旧欢迎按钮保留原来每行2个。频道仍为纯文字链接，常驻「首页」不变。</p>`+
     (!welcome?`<label>按钮配置<select data-bmode${opt.disabled?' disabled':''}>${opt.city?`<option value="inherit"${m==='inherit'?' selected':''}>沿用全站按钮</option>`:''}<option value="default"${m==='default'?' selected':''}>兼容原有默认按钮与附加按钮开关</option><option value="custom"${m==='custom'?' selected':''}>自定义按钮（空列表＝不附按钮）</option></select></label>`:'')+
-    (m==='custom'?items().map((b,i)=>`<div class="message-button-row" data-brow="${i}"${welcome?` data-wrow="${i}"`:''}>
+    (m==='custom'?items().map((b,i)=>opt.layout==='compact'?compactRow(b,i,editable):`<div class="message-button-row" data-brow="${i}"${welcome?` data-wrow="${i}"`:''}>
       <label><input type="checkbox" data-bkey="enabled"${b.enabled!==false?' checked':''}${!editable?' disabled':''}/>启用</label>
       <select data-bkey="type"${!editable?' disabled':''}><option value="webapp"${b.type==='webapp'?' selected':''}>小程序</option><option value="url"${b.type==='url'?' selected':''}>链接</option></select>
       <input data-bkey="label" maxlength="32" value="${esc(b.label)}" placeholder="按钮文字"${!editable?' disabled':''}/>

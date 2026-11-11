@@ -69,11 +69,14 @@ def export(destination:Path):
       'desktop-review.html':{'page':'review','tab':'media','post':'post-media'},
       'desktop-messages.html':{'page':'messages','tab':'approval'},
       'desktop-city.html':{'page':'settings','tab':'popup'},
+      'desktop-community.html':{'page':'settings','tab':'community'},
+      'desktop-channel.html':{'page':'settings','tab':'channel'},
+      'desktop-logs-list.html':{'page':'logs'},
       'desktop-logs.html':{'page':'logs','log':'log-unknown'},
       'desktop-permissions.html':{'page':'system','tab':'permissions'},
     }
     for name,start in starts.items():(destination/name).write_text(page(start))
-    for name,start in [('mobile-city.html',{'page':'settings','tab':'popup'}),('mobile-messages.html',{'page':'messages','tab':'approval'}),('mobile-logs.html',{'page':'logs','log':'log-unknown'})]:
+    for name,start in [('mobile-city.html',{'page':'settings','tab':'popup'}),('mobile-messages.html',{'page':'messages','tab':'approval'}),('mobile-logs.html',{'page':'logs','log':'log-unknown'}),('mobile-logs-list.html',{'page':'logs'}),('mobile-community.html',{'page':'settings','tab':'community'})]:
         inner=page(start)
         outer='<!DOCTYPE html><html lang="zh-CN"><meta charset="utf-8"><title>390px 实现界面审核 · 示例</title><style>body{margin:0;background:#080c14;color:#b5c9e5;font:14px sans-serif;text-align:center}iframe{width:390px;max-width:100vw;height:1000px;border:1px solid #34445d}p{margin:12px}</style><p>390px 真实CSS审核容器 · 示例数据 · 非截图 / 未视觉验收</p><iframe title="390px 离线实际界面" srcdoc="'+html.escape(inner,quote=True)+'"></iframe></html>'
         (destination/name).write_text(outer)
@@ -83,13 +86,19 @@ def export(destination:Path):
 
 - `index.html`：完整六页导航，总览 → 审核与上架 → 消息与按钮 → 站点与城市配置 → 执行日志 → 系统与权限。
 - `desktop-review.html`：真实旧/新媒体比较抽屉；`desktop-messages.html`：实际按钮编辑器；`desktop-city.html`：公告配置；`desktop-logs.html`：未知送达详情；`desktop-permissions.html`：权限工作页。
+- `desktop-community.html`：分组双栏社区配置；`desktop-channel.html`：频道正文、链接标签与任务分区；`desktop-logs-list.html`：日志筛选列表（不自动打开详情）。
+- `mobile-community.html` / `mobile-logs-list.html`：390px社区配置与日志筛选列表。
 - `mobile-city.html` / `mobile-messages.html` / `mobile-logs.html`：390px iframe 真实响应式CSS容器，不是图片。
 - 也可直接缩小 `index.html` 的浏览器窗口检查响应式排版。
 
-下载后用本机浏览器打开，无需登录。若当前宿主禁止 file/srcdoc，这属于宿主限制；此包未通过浏览器像素/视觉验收，不应宣称已截图验证。没有为绕过宿主启动 localhost，也没有外接 API。
+下载后用本机浏览器打开，无需登录。若当前宿主禁止 file/srcdoc，这属于宿主限制；此包未通过浏览器像素/视觉验收，不应宣称已截图验证。允许用仅绑定127.0.0.1的本地静态服务打开审核目录；这不启用真实API。未外接任何API，也不代表浏览器视觉验收。
 
 按钮预览在正式应用使用既有后台渲染器；离线包用明确标注的示例响应，不是后台集成测试。部分旧操作在本包会提示“未实现示例操作，已阻止”，正式UI仍连接原有受鉴权API。操作后刷新页面会恢复全部示例。
 ''')
+    # Simple network-free launcher, separate from fixture pages whose anchors are intentionally blocked.
+    links=[('总览','index.html'),('消息与按钮 · 桌面','desktop-messages.html'),('社区配置 · 桌面','desktop-community.html'),('频道配置 · 桌面','desktop-channel.html'),('日志列表 · 桌面','desktop-logs-list.html'),('日志详情 · 桌面','desktop-logs.html'),('消息与按钮 · 390px','mobile-messages.html'),('城市弹窗 · 390px','mobile-city.html'),('社区配置 · 390px','mobile-community.html'),('日志列表 · 390px','mobile-logs-list.html'),('日志详情 · 390px','mobile-logs.html')]
+    launcher='<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>后台布局优化评审</title><style>body{background:#0b0f18;color:#dfeaff;font:16px/1.8 sans-serif;max-width:900px;margin:40px auto;padding:0 20px}a{display:block;padding:12px 16px;background:#171e2c;color:#9fc6ff;border:1px solid #293448;border-radius:8px;margin:10px 0}p{color:#98a7bd;font-size:14px}</style><h1>月影车姬 · 布局优化评审</h1><p>真实未合并HTML/CSS/JS，示例数据、内存操作、网络隔离。不是线上截图；生产未变。桌面建议1440×1000，移动页为390px容器。可直接导航六页；关闭/刷新会恢复示例。</p>'+''.join('<a href="'+url+'">'+label+'</a>' for label,url in links)+'</html>'
+    (destination/'review-index.html').write_text(launcher)
     archive=destination.parent/(destination.name+'.zip')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for p in sorted(destination.iterdir()):z.write(p,arcname=destination.name+'/'+p.name)

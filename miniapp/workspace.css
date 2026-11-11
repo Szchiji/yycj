@@ -30,3 +30,203 @@
 .workspace-body .btn.primary{background:#6ea8ff;border-color:#6ea8ff;color:#0c1a30}.ws-editor-details{border:1px solid var(--line);border-radius:10px;margin-bottom:18px;background:var(--card)}.ws-editor-details>summary{padding:16px 20px;min-height:48px;cursor:pointer;color:#b4d1ff}.ws-editor-details>.card{border:0!important;margin:0!important;border-top:1px solid var(--line)!important}.workspace-body .ws-editor-details.ws-legacy-hide{display:none!important}
 
 @media(max-width:760px){.workspace-body .ws-inherit{min-height:44px;padding:8px 0}.workspace-body .ws-field .field-top>label{min-height:44px;display:flex;align-items:center}.workspace-body .tabs button,.workspace-body .ws-table-actions .link{min-height:44px}.workspace-body .muted{font-size:13px}.workspace-body .ws-log-op{font-size:12px;overflow-wrap:anywhere}.workspace-body .workspace-topbar select{min-height:44px}}
+
+/* Layout refinement 20261111b: scoped to the admin workbench; no guest styles. */
+.workspace-body{--ws-sidebar:196px;--ws-top:64px}
+.workspace-body .sidebar{width:var(--ws-sidebar);padding:20px 12px}
+.workspace-body .brand{padding:0 10px 22px;gap:10px}
+.workspace-body .brand b{font-size:18px}
+.workspace-body .nav-link{min-height:44px;margin:3px 0;padding:9px 12px;gap:9px}
+.workspace-body .side-foot{left:24px;bottom:20px}
+.workspace-body #console{margin-left:var(--ws-sidebar);min-height:calc(100dvh - var(--ws-top))}
+.workspace-body .workspace-topbar{height:var(--ws-top);margin-left:var(--ws-sidebar);padding:0 24px}
+.workspace-body .workspace-topbar #status{left:24px;bottom:1px}
+.workspace-body .scope{gap:8px;min-width:0}
+.workspace-body .workspace-topbar .scope select{font-size:15px;min-width:120px;max-width:190px}
+.workspace-body .content{max-width:1560px;padding:20px 24px 48px;min-width:0}
+.workspace-body .pagehead{margin-bottom:16px;align-items:flex-start;gap:16px}
+.workspace-body .pagehead h1{font-size:23px;line-height:1.4;margin:0 0 4px;letter-spacing:0}
+.workspace-body .pagehead p{margin:0;font-size:12px;line-height:1.6}
+.workspace-body .save-note{font-size:11px}
+.workspace-body .tabs{gap:22px;margin-bottom:16px}
+.workspace-body .tabs button{padding-bottom:9px;min-height:40px}
+.workspace-body .card{padding:18px;margin-bottom:16px;border-radius:12px}
+.workspace-body h2{font-size:15px}
+.workspace-body .grid{gap:16px}
+.workspace-body .metrics{gap:14px;margin-bottom:16px}
+.workspace-body .metric{margin:0;padding:16px 18px}
+.workspace-body .metric strong{font-size:28px;margin:6px 0 0}
+.workspace-body .queue-row{padding:14px 0;gap:12px}
+.workspace-body .queue-row p{margin-bottom:0}
+.workspace-body #workspaceLegacy>.admin-pane>h3{display:none}
+.workspace-body #workspaceLegacy .card,.workspace-body #workspaceLegacy .ops-card{padding:18px;margin-bottom:16px}
+.workspace-body .ws-review-grid,.workspace-body #workspaceLegacy #adminListings{gap:16px}
+.workspace-body .ws-queue-filter{display:flex;align-items:center;gap:16px}
+.workspace-body .ws-queue-filter input{min-width:0;flex:1}
+.workspace-body .ws-queue-filter p{margin:0;max-width:300px}
+.workspace-body .ws-context-strip{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0 12px;margin-bottom:4px;color:#91a8c7;font-size:11px}
+.workspace-body .ws-context-help{position:relative;flex-shrink:0}
+.workspace-body summary{cursor:pointer;outline-offset:4px}
+.workspace-body .ws-context-help>summary{color:#accbfa;min-height:28px;display:list-item}
+.workspace-body .ws-context-help>p{position:absolute;right:0;top:30px;width:min(360px,80vw);padding:14px;margin:0;background:#1b2a40;border:1px solid #3d5577;border-radius:9px;box-shadow:0 12px 30px #0005;z-index:18;font-size:12px}
+.workspace-body .ws-config-grid{grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:20px;align-items:start}
+.workspace-body .ws-config-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;min-width:0}
+.workspace-body .ws-editor-groups{grid-template-columns:1fr}
+.workspace-body .ws-config-group{margin:0;min-width:0}
+.workspace-body .ws-config-group:only-child{grid-column:1/-1;max-width:880px;width:100%}
+.workspace-body .ws-config-grid .ws-config-group:only-child{max-width:none}
+.workspace-body .ws-config-group>h2{padding-bottom:12px;margin:0 0 14px;border-bottom:1px solid var(--line)}
+.workspace-body .ws-group-body{min-width:0}
+.workspace-body .ws-field{margin-bottom:16px;min-width:0}
+.workspace-body .ws-field:last-child{margin-bottom:0}
+.workspace-body .field-top{gap:8px;margin-bottom:6px;align-items:center}
+.workspace-body .field-top>label{font-size:12px;margin:0}
+.workspace-body .field-top>.ws-inherit{font-size:11px;white-space:nowrap}
+.workspace-body .ws-field textarea{min-height:96px;line-height:1.7}
+.workspace-body .ws-field input,.workspace-body .ws-field select{min-width:0}
+.workspace-body .ws-type-bool{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;align-items:center}
+.workspace-body .ws-type-bool>.field-top{grid-column:1;grid-row:1;margin:0;flex-wrap:wrap;justify-content:flex-start}
+.workspace-body .ws-type-bool>.toggle{grid-column:2;grid-row:1;margin:0}
+.workspace-body .toggle{width:39px;min-width:39px;height:23px;min-height:23px}
+.workspace-body .ws-type-bool>.ws-effective{grid-column:1/-1}
+.workspace-body .ws-effective{font-size:11px;color:#8298b5;margin:5px 0 0;min-width:0}
+.workspace-body .ws-effective>summary{overflow-wrap:anywhere;line-height:1.7}
+.workspace-body .ws-effective .effective{margin:7px 0 0;padding:8px 10px;background:#101927;border-radius:6px;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
+.workspace-body .ws-field-hint{font-size:11px;color:#c5b388;margin:5px 0 0}
+.workspace-body .ws-advanced{border:1px solid var(--line);background:var(--card);border-radius:12px}
+.workspace-body .ws-advanced>summary{padding:15px 18px;font-size:13px;color:#b7ceee}
+.workspace-body .ws-advanced>summary span{float:right}
+.workspace-body .ws-advanced>.ws-group-body{padding:0 18px 18px}
+.workspace-body [data-tab=community] .ws-config-group:last-child,.workspace-body [data-tab=channel] .ws-config-group:nth-child(3){grid-column:1/-1}
+.workspace-body [data-tab=community] .ws-config-group:last-child .ws-group-body,.workspace-body [data-tab=channel] .ws-config-group:nth-child(3) .ws-group-body{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
+.workspace-body [data-tab=community] .ws-config-group:last-child .ws-field:last-child{grid-column:1/-1}
+.workspace-body .ws-message-preview{top:80px;min-width:0}
+.workspace-body .ws-preview-panel{padding:0;overflow:hidden}
+.workspace-body .ws-preview-panel>summary{padding:14px 16px;font-size:14px;font-weight:600;color:#c4d9f7}
+.workspace-body .ws-preview-panel>summary .badge{float:right;font-weight:400;margin-left:8px}
+.workspace-body .ws-preview-content{padding:0 16px 16px}
+.workspace-body .preview{padding:14px}
+.workspace-body .preview-label{margin-bottom:10px;font-size:10px}
+.workspace-body .chat-bubble{padding:14px;font-size:13px;line-height:1.8}
+.workspace-body .ws-help{color:#91a8c7;font-size:12px;margin:12px 0}
+.workspace-body .ws-help>summary{min-height:32px;line-height:32px;color:#9fbcdf}
+.workspace-body .ws-help>p{margin:8px 0;line-height:1.8}
+.workspace-body .ws-buttons-field>.field-label{display:none}
+.workspace-body .ws-external-preview>p{font-size:11px;line-height:1.7;margin-bottom:10px}
+.workspace-body .ws-external-preview>label{display:block;font-size:12px;color:#b0c4df}
+.workspace-body .ws-external-preview>label>select{margin:6px 0 2px}
+.workspace-body .ws-button-card{display:block;padding:12px;margin:10px 0;border:1px solid #34445e;border-radius:9px;background:#111b2a;min-width:0}
+.workspace-body .ws-button-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.workspace-body .ws-button-head>strong{font-size:11px;color:#8da9ce;font-weight:500}
+.workspace-body .ws-button-head>label{font-size:11px;white-space:nowrap}
+.workspace-body .ws-button-actions{display:flex;gap:4px;margin-left:auto}
+.workspace-body .ws-button-actions .btn{padding:3px 9px;min-height:30px;font-size:11px}
+.workspace-body .ws-button-fields{display:grid;grid-template-columns:minmax(0,1fr) 90px minmax(0,1.2fr);gap:8px;min-width:0}
+.workspace-body .ws-button-fields>label{display:block;font-size:11px;color:#8fa7c7;min-width:0}
+.workspace-body .ws-button-fields input,.workspace-body .ws-button-fields select{margin-top:4px;width:100%;max-width:100%;min-width:0;min-height:38px;font-size:12px;padding:7px 8px}
+.workspace-body .message-button-preview{padding:10px;margin:8px 0}
+.workspace-body .message-button-preview>b{font-size:10px;font-weight:400;color:#8aa7cd}
+.workspace-body .message-button-preview span{flex:1;text-align:center;font-size:12px;padding:9px 8px;min-width:0}
+.workspace-body .ws-logs-card{padding:16px}
+.workspace-body .ws-log-primary{display:grid;grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) minmax(280px,2fr) auto;gap:10px;align-items:end;margin-bottom:10px}
+.workspace-body .ws-log-primary label,.workspace-body .ws-log-time label{display:block;font-size:11px;color:#91a8c7;min-width:0}
+.workspace-body .ws-log-primary input,.workspace-body .ws-log-primary select,.workspace-body .ws-log-time input{margin-top:4px;min-width:0;font-size:12px}
+.workspace-body .ws-log-id{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;min-width:0}
+.workspace-body .ws-log-advanced{font-size:11px;color:#94afcf;margin:0 0 12px}
+.workspace-body .ws-log-advanced>summary{min-height:28px;line-height:28px}
+.workspace-body .ws-log-time{margin:6px 0 12px;max-width:700px;gap:10px}
+.workspace-body table th{padding:10px;font-size:11px}
+.workspace-body table td{padding:12px 10px;font-size:12px}
+.workspace-body .ws-log-op{overflow-wrap:anywhere;max-width:290px;font-size:10px}
+.workspace-body .ws-pagination{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.workspace-body .ws-drawer{width:min(740px,100%);padding:24px 26px 110px}
+.workspace-body .ws-drawer .drawer-actions{width:min(740px,100%)}
+.workspace-body .ws-detail-head{position:relative;padding-right:30px;margin-bottom:16px}
+.workspace-body .ws-detail-head h2{font-size:20px;margin:4px 0 10px}
+.workspace-body .ws-detail-meta{display:grid;grid-template-columns:1fr 1.4fr;gap:12px;padding:14px;background:#172437;border:1px solid #2e405a;border-radius:9px;margin-bottom:18px}
+.workspace-body .ws-detail-meta small{display:block;color:#809abb;font-size:10px;margin-bottom:5px}
+.workspace-body .ws-detail-meta strong,.workspace-body .ws-detail-meta code{font-size:12px;font-weight:400;overflow-wrap:anywhere;color:#b9cee9}
+.workspace-body .ws-stage{margin:12px 0;padding:0 0 12px 16px}
+.workspace-body .ws-stage-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px}
+.workspace-body .ws-stage-head h3{margin:0;overflow-wrap:anywhere}
+.workspace-body .ws-stage-head .badge{margin:0;flex-shrink:0}
+.workspace-body .ws-stage p{margin:4px 0;font-size:12px;overflow-wrap:anywhere}
+@media(min-width:761px) and (max-width:1100px){
+ .workspace-body{--ws-sidebar:176px}
+ .workspace-body .content{padding:18px}
+ .workspace-body .workspace-topbar{padding:0 18px}
+ .workspace-body .ws-config-grid{grid-template-columns:1fr}
+ .workspace-body .ws-message-preview{position:static;max-width:640px}
+ .workspace-body .ws-log-primary{grid-template-columns:1fr 1fr}
+ .workspace-body .ws-log-id{grid-column:1;grid-template-columns:96px minmax(0,1fr)}
+}
+@media(max-width:760px){
+ .workspace-body{--ws-top:64px}
+ .workspace-body .sidebar{width:258px}
+ .workspace-body .workspace-topbar{margin-left:0;padding:0 14px;gap:8px;height:64px}
+ .workspace-body .workspace-topbar #status{left:14px;font-size:9px}
+ .workspace-body .workspace-topbar .scope select{min-width:105px;max-width:154px;font-size:15px}
+ .workspace-body .content{padding:18px 14px calc(112px + env(safe-area-inset-bottom));width:100%;overflow-wrap:anywhere}
+ .workspace-body .pagehead{margin-bottom:14px}
+ .workspace-body .pagehead h1{font-size:22px;margin-bottom:4px}
+ .workspace-body .pagehead p{font-size:12px}
+ .workspace-body .tabs{gap:18px;margin-bottom:14px}
+ .workspace-body .tabs button{min-height:44px;font-size:12px;flex-shrink:0}
+ .workspace-body .card,.workspace-body #workspaceLegacy .card,.workspace-body #workspaceLegacy .ops-card{padding:16px;margin-bottom:14px}
+ .workspace-body .metrics{gap:10px}
+ .workspace-body .metric{padding:13px;margin:0}
+ .workspace-body .metric strong{font-size:25px}
+ .workspace-body .metric .muted{font-size:11px}
+ .workspace-body .ws-queue-filter{display:block}
+ .workspace-body .ws-queue-filter p{max-width:none;margin-top:6px;font-size:11px}
+ .workspace-body .ws-config-grid,.workspace-body .ws-config-groups{grid-template-columns:1fr;gap:14px}
+ .workspace-body .ws-config-group{margin:0}
+ .workspace-body .ws-context-strip{align-items:flex-start;flex-direction:column;gap:2px;padding:0 0 10px;font-size:11px}
+ .workspace-body .ws-context-help{width:100%}
+ .workspace-body .ws-context-help>summary{min-height:36px;line-height:36px}
+ .workspace-body .ws-context-help>p{position:static;width:auto;font-size:12px;margin:0 0 8px}
+ .workspace-body .field-top{flex-wrap:wrap;gap:4px 10px}
+ .workspace-body .field-top>label{font-size:13px;min-height:32px}
+ .workspace-body .field-top>.ws-inherit{font-size:11px;min-height:36px;padding:4px 0}
+ .workspace-body .ws-field{margin-bottom:16px}
+ .workspace-body .ws-field input:not([type=checkbox]),.workspace-body .ws-field select,.workspace-body .ws-field textarea,.workspace-body .ws-log-primary input,.workspace-body .ws-log-primary select,.workspace-body .ws-log-time input{font-size:16px;min-height:44px;width:100%;max-width:100%}
+ .workspace-body .ws-effective>summary{min-height:32px;font-size:11px;padding:5px 0}
+ .workspace-body .ws-effective .effective{font-size:12px}
+ .workspace-body [data-tab=community] .ws-config-group:last-child .ws-group-body,.workspace-body [data-tab=channel] .ws-config-group:nth-child(3) .ws-group-body{grid-template-columns:1fr;gap:0}
+ .workspace-body .ws-message-preview{position:static}
+ .workspace-body .ws-preview-panel{padding:0}
+ .workspace-body .ws-preview-panel>summary{min-height:48px;padding:14px;font-size:13px}
+ .workspace-body .ws-preview-content{padding:0 14px 14px}
+ .workspace-body .ws-preview-panel>summary .badge{font-size:10px}
+ .workspace-body .ws-button-card{display:block;padding:10px}
+ .workspace-body .ws-button-head{gap:6px 10px;align-items:center;margin-bottom:8px}
+ .workspace-body .ws-button-head>label{min-height:44px;display:flex}
+ .workspace-body .ws-button-actions{gap:4px}
+ .workspace-body .ws-button-actions .btn{min-width:44px;min-height:44px;padding:6px;font-size:12px}
+ .workspace-body .ws-button-fields{grid-template-columns:1fr;gap:10px}
+ .workspace-body .ws-button-fields>label{display:block;font-size:12px}
+ .workspace-body .ws-button-fields input,.workspace-body .ws-button-fields select{font-size:16px;min-height:44px}
+ .workspace-body .ws-external-preview>p{font-size:11px}
+ .workspace-body .ws-log-primary,.workspace-body .ws-log-id{grid-template-columns:1fr;gap:10px}
+ .workspace-body .ws-log-primary>button{min-height:44px;margin-top:2px}
+ .workspace-body .ws-log-advanced>summary{min-height:44px;line-height:44px}
+ .workspace-body .ws-log-time{grid-template-columns:1fr;max-width:none}
+ .workspace-body table td{padding:7px 0;font-size:12px}
+ .workspace-body .ws-log-op{font-size:11px;max-width:225px}
+ .workspace-body .ws-pagination .btn{min-height:44px}
+ .workspace-body .ws-detail-meta{grid-template-columns:1fr;gap:12px}
+ .workspace-body .ws-drawer{padding:20px 16px 120px}
+ .workspace-body .ws-drawer .drawer-actions{padding:14px 16px calc(14px + env(safe-area-inset-bottom))}
+ .workspace-body .ws-stage{padding-left:12px}
+ .workspace-body .ws-stage-head{align-items:flex-start}
+ .workspace-body .save-area{padding:10px 14px calc(10px + env(safe-area-inset-bottom));gap:10px}
+ .workspace-body .save-area .btn{min-height:48px;font-size:13px;padding:9px 14px}
+ .workspace-body .save-note{font-size:11px;max-width:155px;line-height:1.5}
+ .workspace-body .ws-help>summary{min-height:44px;line-height:44px}
+}
+.workspace-body .ws-button-head>label,.workspace-body .ws-button-fields>label,.workspace-body .ws-log-primary label{margin:0}
+@media(max-width:760px){
+ .workspace-body .workspace-topbar #btnMenu{min-width:44px;min-height:44px}
+ .workspace-body #sideMask.open{display:block;position:fixed;inset:64px 0 0;background:#02050bb3;z-index:44}
+}
+.workspace-body .ws-protected .empty-locked{padding:10px 12px;text-align:left;font-size:12px}

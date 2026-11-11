@@ -171,7 +171,7 @@ def test_all_true_admin_entrypoints_use_new_shell_without_fixture_routes(monkeyp
         async with environment(monkeypatch) as(c,h,home):
             for url in ['/app/admin.html','/app/console.html','/app/desk.html']:
                 r=await c.get(url);assert r.status_code==200
-                assert 'workspaceNav' in r.text and 'workspace.js?v=20261111a' in r.text
+                assert 'workspaceNav' in r.text and 'workspace.js?v=20261111b' in r.text
                 assert 'workspace_fixture' not in r.text and 'OFFLINE_FIXTURE' not in r.text
                 assert 'no-store' in r.headers['cache-control']
             r=await c.get('/app/desk-legacy.html');assert r.status_code==200
