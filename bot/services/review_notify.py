@@ -79,11 +79,11 @@ _SEC = (("diff", "人照课表差异"), ("pros", "优点"), ("cons", "不足"), 
 
 async def _caption(review: Dict[str, Any], lamp: Dict[str, Any], limit: int = 4000) -> str:
     """Moderation text. 4000 for a text message (补充 up to 1000 字 fits), 1024 for a photo caption."""
-    from bot.services import credit_service
+    from bot.services import users
     gid = review.get("guest_id")
     who = f"<code>{gid}</code>"
     try:
-        u = await credit_service.ensure_user(int(gid))
+        u = await users.ensure_user(int(gid))
         if u.get("username"):
             who += f" @{_h(str(u['username']))}"
         if u.get("guest_alias"):

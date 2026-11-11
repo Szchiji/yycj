@@ -15,8 +15,8 @@ def test_map_only_uses_published_district_group_points():
 def test_guest_assets_versioned_without_cancelled_native_integration():
     for name in ['index.html', 'go.html']:
         text = (ROOT / 'miniapp' / name).read_text()
-        assert 'app.bundle.js?v=20261111n' in text
-        assert 'app.bundle.css?v=20261111n' in text
+        assert 'app.bundle.js?v=20261112a' in text
+        assert 'app.bundle.css?v=20261112a' in text
         assert 'telegram-native' not in text
     manifest = (ROOT / 'scripts/build_miniapp.py').read_text()
     assert manifest.index('"edit-history-ui.js"') < manifest.index('"map-results.js"') < manifest.index('"community-ui.js"')

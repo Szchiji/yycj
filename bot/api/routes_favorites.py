@@ -10,7 +10,7 @@ from bot.api.deps import get_current_user_id
 from bot.api.routes_core import router
 from bot.db import session_scope
 from bot.models_extra import Favorite
-from bot.services import credit_service, search_service
+from bot.services import search_service, users
 
 
 @router.get("/me/favorites")
@@ -33,7 +33,7 @@ async def api_toggle_favorite(
     lamp_id: str,
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    u = await credit_service.ensure_user(user_id)
+    u = await users.ensure_user(user_id)
     if (u.get("role") or "guest") != "guest":
         raise HTTPException(status_code=403, detail="仅客人可收藏")
     async with session_scope() as s:

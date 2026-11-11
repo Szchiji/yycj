@@ -68,7 +68,7 @@ def session_accept_kb(session_id: str) -> InlineKeyboardMarkup:
 def session_end_kb(session_id: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.row(InlineKeyboardButton(text="🔚 结束会话", callback_data=f"session_end:{session_id}"))
-    b.row(InlineKeyboardButton(text="👍 好评结算", callback_data=f"session_praise:{session_id}"))
+    b.row(InlineKeyboardButton(text="👍 好评", callback_data=f"session_praise:{session_id}"))
     return b.as_markup()
 
 

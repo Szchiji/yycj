@@ -62,7 +62,7 @@
 | --- | --- | --- |
 | `STAGING_ENABLE_BOT_HOOKS` | 关 | `setWebhook`、菜单按钮、Bot 命令、`deleteWebhook`、启动时 `getMe` |
 | `STAGING_ENABLE_TELEGRAM_JOBS` | 关 | 到期提醒、班次提醒、频道目录刷新、优惠帖收尾、标签同步、审核通知补发 |
-| `STAGING_ENABLE_DB_JOBS` | 关 | 过期资料/会话清理、会话消息清理、积分日结、价格回填 |
+| `STAGING_ENABLE_DB_JOBS` | 关 | 过期资料/会话清理、会话消息清理、价格回填 |
 | `STAGING_ENABLE_DEMO_PURGE` | 关 | 启动时清理标题含「演示」的资料 |
 | `STAGING_ALLOW_TEST_CHANNELS` | 关 | 允许库内已有频道或必进群配置；默认要求这些字段为空 |
 

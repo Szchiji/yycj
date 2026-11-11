@@ -88,19 +88,6 @@
           </div>
           <div id="adminUsers"></div>
         </div>
-        <div class="ops-card">
-          <h4>月影遮蔽</h4>
-          <label>用户 ID</label>
-          <input id="shadowUid" type="number" />
-          <label>天数</label>
-          <input id="shadowDays" type="number" min="1" max="365" value="7" />
-          <label>原因</label>
-          <input id="shadowReason" />
-          <div class="row">
-            <button class="btn danger" id="btnShadowOn" type="button">设置遮蔽</button>
-            <button class="btn" id="btnShadowOff" type="button">解除遮蔽</button>
-          </div>
-        </div>
       </section>
       <section class="admin-pane" id="pane-venue">
         <h3>站点设置</h3>
@@ -155,22 +142,6 @@
           <h4>举报</h4>
           <div id="adminReports"></div>
         </div>
-        <div class="ops-card">
-          <h4>遮蔽名单</h4>
-          <div id="adminShadow"></div>
-        </div>
-        <div class="ops-card">
-          <h4>调整口碑分</h4>
-          <form id="adjForm">
-            <label>用户 ID</label>
-            <input id="adjUser" type="number" required />
-            <label>加减分</label>
-            <input id="adjDelta" type="number" required />
-            <label>备注</label>
-            <input id="adjNote" />
-            <button class="btn primary" type="submit">提交</button>
-          </form>
-        </div>
       </section>
     </div>
     </div>
@@ -179,8 +150,8 @@
   <script src="./admin-boot.js?v=20261030d"></script>
   <script src="./edit-state-ui.js?v=20261111f"></script>
   <script src="./edit-history-ui.js?v=20261111n"></script>
-  <script src="./admin.js?v=20261111a"></script>
-  <script src="./admin-ops.js?v=20261111n"></script>
+  <script src="./admin.js?v=20261112a"></script>
+  <script src="./admin-ops.js?v=20261112a"></script>
   <script src="./admin-list.js?v=20261111d"></script>
   <script src="./hours-picker.js?v=20261030d"></script>
   <script src="./admin-proxy.js?v=20261111a"></script>
@@ -188,6 +159,6 @@
   <script src="./admin-buttons.js?v=20261111b"></script>
 <script src="./admin-insights.js?v=20261031e"></script>
 <script src="./admin-coupons.js?v=20261111a"></script>
-<script src="./workspace.js?v=20261111g"></script>
+<script src="./workspace.js?v=20261112a"></script>
 </body>
 </html>

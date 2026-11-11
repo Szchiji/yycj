@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Query
 
 from bot.api.deps import get_admin_user_id, get_super_user_id
 from bot.models import ReviewStatus
-from bot.services import credit_service, home_service, session_service
+from bot.services import home_service, session_service
 from bot.services import admin_ops, city_scope
 from bot.services.admin_ops import AdminActionError
 from bot.api.routes_core import (
@@ -308,20 +308,7 @@ async def api_admin_credit_adjust(
     body: CreditAdjustBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    await city_scope.guard_user(admin_id, body.user_id)
-    if body.delta == 0:
-        raise HTTPException(status_code=400, detail="delta 不能为 0")
-    if abs(body.delta) > 500:
-        raise HTTPException(status_code=400, detail="单次调整幅度过大")
-    note = (body.note or "").strip() or "管理员调整"
-    user = await credit_service.settle_lanhua(
-        body.user_id,
-        body.delta,
-        action="admin_adjust",
-        reason=f"[admin:{admin_id}] {note}"[:256],
-        related_id=None,
-    )
-    return {"ok": True, "user": _ser_user(user)}
+    raise HTTPException(status_code=410, detail="兰花信用已停用")
 
 @router.get("/admin/shadow")
 async def api_admin_shadow_list(
@@ -329,12 +316,7 @@ async def api_admin_shadow_list(
     city: Optional[str] = None,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    items = await admin_ops.list_shadowed_users(limit=limit)
-    cities = await city_scope.effective(admin_id, city)
-    if cities is not None:
-        keep = await city_scope.filter_user_ids(cities, (x.get("user_id") for x in items))
-        items = [x for x in items if int(x.get("user_id") or 0) in keep]
-    return {"ok": True, "items": [_ser_user(x) for x in items]}
+    raise HTTPException(status_code=410, detail="兰花信用已停用")
 
 @router.get("/admin/sessions/{session_id}/messages")
 async def api_admin_session_messages(

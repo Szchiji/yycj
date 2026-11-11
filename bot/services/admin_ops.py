@@ -11,9 +11,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 
 from bot.db import session_scope
-from bot.models import Post, PostStatus, Report, ReportStatus, User
-from bot.services import credit_service, search_service
-from bot.services.credit_service import _user_to_dict
+from bot.models import Post, PostStatus, Report, ReportStatus
+from bot.services import search_service
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +75,6 @@ async def list_pending_reports(limit: int = 50, cities: Optional[set] = None) ->
         ]
 
 
-async def list_shadowed_users(limit: int = 100) -> List[Dict[str, Any]]:
-    async with session_scope() as s:
-        res = await s.execute(
-            select(User)
-            .where(User.is_shadowed.is_(True))
-            .order_by(User.shadow_days.desc(), User.lanhua_score.asc())
-            .limit(max(1, min(limit, 500)))
-        )
-        return [_user_to_dict(u) for u in res.scalars().all()]
-
-
 class AdminActionError(Exception):
     """业务层审核错误（已处理 / 不存在等）。"""
 
@@ -129,13 +117,6 @@ async def approve_post(post_id: str, *, notify: bool = True) -> Dict[str, Any]:
         publisher_role=data.get("publisher_role"),
     )
     await search_service.approve_lamp(lamp["lamp_id"])
-    await credit_service.settle_lanhua(
-        user_id,
-        credit_service.DELTA_POST_APPROVED,
-        "post_approved",
-        "灯笼审核通过",
-        post_id,
-    )
     if notify:
         await notify_user_best_effort(
             user_id,
@@ -174,7 +155,7 @@ async def reject_post(post_id: str, *, notify: bool = True) -> Dict[str, Any]:
 
 
 async def accept_report(report_id: str, *, notify: bool = True) -> Dict[str, Any]:
-    """采纳报告 → 下架灯笼、目标 -30、举报人 +10。与 Bot admin_report_ok 一致。"""
+    """采纳报告 → 下架灯笼。与 Bot admin_report_ok 一致。"""
     async with session_scope() as s:
         res = await s.execute(select(Report).where(Report.report_id == report_id))
         rep = res.scalar_one_or_none()
@@ -192,29 +173,15 @@ async def accept_report(report_id: str, *, notify: bool = True) -> Dict[str, Any
     if lamp:
         target_id = int(lamp["user_id"])
         await search_service.reject_lamp(lamp_id)
-        await credit_service.settle_lanhua(
-            target_id,
-            credit_service.DELTA_REPORT_VALID_TARGET,
-            "report_accepted",
-            "报告成立，灯笼下架",
-            report_id,
-        )
-    await credit_service.settle_lanhua(
-        reporter_id,
-        credit_service.DELTA_REPORT_VALID_REPORTER,
-        "report_reward",
-        "有效报告奖励",
-        report_id,
-    )
     if notify:
         await notify_user_best_effort(
             reporter_id,
-            f"你的月影报告已采纳，兰花分变动：{credit_service.DELTA_REPORT_VALID_REPORTER:+d}",
+            "你的举报已采纳，相关资料已下架。",
         )
         if target_id is not None:
             await notify_user_best_effort(
                 target_id,
-                f"有报告成立，相关灯笼已下架；兰花分变动：{credit_service.DELTA_REPORT_VALID_TARGET:+d}",
+                "有举报成立，相关资料已下架。",
             )
     return {
         "ok": True,
@@ -227,7 +194,7 @@ async def accept_report(report_id: str, *, notify: bool = True) -> Dict[str, Any
 
 
 async def reject_report(report_id: str, *, notify: bool = True) -> Dict[str, Any]:
-    """驳回报告 → 举报人 -15。与 Bot admin_report_no 一致。"""
+    """驳回报告。与 Bot admin_report_no 一致。"""
     async with session_scope() as s:
         res = await s.execute(select(Report).where(Report.report_id == report_id))
         rep = res.scalar_one_or_none()
@@ -239,17 +206,10 @@ async def reject_report(report_id: str, *, notify: bool = True) -> Dict[str, Any
         rep.reviewed_at = datetime.utcnow()
         reporter_id = rep.reporter_id
 
-    await credit_service.settle_lanhua(
-        reporter_id,
-        credit_service.DELTA_MALICIOUS_REPORT,
-        "report_rejected",
-        "无效或恶意报告驳回",
-        report_id,
-    )
     if notify:
         await notify_user_best_effort(
             reporter_id,
-            f"你的月影报告未通过审核，兰花分变动：{credit_service.DELTA_MALICIOUS_REPORT:+d}",
+            "你的举报未通过审核。",
         )
     return {
         "ok": True,

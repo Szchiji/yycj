@@ -14,7 +14,7 @@ from bot.api.deps import get_current_user_id
 from bot.api.telegram_webapp import WebAppAuthError, issue_access_token, validate_init_data
 from bot.config import get_settings
 from bot.models import UserRole
-from bot.services import credit_service, home_service
+from bot.services import home_service, user_admin, users
 from bot.services.admin_ops import AdminActionError
 from bot.services.media_urls import pick_cover
 
@@ -147,8 +147,8 @@ def _ser_dt(v: Any) -> Any:
     return v
 
 def _ser_user(u: Dict[str, Any]) -> Dict[str, Any]:
-    out = dict(u)
-    for k in ("created_at", "updated_at", "last_recovery_at"):
+    out = users.public_user(dict(u))
+    for k in ("created_at", "updated_at"):
         if k in out:
             out[k] = _ser_dt(out[k])
     role = out.get("role")
@@ -164,6 +164,8 @@ def _ser_lamp(lamp: Dict[str, Any]) -> Dict[str, Any]:
     out.pop("_distance_km", None)
     out.pop("approx_lat", None)
     out.pop("approx_lng", None)
+    out.pop("authenticity_score", None)
+    out.pop("credit_boost", None)
     try:
         out["cover_url"] = pick_cover(out)
     except Exception:
@@ -218,7 +220,7 @@ async def api_auth(body: AuthBody) -> Dict[str, Any]:
     user_id = int(tg_user["id"])
     username = tg_user.get("username")
     full_name = " ".join(x for x in [tg_user.get("first_name"), tg_user.get("last_name")] if x).strip() or None
-    user = await credit_service.ensure_user(user_id, username=username, full_name=full_name)
+    user = await users.ensure_user(user_id, username=username, full_name=full_name)
     if user.get("is_banned") and not settings.is_admin(user_id):
         raise HTTPException(status_code=403, detail="当前账号无法使用")
     token = issue_access_token(user_id, settings.bot_token)
@@ -227,7 +229,7 @@ async def api_auth(body: AuthBody) -> Dict[str, Any]:
 
 @router.get("/me")
 async def api_me(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
-    user = await credit_service.ensure_user(user_id)
+    user = await users.ensure_user(user_id)
     my_reviews = await home_service.list_my_reviews(user_id, limit=20)
     for r in my_reviews:
         r["created_at"] = _ser_dt(r.get("created_at"))
@@ -245,7 +247,7 @@ async def api_me(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
 @router.post("/me/role")
 async def api_set_role(body: RoleBody, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
     try:
-        user = await credit_service.set_user_role(user_id, body.role.strip().lower())
+        user = await users.set_user_role(user_id, body.role.strip().lower())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, "user": _ser_user(user), "role": user.get("role"), "role_label": _ROLE_LABEL.get(user.get("role") or "", "")}
@@ -253,7 +255,7 @@ async def api_set_role(body: RoleBody, user_id: int = Depends(get_current_user_i
 
 @router.post("/me/alias")
 async def api_set_alias(body: AliasBody, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
-    user = await credit_service.set_guest_alias(user_id, body.alias)
+    user = await user_admin.set_guest_alias(user_id, body.alias)
     return {"ok": True, "user": _ser_user(user)}
 
 
@@ -268,8 +270,4 @@ async def api_gate(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any
 
 @router.get("/me/credit")
 async def api_me_credit(user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
-    user = await credit_service.ensure_user(user_id)
-    hist = await credit_service.history(user_id, limit=30)
-    for h in hist:
-        h["time"] = _ser_dt(h.get("time"))
-    return {"ok": True, "user": _ser_user(user), "tier_ranges": credit_service.TIER_RANGES, "history": hist}
+    raise HTTPException(status_code=410, detail="兰花信用已停用")

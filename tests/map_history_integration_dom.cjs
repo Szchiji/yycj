@@ -7,8 +7,8 @@ const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
 (async()=>{
   for(const page of ['miniapp/index.html','miniapp/go.html']){
     const html=read(page);
-    assert.match(html,/app\.bundle\.js\?v=20261111n/);
-    assert.match(html,/app\.bundle\.css\?v=20261111n/);
+    assert.match(html,/app\.bundle\.js\?v=20261112a/);
+    assert.match(html,/app\.bundle\.css\?v=20261112a/);
     assert.doesNotMatch(html,/20261111h|20261111k/);
     assert.doesNotMatch(html,/telegram-native/);
   }
@@ -53,6 +53,6 @@ const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
   assert(d.getElementById('feed').querySelector('.feed-card'));
   w.__yycjHistoryUI.close();
   assert(overlay.classList.contains('hidden'));
-  console.log('map+history integration DOM: unified 20261111n, both features, no native, feed cards unchanged, stale callbacks still guarded PASS');
+  console.log('map+history integration DOM: unified 20261112a, both features, no native, feed cards unchanged, stale callbacks still guarded PASS');
   w.close();
 })().catch(e=>{console.error(e);process.exit(1)});

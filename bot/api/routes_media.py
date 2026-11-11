@@ -97,8 +97,8 @@ async def _require_uploader(user_id: int) -> bool:
     await warm()
     if is_admin(user_id):
         return True
-    from bot.services import credit_service
-    u = await credit_service.ensure_user(user_id)
+    from bot.services import users
+    u = await users.ensure_user(user_id)
     if u.get("role") not in ("teacher", "merchant"):
         raise HTTPException(status_code=403, detail="仅老师或商家可上传，请先在「我的」切换身份")
     return False

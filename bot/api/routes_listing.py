@@ -10,7 +10,7 @@ from pydantic import BaseModel, field_validator, Field
 from bot.api.deps import get_admin_user_id, get_current_user_id
 from bot.api.routes_core import MediaItem, _normalize_media, _ser_dt, router
 from bot.models import LampStatus, UserRole
-from bot.services import credit_service, listing_flow, listing_notify, search_service
+from bot.services import listing_flow, listing_notify, search_service, users
 from bot.services.admin_ops import notify_user_best_effort
 from bot.services.broadcast import update_broadcast
 from bot.services.extras_store import save_extras, save_user_fields
@@ -103,9 +103,7 @@ async def api_me_edit(
     body: EditBody,
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    u = await credit_service.ensure_user(user_id)
-    if u.get("is_shadowed"):
-        raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法改稿")
+    await users.ensure_user(user_id)
     media = _normalize_media(body.media, body.photos)
     mine = await listing_flow.list_my_lamps(user_id)
     current = next((x for x in mine if x.get("lamp_id") == lamp_id), None)
@@ -235,9 +233,9 @@ async def api_me_todos(user_id: int = Depends(get_current_user_id)) -> Dict[str,
     from datetime import datetime, timedelta
     from sqlalchemy import func, select
     from bot.models_extra import Favorite
-    from bot.services import coupons, credit_service
+    from bot.services import coupons, users
 
-    u = await credit_service.ensure_user(user_id)
+    u = await users.ensure_user(user_id)
     role = u.get("role") or "guest"
     if role in ("teacher", "merchant"):
         items = await listing_flow.list_my_lamps(user_id)
@@ -305,8 +303,7 @@ async def _retry_edit(key,body,actor,admin):
         if not op:raise HTTPException(status_code=404,detail="修改记录不存在")
         lamp_id=op.lamp_id
     if admin:await city_scope.guard(actor,"lamp",lamp_id)
-    elif (await credit_service.ensure_user(actor)).get("is_shadowed"):
-        raise HTTPException(status_code=403,detail="月影遮蔽中，暂时无法重试修改同步")
+    else:await users.ensure_user(actor)
     try:result=await listing_edits.retry(key,body.step,actor,admin=admin)
     except ValueError as exc:raise HTTPException(status_code=409,detail=str(exc)) from exc
     return {"operation":result}
@@ -394,10 +391,10 @@ async def api_admin_edit_history_preview(lamp_id: str, version_id: str, admin_id
 
 
 async def _restore(lamp_id, version_id, body, actor, admin):
-    from bot.services import listing_history, credit_service
+    from bot.services import listing_history, users
     await _history_access(lamp_id, actor, admin)
-    if not admin and (await credit_service.ensure_user(actor)).get("is_shadowed"):
-        raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法恢复资料")
+    if not admin:
+        await users.ensure_user(actor)
     try:
         result = await listing_history.restore(
             lamp_id, version_id, actor, body.operation_id,

@@ -41,7 +41,7 @@ from bot.config import get_settings
 from bot.db import close_db, connect_db
 from bot.handlers import register_handlers
 from bot.middlewares import ErrorLogMiddleware
-from bot.services import anti_brush, credit_service, session_service
+from bot.services import anti_brush, session_service
 from bot.services import staging_guard
 
 logging.basicConfig(
@@ -107,14 +107,6 @@ async def job_purge_session_messages() -> None:
         logger.exception("purge session messages failed")
 
 
-async def job_daily_credit() -> None:
-    try:
-        n = await credit_service.tick_shadow_daily()
-        logger.info("Daily credit tick updated %s users", n)
-    except Exception:
-        logger.exception("daily credit failed")
-
-
 async def job_expire_listings() -> None:
     try:
         from bot.services import listing_ops
@@ -139,7 +131,6 @@ def _schedule_jobs() -> None:
     if db_jobs:
         scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True)
         scheduler.add_job(job_purge_session_messages, "interval", minutes=30, id="purge_session_messages", replace_existing=True)
-        scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True)
         scheduler.add_job(job_expire_listings, "interval", minutes=30, id="expire_listings", replace_existing=True)
     else:
         logger.warning("Staging: DB maintenance jobs off until STAGING_ENABLE_DB_JOBS=1")

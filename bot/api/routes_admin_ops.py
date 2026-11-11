@@ -159,16 +159,7 @@ async def api_admin_shadow(
     body: ShadowBody,
     admin_id: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
-    if get_settings().is_admin(body.user_id):
-        raise HTTPException(status_code=400, detail="不能遮蔽管理员")
-    await city_scope.guard_user(admin_id, body.user_id)
-    user = await user_admin.set_shadow(
-        body.user_id,
-        shadowed=body.shadowed,
-        days=body.days,
-        reason=body.reason or ("管理员设置" if body.shadowed else ""),
-    )
-    return {"ok": True, "user": _ser_user(user), "by": admin_id}
+    raise HTTPException(status_code=410, detail="兰花信用已停用")
 
 
 @router.post("/admin/users/unlock-role")

@@ -13,7 +13,7 @@ from bot.api.routes_core_base import (
     _ser_lamp,
     router,
 )
-from bot.services import anti_brush, credit_service, home_service, search_service, session_service
+from bot.services import anti_brush, home_service, search_service, session_service, users
 from bot.services.community import district_groups
 from bot.services import pin_query
 from bot.services.extras_store import load_extras, load_extras_bulk
@@ -322,7 +322,6 @@ async def api_home(
         "limit": limit,
         "offset": offset,
         "has_more": len(safe_items) >= limit,
-        "scoring_rules": home_service.SCORING_RULES,
         "chat_cta_label": settings.get("chat_cta_label") or "想聊聊",
         "show_chat_cta": settings.get("show_chat_cta") is not False,
         "media_max_count": int(settings.get("media_max_count") or 6),
@@ -463,9 +462,7 @@ async def api_session_request(
         raise HTTPException(status_code=409, detail="休息中，暂不联系")
     if lamp["user_id"] == user_id:
         raise HTTPException(status_code=400, detail="不能与自己发起会话")
-    u = await credit_service.ensure_user(user_id)
-    if u.get("is_shadowed"):
-        raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法发起会话")
+    u = await users.ensure_user(user_id)
     if not await anti_brush.check_session_request_rate(user_id):
         raise HTTPException(status_code=429, detail="请求过于频繁")
     existing = await session_service.get_active_for_user(user_id)
@@ -473,7 +470,7 @@ async def api_session_request(
         raise HTTPException(status_code=400, detail="已有进行中的会话，请先结束")
     alias = (body.guest_alias or "").strip()
     if not alias:
-        me = await credit_service.ensure_user(user_id)
+        me = await users.ensure_user(user_id)
         alias = (me.get("guest_alias") or "").strip() or None
     sess = await session_service.create_request(
         body.lamp_id, user_id, lamp["user_id"], lamp_title=lamp.get("title"), guest_alias=alias

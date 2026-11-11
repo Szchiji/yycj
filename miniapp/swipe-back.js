@@ -43,7 +43,7 @@
 
   // ---------- what "back" means right now ----------
   function sheetOpen() {
-    for (const id of ["guideSheet", "rulesSheet", "citySheet"]) {
+    for (const id of ["guideSheet", "citySheet"]) {
       const s = document.getElementById(id);
       if (s && shown(s) && getComputedStyle(s).display !== "none") return s;
     }
@@ -215,7 +215,7 @@ html.swb-drag,html.swb-drag body{overscroll-behavior:none;}`;
   }
   // overlays (sheets, 地区 panel, city list, photo viewer) also change whether back exists
   const omo = new MutationObserver(() => syncListeners());
-  ["guideSheet", "rulesSheet", "citySheet", "areaPanel", "cityDrop"].forEach((id) => {
+  ["guideSheet", "citySheet", "areaPanel", "cityDrop"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) omo.observe(el, { attributes: true, attributeFilter: ["class"] });
   });
