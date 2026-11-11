@@ -291,6 +291,22 @@ def test_map_endpoint_keeps_filters_and_card_privacy(monkeypatch):
                 assert args["limit"] == (600 if mode == "1" else 3)
                 assert args["flt"].tags == ["温柔"] and args["flt"].band == (600, 1000)
 
+            # A failed map query is actionable, not a fabricated empty viewport.
+            # The historical non-map response remains unchanged.
+            query.side_effect = RuntimeError("private database connection detail")
+            for mode, code in [("1", 503), ("0", 200)]:
+                r = await c.get("/api/home", params={"city": "深圳", "map_results": mode})
+                assert r.status_code == code
+                assert "private database" not in r.text
+                if mode == "1":
+                    assert r.json()["detail"] == "地图资料暂时无法加载，请重试"
+                else:
+                    assert r.json()["items"] == [] and r.json()["ok"] is True
+            query.side_effect = None
+            query.return_value = []
+            r = await c.get("/api/home", params={"city": "深圳", "map_results": "1"})
+            assert r.status_code == 200 and r.json()["items"] == []
+
     asyncio.run(run())
 
 

@@ -227,6 +227,10 @@ async def api_home(
             items = pinned + fresh
     except Exception:
         logger.exception("home search failed")
+        # Map search must not disguise a failed query as an empty viewport.
+        # Preserve the historical list-mode contract; no internal error detail leaks.
+        if map_results:
+            raise HTTPException(status_code=503, detail="地图资料暂时无法加载，请重试") from None
         items = []
 
     announcement = None

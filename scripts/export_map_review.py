@@ -10,8 +10,9 @@ sys.path.insert(0,str(ROOT))
 from bot.services.feed_filters import center_of
 
 
-def export(dest):
+def export(dest, live_tiles=False):
  dest.mkdir(parents=True,exist_ok=True)
+ (dest/'LAYOUT-REVIEW.md').write_text((ROOT/'docs/map-upgrade-review.md').read_text())
  items=[];groups=[]
  for district,count in [('南山',6),('福田',3),('罗湖',2),('宝安',1)]:
   ids=[]
@@ -47,18 +48,29 @@ window.__yycjLoadHome=({mapArea=null}={})=>{const meta={seq:++seq,city:'深圳',
 window.fetch=async url=>{if(String(url).startsWith('/api/lamps/'))return{ok:true,json:async()=>({lamp:{title:'离线详情示例'}})};throw Error('offline only')};
 window.__yycjRenderDetail=(d,id)=>{$('#detail').textContent='离线详情示例 · '+id};
 '''.replace('DATA',json.dumps(data,ensure_ascii=False))
+ if live_tiles:
+  base=base.replace('img-src data: blob: file:;', 'img-src data: blob: file: https://tile.openstreetmap.org;')
+  base=base.replace('<head>', '<head><meta name="referrer" content="strict-origin-when-cross-origin">')
+  base=base.replace('离线审核 · 示例资料 / 示意底图（非真实道路） · 未发布', '真实OSM底图待手动加载 · 全部资料为示例 · 未发布 / 非Telegram实机')
+  setup=setup.replace('// Only tile rendering is replaced. Real Leaflet projection, bounds, zoom, markers and events run.', '// Manual live fixture: actual OSM layer; never auto-started by the exporter.')
+  setup=re.sub(r'const Schematic=L.GridLayer.extend.*?window.__yycjLoadLeaflet=async\(\)=>L;', 'window.__yycjLoadLeaflet=async()=>L;', setup, flags=re.S)
  source=''.join('<script>'+s.replace('</script','<\\/script')+'</script>' for s in [leaf,setup,(ROOT/'miniapp/map-results.js').read_text(),(ROOT/'miniapp/community-ui.js').read_text()])
- for case in ['overview','selected','chooser','empty','error','loading','desktop']:
+ for case in (['live'] if live_tiles else ['overview','selected','chooser','empty','error','loading','desktop','tile-error','dense']):
   after='''
+const fixtureCase=CASE;
+if(fixtureCase==='dense'){
+ const g=data.map_groups[0];data.items=Array.from({length:600},(_,i)=>({lamp_id:'dense-'+i,title:'同区示例资料 '+String(i+1).padStart(3,'0'),city:'深圳',district:g.district,media_count:0,open_text:'营业中'}));data.map_groups=[{...g,lamp_ids:data.items.map(x=>x.lamp_id),count:600}];data.map_truncated=true;
+}
 $('#hubMapToggle').click();
 let ticks=0;const timer=setInterval(()=>{if(++ticks>100){clearInterval(timer);return}if(!lastMap||!document.querySelector('.hub-map-marker'))return;clearInterval(timer);
  setTimeout(()=>{
  const action=CASE;
- if(action==='selected'||action==='chooser'){
+ if(action==='selected'||action==='chooser'||action==='dense'){
   const centre=data.map_groups.find(g=>g.district==='南山');lastMap.setView([centre.lat,centre.lng],14,{animate:false});
-  const marker=[...document.querySelectorAll('.hub-map-marker')].find(e=>e.getAttribute('title')==='6份区域资料');
-  marker?.click();if(action==='selected')document.querySelector('[data-map-select="南山-1"]')?.click();
+  const marker=[...document.querySelectorAll('.hub-map-marker')].find(e=>e.getAttribute('title')===(action==='dense'?'600':'6')+'份区域资料');
+  marker?.click();if(action==='dense'){const options=document.querySelector('.hub-map-options');options.scrollTop=options.scrollHeight;}if(action==='selected')document.querySelector('[data-map-select="南山-1"]')?.click();
  }
+ if(action==='tile-error'){lastMap.eachLayer(layer=>{if(layer instanceof L.GridLayer)layer.fire('tileerror')});}
  if(['empty','error','loading'].includes(action)){
   lastMap.setView([22.1,113.7],13,{animate:false});if(action==='error')failNext=true;if(action==='loading')hold=true;
   setTimeout(()=>document.querySelector('#hubSearchArea')?.click(),60);
@@ -67,9 +79,11 @@ let ticks=0;const timer=setInterval(()=>{if(++ticks>100){clearInterval(timer);re
  },120);
 },40);
 '''.replace('CASE',json.dumps(case))
+  if live_tiles:
+   after="const liveButton=document.createElement('button');liveButton.className='btn';liveButton.textContent='手动加载真实OSM底图';document.querySelector('#mapReviewCaption').appendChild(liveButton);liveButton.onclick=()=>{liveButton.disabled=true;if(!window.__yycjMapMode)document.querySelector('#hubMapToggle').click();};"
   (dest/('map-'+case+'.html')).write_text(base.replace('</body>',source+'<script>'+after+'</script></body>'))
- (dest/'index.html').write_text('<!doctype html><meta charset="utf-8"><title>地图首批升级 · 离线审核</title><body style="font:16px sans-serif;background:#10251e;color:#dbc894;padding:24px"><h1>地图首批升级 · 未发布</h1><p>真实本地CSS/JS与Leaflet；示意底图和示例资料，不是真实道路/线上数据。无Telegram SDK/鉴权/定位权限。</p>'+''.join('<p><a style="color:#e2ca83" href="map-'+c+'.html">'+c+'</a></p>' for c in ['overview','selected','chooser','empty','error','loading','desktop'])+'</body>')
+ if not live_tiles:(dest/'index.html').write_text('<!doctype html><meta charset="utf-8"><title>地图首批升级 · 离线审核</title><body style="font:16px sans-serif;background:#10251e;color:#dbc894;padding:24px"><h1>地图首批升级 · 未发布</h1><p>真实本地CSS/JS与Leaflet；示意底图和示例资料，不是真实道路/线上数据。无Telegram SDK/鉴权/定位权限。live页须人工打开并点击按钮，才加载真实OSM瓦片，其他页完全离线。</p>'+''.join('<p><a style="color:#e2ca83" href="map-'+c+'.html">'+c+'</a></p>' for c in ['overview','selected','chooser','empty','error','loading','desktop','tile-error','dense','live'])+'<h2>短屏与故障截图</h2>'+''.join('<p><a style="color:#e2ca83" href="map-'+c+'.png">'+c+'</a></p>' for c in ['dense-360x640','dense-390x640','dense-360x568','dense-390x900','dense-selected-360x640','selected-360x568','tile-error','tile-list-360x640'])+'</body>')
  print(str(dest))
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);export(p.parse_args().output.resolve())
+ p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--live-tiles',action='store_true');args=p.parse_args();export(args.output.resolve(),args.live_tiles)

@@ -29,3 +29,24 @@ def test_no_new_backend_bounds_or_coordinate_exposure():
     assert 'requestSig !== filtSig()' in home
     assert 'if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode' in home
     assert 'return !window.__yycjMapMode && !paused' in home
+
+
+def test_map_query_still_requires_authentication(monkeypatch):
+    import asyncio
+    from fastapi import FastAPI
+    import httpx
+    from unittest.mock import AsyncMock
+    from bot.api import routes_core_home as rh
+    from bot.services import search_service
+
+    query = AsyncMock()
+    monkeypatch.setattr(search_service, "search_lamps", query)
+    app = FastAPI()
+    app.include_router(rh.router)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client:
+            response = await client.get("/api/home?city=深圳&map_results=1")
+            assert response.status_code == 401
+            query.assert_not_awaited()
+    asyncio.run(run())

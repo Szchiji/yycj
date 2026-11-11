@@ -717,6 +717,15 @@ html body .yycj-dlg-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
 #hubMapUnlocated{font-size:12px;color:#b8c7ba;margin-top:8px}#hubMapUnlocated>summary{min-height:44px;line-height:44px;cursor:pointer}#hubMapUnlocated>div{max-height:220px;overflow:auto}
 @media(min-width:761px){#hubMapWrap #hubResultMap{height:440px}.hub-map-selection{max-width:620px;margin:0 auto}.hub-map-options{max-height:220px}}
 @media(max-width:420px){#hubMapWrap #hubResultMap{height:350px}.hub-map-selection{padding-left:10px;gap:8px}.hub-map-selection img{width:48px;height:60px}.hub-map-card-text{min-width:72px}.hub-map-card-text>b{font-size:14px}}
+
+/* Map-only short-screen adaptation; reserve existing webpage bottom navigation. */
+#hubMapWrap{scroll-margin-bottom:calc(var(--nav-h,64px) + 24px)}
+.hub-map-chooser,.hub-map-selection{scroll-margin-bottom:calc(var(--nav-h,64px) + 24px)}
+.hub-map-options{max-height:clamp(96px,25vh,180px);scroll-padding-bottom:8px;padding-bottom:8px}
+.hub-map-tile-status{display:flex;align-items:center;gap:6px;color:#d8c38c;font-size:12px;min-height:44px;margin:0 0 8px}
+.hub-map-tile-status>span{flex:1}.hub-map-tile-status>.btn{min-height:44px;white-space:nowrap;font-size:12px;padding:6px 9px}
+@media(max-width:760px){#hubMapWrap #hubResultMap{height:clamp(180px,calc(100vh - 490px),350px)}}
+@supports(height:100svh){@media(max-width:760px){#hubMapWrap #hubResultMap{height:clamp(180px,calc(100svh - 490px),350px)}}.hub-map-options{max-height:clamp(96px,25svh,180px)}}
 /* ---- entry-announcement.css ---- */
 .entry-announcement-open{overflow:hidden}.entry-announcement{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:#0009;box-sizing:border-box}.entry-announcement-panel{width:min(100%,420px);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;background:#16302A;color:#F1EEE4;border:1px solid #D4B26A;border-radius:18px;box-shadow:0 20px 80px #0008;overflow:hidden}.entry-announcement-panel header,.entry-announcement-panel footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;flex-shrink:0}.entry-announcement-panel h2{font-size:18px;margin:0;color:#D4B26A}.entry-announcement-text{white-space:pre-wrap;overflow-wrap:anywhere;overflow-y:auto;overscroll-behavior:contain;padding:0 18px 18px;line-height:1.8;font-size:14px}.entry-announcement-panel footer{border-top:1px solid #355247}.entry-announcement-panel footer .btn{flex:1;font-size:13px}.entry-announcement-panel header .btn{padding:6px 10px;font-size:12px}
 /* These moves do not touch the 117x224 cards, three-column grid or paging. */
