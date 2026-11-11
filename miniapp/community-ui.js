@@ -34,31 +34,16 @@
   function mount() {
     const home=$('#view-home');if(!home) return;
     if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
-    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='<p class="muted">同一套搜索 / 筛选 · 按区中心聚合，并非资料精确位置</p><div id="hubResultMap"></div><div id="hubMapRows"></div>';$('#feed')?.insertAdjacentElement('beforebegin',w); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();controller()?.activate(!!window.__yycjMapMode);window.__yycjLoadHome?.();}; }
+    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
   function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
-  let map=null, layer=null, lastSeq=0;
-  async function drawMap(data) {
-    mount();syncMapMode();if(!window.__yycjMapMode)return;
-    const seq=++lastSeq, rows=$('#hubMapRows'), groups=data.map_groups || [], items=data.items || [];
-    const list = group => { const ids=new Set(group?.lamp_ids || items.map(x=>x.lamp_id)); rows.innerHTML=`<p class="muted">${esc(group?.district || '全部区域')} · ${ids.size} 份资料${data.map_truncated?'（最多显示600份，请缩小筛选）':''}</p>`+items.filter(x=>ids.has(x.lamp_id)).map(x=>`<button class="hub-row" data-hub-lamp="${esc(x.lamp_id)}"><b>${esc(x.title)}</b><span>${esc(x.district || '其他')}${x.distance?' · '+esc(x.distance):''} ›</span></button>`).join(''); };
-    list();
-    const known=groups.filter(g=>g.lat!=null && g.lng!=null);$('#hubResultMap').classList.toggle('hidden',!known.length);
-    if(!known.length) { rows.insertAdjacentHTML('afterbegin','<p class="muted">当前结果暂无公开区中心，可查看下方列表。</p>');return; }
-    try {
-      const L=await window.__yycjLoadLeaflet();if(seq!==lastSeq || !window.__yycjMapMode)return;
-      if(!map) {
-        map=L.map('hubResultMap',{scrollWheelZoom:false}).setView([known[0].lat,known[0].lng],11);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:15,attribution:'© OpenStreetMap'}).addTo(map);
-        layer=L.layerGroup().addTo(map);
-      }
-      layer.clearLayers();const pts=[];
-      known.forEach(g=>{const pt=[g.lat,g.lng];pts.push(pt);L.marker(pt,{icon:L.divIcon({className:'hub-cluster',html:`<b>${g.count}</b><span>${esc(g.district)}</span>`,iconSize:[68,48]})}).addTo(layer).on('click',()=>list(g));});
-      map.invalidateSize();map.fitBounds(pts,{padding:[40,40],maxZoom:12});
-    } catch(e) { rows.insertAdjacentHTML('afterbegin','<p class="muted">地图加载失败，结果列表仍可使用。</p>'); }
-  }
-  window.addEventListener('yycj:home-data',ev=>drawMap(ev.detail));
+  let resultMap=null;
+  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:id=>{window.__yycjBack='home';show('detail');window.__yycjOpenLamp=id;fetchDetail(id);},loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
+  window.addEventListener('yycj:home-data',ev=>{syncMapMode();if(window.__yycjMapMode)controller()?.receive(ev.detail,ev.mapRequest||{});});
+  window.addEventListener('yycj:map-loading',ev=>controller()?.begin(ev.detail));
+  window.addEventListener('yycj:map-error',ev=>controller()?.error(ev.detail));
+  window.addEventListener('pagehide',ev=>{if(!ev.persisted){resultMap?.destroy();resultMap=null;}});
   mount();
   // Welcome's known 「我的」 target, after authentication finishes.
   if(new URLSearchParams(location.search).get('page')==='me') { let tries=0;const go=()=>{if($('#app')&&!$('#app').classList.contains('hidden')) {$('[data-nav="me"]')?.click();} else if(++tries<80) setTimeout(go,150);};go(); }

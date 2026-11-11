@@ -138,8 +138,8 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
     import httpx
     import bot.main as main
     from pathlib import Path
-    assert main._miniapp_asset_v() == "20261111f"
-    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261111f"
+    assert main._miniapp_asset_v() == "20261111i"
+    assert main._menu_webapp_url("https://app.test/app") == "https://app.test/app/go.html?v=20261111i"
     async def run():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app),base_url="http://test") as client:
             for path in ("/preview-fixtures.js","/scripts/preview_review.py","/scripts/preview/fixtures.js","/app/preview-fixtures.js"):

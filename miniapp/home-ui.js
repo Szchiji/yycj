@@ -94,7 +94,7 @@
   function stopTimer() { if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; } }
   // The carousel timer only runs while it can actually be seen: home view shown, page visible,
   // carousel on screen, not being touched. Otherwise no timer is pending at all.
-  function canRun() { return !paused && !touching && pinsSeen && homeVisible(); }
+  function canRun() { return !window.__yycjMapMode && !paused && !touching && pinsSeen && homeVisible(); }
   function arm() {
     if (!canRun()) { stopTimer(); return; }
     if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
@@ -204,7 +204,7 @@
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
-  function applyData(data, reset) {
+  function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
@@ -218,7 +218,7 @@
     offset = lastItems.length;
     paint();
     $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
-    window.dispatchEvent(new CustomEvent("yycj:home-data", {detail:data}));
+    const homeEvent=new CustomEvent("yycj:home-data", {detail:data});homeEvent.mapRequest=mapRequest;window.dispatchEvent(homeEvent);
     const ann = $("#announce");
     if (ann && data.announcement && data.announcement.text) {
       ann.classList.remove("hidden");
@@ -226,11 +226,14 @@
     }
   }
   let loadSequence = 0;
-  async function loadFeed(reset) {
+  async function loadFeed(reset, options = {}) {
     if (!token() || document.hidden) return;
     const seq = ++loadSequence, mapMode = !!window.__yycjMapMode;
     paused = false;
     arm();
+    const requestCity=curCity(),requestSig=filtSig();
+    const mapRequest={seq,city:requestCity,area:options.mapArea||null};
+    if(mapMode)window.dispatchEvent(new CustomEvent("yycj:map-loading",{detail:mapRequest}));
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -256,11 +259,13 @@
       if(window.__yycjMapMode) params.set("map_results", "1");
       appliedSig = filtSig();
       const data = await api("/api/home?" + params.toString());
-      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
-      applyData(data, reset);
+      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity() || requestSig !== filtSig()) return;
+      applyData(data, reset, mapRequest);
       window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
+      if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode || requestCity!==curCity() || requestSig!==filtSig())return;
+      if(mapMode){window.dispatchEvent(new CustomEvent("yycj:map-error",{detail:{...mapRequest,message:e.message}}));return;}
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
     }
@@ -422,7 +427,7 @@
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
   window.__yycjPlaceChanged = function () { lastFacets = null; offset = 0; setFilt({ np: "" }); };
-  window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
+  window.__yycjLoadHome = function (options) { paused = false; return loadFeed(true, options); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }

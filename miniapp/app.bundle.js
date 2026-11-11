@@ -370,7 +370,7 @@ try {
   function stopTimer() { if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; } }
   // The carousel timer only runs while it can actually be seen: home view shown, page visible,
   // carousel on screen, not being touched. Otherwise no timer is pending at all.
-  function canRun() { return !paused && !touching && pinsSeen && homeVisible(); }
+  function canRun() { return !window.__yycjMapMode && !paused && !touching && pinsSeen && homeVisible(); }
   function arm() {
     if (!canRun()) { stopTimer(); return; }
     if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
@@ -480,7 +480,7 @@ try {
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
-  function applyData(data, reset) {
+  function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
@@ -494,7 +494,7 @@ try {
     offset = lastItems.length;
     paint();
     $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
-    window.dispatchEvent(new CustomEvent("yycj:home-data", {detail:data}));
+    const homeEvent=new CustomEvent("yycj:home-data", {detail:data});homeEvent.mapRequest=mapRequest;window.dispatchEvent(homeEvent);
     const ann = $("#announce");
     if (ann && data.announcement && data.announcement.text) {
       ann.classList.remove("hidden");
@@ -502,11 +502,14 @@ try {
     }
   }
   let loadSequence = 0;
-  async function loadFeed(reset) {
+  async function loadFeed(reset, options = {}) {
     if (!token() || document.hidden) return;
     const seq = ++loadSequence, mapMode = !!window.__yycjMapMode;
     paused = false;
     arm();
+    const requestCity=curCity(),requestSig=filtSig();
+    const mapRequest={seq,city:requestCity,area:options.mapArea||null};
+    if(mapMode)window.dispatchEvent(new CustomEvent("yycj:map-loading",{detail:mapRequest}));
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -532,11 +535,13 @@ try {
       if(window.__yycjMapMode) params.set("map_results", "1");
       appliedSig = filtSig();
       const data = await api("/api/home?" + params.toString());
-      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
-      applyData(data, reset);
+      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity() || requestSig !== filtSig()) return;
+      applyData(data, reset, mapRequest);
       window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
+      if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode || requestCity!==curCity() || requestSig!==filtSig())return;
+      if(mapMode){window.dispatchEvent(new CustomEvent("yycj:map-error",{detail:{...mapRequest,message:e.message}}));return;}
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
     }
@@ -698,7 +703,7 @@ try {
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
   window.__yycjPlaceChanged = function () { lastFacets = null; offset = 0; setFilt({ np: "" }); };
-  window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
+  window.__yycjLoadHome = function (options) { paused = false; return loadFeed(true, options); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
     if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
@@ -4602,6 +4607,106 @@ try {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch); else watch();
 })();
 ;} catch (e) { try { console.error("me-layout.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "me-layout.js" }); } catch (x) {} }
+/* ---- map-results.js ---- */
+try {
+// Privacy-safe results map. Only server-published district centres are mapped, never listing coordinates.
+(() => {
+ 'use strict';
+ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const valid=p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180;
+ const same=(a,b)=>a&&b&&['south','west','north','east'].every(k=>Math.abs(a[k]-b[k])<0.0001);
+ const inside=(p,b)=>!b||(p.lat>=b.south&&p.lat<=b.north&&p.lng>=b.west&&p.lng<=b.east);
+ function points(data){
+  const byId=new Map((data.items||[]).slice(0,600).map(x=>[String(x.lamp_id),x])),out=[],seen=new Set();
+  for(const g of data.map_groups||[]){
+   // Deliberately ignore any coordinate-like fields on listing cards.
+   const p={lat:g.lat,lng:g.lng};if(!valid(p))continue;
+   for(const id of g.lamp_ids||[]){const key=String(id),item=byId.get(key);if(item&&!seen.has(key)&&(!data.city||!item.city||item.city===data.city)){out.push({...p,item});seen.add(key);}}
+  }
+  return out;
+ }
+ function clusters(rows,project,radius=52){
+  // Connected components of nearby projected pixels: no adjacent overlapping 44px targets.
+  const pts=rows.map(p=>project([p.lat,p.lng])),parent=rows.map((_,i)=>i);
+  const find=i=>parent[i]===i?i:(parent[i]=find(parent[i]));
+  for(let i=0;i<rows.length;i++)for(let j=0;j<i;j++)if(Math.hypot(pts[i].x-pts[j].x,pts[i].y-pts[j].y)<radius)parent[find(i)]=find(j);
+  const groups=new Map();rows.forEach((p,i)=>{const key=find(i);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);});
+  const result=[...groups.values()];
+  // A connected ring can surround an isolated point: the marker centroids would
+  // overlap even though no original points are close. Merge overlapping targets
+  // until stable, using exactly the same geographic centroid as paint().
+  const centre=g=>project([g.reduce((s,p)=>s+p.lat,0)/g.length,g.reduce((s,p)=>s+p.lng,0)/g.length]);
+  let merged=true;while(merged){merged=false;const centres=result.map(centre);outer:for(let i=0;i<result.length;i++)for(let j=0;j<i;j++)if(Math.hypot(centres[i].x-centres[j].x,centres[i].y-centres[j].y)<radius){result[j].push(...result[i]);result.splice(i,1);merged=true;break outer;}}
+  return result;
+ }
+ class ResultMap{
+  constructor(host,{city,onSearch,onDetail,loadLeaflet}){
+   this.host=host;this.city=city;this.onSearch=onSearch;this.onDetail=onDetail;this.loadLeaflet=loadLeaflet;this.seq=0;this.epoch=0;this.rows=[];this.selected='';this.visible=true;this.busy=false;
+   host.innerHTML='<div class="hub-map-heading"><b>地图找资料</b><span id="hubMapCount"></span></div><p class="hub-map-privacy">仅按公开区中心展示，不代表资料具体位置</p><div class="hub-map-stage"><div id="hubResultMap" aria-label="本城资料区域地图"></div><button type="button" class="btn hub-search-area hidden" id="hubSearchArea">搜索此区域</button></div><div id="hubMapStatus" class="hub-map-status" role="status" aria-live="polite"></div><section id="hubMapSelection" class="hub-map-selection hidden" aria-label="已选资料"></section><section id="hubMapChooser" class="hub-map-chooser hidden" aria-label="同区域资料"></section><details id="hubMapUnlocated" class="hidden"><summary></summary><div></div></details>';
+   this.$=s=>host.querySelector(s);
+   this.click=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='hubSearchArea')this.search();else if(b.hasAttribute('data-map-retry'))this.retry();else if(b.hasAttribute('data-map-select'))this.select(b.dataset.mapSelect);else if(b.hasAttribute('data-map-detail'))this.onDetail(b.dataset.mapDetail);else if(b.hasAttribute('data-map-close'))this.deselect();else if(b.hasAttribute('data-map-choose'))this.choose(this.chosen||[]);};
+   host.addEventListener('click',this.click);
+  }
+  bounds(){if(!this.map||this.map.getZoom()==null)return null;const b=this.map.getBounds();return {south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()};}
+  status(text,retry=false){this.$('#hubMapStatus').innerHTML='<span>'+esc(text)+'</span>'+(retry?'<button type="button" class="btn" data-map-retry>'+ (this.meta?.area?'重试此区域':'重试加载')+'</button>':'');}
+  begin(meta){if(!this.visible)return;this.seq=meta.seq;this.meta=meta;this.busy=true;++this.epoch;this.rows=[];this.$('#hubMapUnlocated').classList.add('hidden');this.$('#hubMapCount').textContent='读取中';this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.layer?.clearLayers();this.status('正在读取本城资料…');this.updateSearch();}
+  error(meta){if(!this.visible||meta.seq!==this.seq||meta.city!==this.city())return;this.busy=false;this.$('#hubMapCount').textContent='搜索失败';this.status('加载失败，请重试。未展示旧搜索结果。',true);this.updateSearch();}
+  updateSearch(){const b=this.$('#hubSearchArea');const moved=this.map&&!same(this.bounds(),this.searched);b.classList.toggle('hidden',!moved||!this.visible);b.disabled=this.busy;b.textContent=this.busy?'搜索中…':'搜索此区域';}
+  search(){if(this.busy||!this.visible)return;this.onSearch(this.bounds());}
+  retry(){if(!this.busy&&this.visible)this.onSearch(this.meta?.area||null);}
+  async receive(data,meta={}){
+   if(!this.visible||(meta.seq&&meta.seq!==this.seq)||(meta.city&&meta.city!==this.city())||(data.city&&data.city!==this.city()))return;
+   const epoch=++this.epoch;this.meta=meta;this.busy=false;this.selected='';this.chosen=[];this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');
+   this.all=points(data);this.rows=this.all.filter(p=>inside(p,meta.area));this.data=data;
+   const mapped=new Set(this.all.map(p=>String(p.item.lamp_id))),missing=(data.items||[]).slice(0,600).filter(x=>!mapped.has(String(x.lamp_id))&&(!data.city||!x.city||x.city===data.city));
+   const unknown=this.$('#hubMapUnlocated');unknown.classList.toggle('hidden',!missing.length);unknown.open=false;unknown.querySelector('summary').textContent=missing.length+' 份无公开区中心 · 不参与区域筛选';unknown.querySelector('div').innerHTML=missing.map(x=>this.rowButton(x,'data-map-detail')).join('');
+   this.$('#hubMapCount').textContent=this.rows.length+' 份'+(meta.area?' · 此区域':' · 本城');
+   const suffix=data.map_truncated?' · 已达600份上限，请缩小现有筛选（区域搜索仅筛选这批结果）':'';
+   this.status((this.rows.length?'点圆点选资料，数字表示聚合数量':meta.area?'此区域暂无匹配资料，可移动地图后再搜索':missing.length?'暂无可定位资料，可展开下方列表':'暂无匹配资料，请调整城市或现有筛选')+suffix);
+   if(!this.all.length&&!this.map){this.$('#hubResultMap').classList.add('hidden');this.updateSearch();return;}
+   try{
+    const L=await this.loadLeaflet();if(epoch!==this.epoch||!this.visible)return;
+    if(!this.map){
+     this.L=L;this.map=L.map('hubResultMap',{scrollWheelZoom:false,zoomControl:false,maxZoom:15});L.control.zoom({position:'topright'}).addTo(this.map);
+     this.layer=L.layerGroup().addTo(this.map);
+     const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:15,updateWhenIdle:true,keepBuffer:1,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(this.map);
+     let tileFailed=false;tiles.on('tileerror',()=>{if(!tileFailed&&this.visible){tileFailed=true;this.status('底图暂不可用，资料点与列表仍可选择。');}});
+     this.onMove=()=>{this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());
+    }
+    this.map.invalidateSize();
+    if(!meta.area&&this.all.length)this.map.fitBounds(this.all.map(p=>[p.lat,p.lng]),{padding:[42,42],maxZoom:12,animate:false});
+    // No invented city/point when nothing has a public centre. Retain the existing view if any.
+    if(!this.map.getZoom()&&!this.all.length){this.$('#hubResultMap').classList.add('hidden');this.updateSearch();return;}
+    this.$('#hubResultMap').classList.remove('hidden');this.searched=meta.area||this.bounds();this.paint();this.updateSearch();
+   }catch(e){if(epoch===this.epoch){if(this.map&&!this.layer){this.map.remove();this.map=null;}this.status('地图加载失败，可重试或使用资料列表。',true);this.$('#hubMapChooser').classList.remove('hidden');this.$('#hubMapChooser').innerHTML=this.rows.map(p=>this.rowButton(p.item,'data-map-detail')).join('');}}
+  }
+  rowButton(item,attr='data-map-select'){return '<button type="button" class="hub-map-row" '+attr+'="'+esc(item.lamp_id)+'"><b>'+esc(item.title||'未命名资料')+'</b><span>'+esc(item.district||'未标注地区')+(item.open_text?' · '+esc(item.open_text):'')+' ›</span></button>';}
+  paint(){if(!this.map)return;this.layer.clearLayers();if(this.busy||!this.visible||(this.data?.city&&this.data.city!==this.city()))return;
+   for(const group of clusters(this.rows,p=>this.map.project(p,this.map.getZoom()))){
+    const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lng=group.reduce((s,p)=>s+p.lng,0)/group.length;
+    const one=group.length===1,item=group[0].item,selected=group.some(p=>String(p.item.lamp_id)===this.selected);
+    const marker=this.L.marker([lat,lng],{keyboard:true,title:one?(item.title||'查看资料'):group.length+'份区域资料',icon:this.L.divIcon({className:'hub-map-marker'+(one?' is-single':'')+(selected?' is-selected':''),html:one?'<span aria-hidden="true">●</span>':'<b>'+group.length+'</b>',iconSize:[44,44],iconAnchor:[22,22]})}).addTo(this.layer);
+    marker.on('click',()=>{
+     if(one){this.select(item.lamp_id);return;}
+     const distinct=new Set(group.map(p=>p.lat+','+p.lng));
+     if(distinct.size>1&&this.map.getZoom()<15){const before=this.map.getZoom();this.map.fitBounds(group.map(p=>[p.lat,p.lng]),{padding:[56,56],maxZoom:Math.min(15,before+2),animate:false});if(this.map.getZoom()<=before)this.choose(group);}
+     else this.choose(group);
+    });
+   }
+  }
+  choose(group){this.chosen=group;this.selected='';this.$('#hubMapSelection').classList.add('hidden');const e=this.$('#hubMapChooser');e.classList.remove('hidden');e.innerHTML='<div class="hub-chooser-title"><b>区域内 '+group.length+' 份资料</b><button type="button" class="btn" data-map-close aria-label="关闭区域资料">×</button></div><p class="hub-map-privacy">共用公开区中心，不偏移到虚构位置</p><div class="hub-map-options">'+group.map(p=>this.rowButton(p.item)).join('')+'</div>';this.paint();}
+  select(id){const p=this.rows.find(p=>String(p.item.lamp_id)===String(id));if(!p)return;this.selected=String(id);this.$('#hubMapChooser').classList.add('hidden');const x=p.item,el=this.$('#hubMapSelection');el.classList.remove('hidden');
+   // cover_url is supplied by the existing public card serializer; no synthetic portrait.
+   const cover=String(x.cover_url||'');const media=Number(x.media_count)>0&&/^(https?:\/\/|\/)/.test(cover)?'<img src="'+esc(cover)+'" alt="" loading="lazy">':'';
+   el.innerHTML=media+'<div class="hub-map-card-text"><b>'+esc(x.title||'未命名资料')+'</b><p>'+esc([x.city,x.district].filter(Boolean).join(' · '))+'</p>'+(x.open_text?'<span>'+esc(x.open_text)+'</span>':'')+'</div><button type="button" class="btn" data-map-detail="'+esc(id)+'">查看详情</button><button type="button" class="hub-map-close" data-map-close aria-label="关闭已选资料">×</button>'+(this.chosen?.length>1?'<button type="button" class="hub-map-siblings" data-map-choose>同区域 '+this.chosen.length+' 份 ›</button>':'');this.paint();
+  }
+  deselect(){this.selected='';this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');this.paint();}
+  activate(on){this.visible=on;if(!on){++this.epoch;this.busy=false;this.deselect();}else this.map?.invalidateSize();}
+  destroy(){++this.epoch;this.host.removeEventListener('click',this.click);this.map?.remove();}
+ }
+ window.yycjResultMap={ResultMap,points,clusters,inside,same};
+})();
+;} catch (e) { try { console.error("map-results.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "map-results.js" }); } catch (x) {} }
 /* ---- community-ui.js ---- */
 try {
 // City community, shared-filter district map, and a light review ranking. No new bottom tab.
@@ -4640,31 +4745,16 @@ try {
   function mount() {
     const home=$('#view-home');if(!home) return;
     if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
-    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='<p class="muted">同一套搜索 / 筛选 · 按区中心聚合，并非资料精确位置</p><div id="hubResultMap"></div><div id="hubMapRows"></div>';$('#feed')?.insertAdjacentElement('beforebegin',w); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();controller()?.activate(!!window.__yycjMapMode);window.__yycjLoadHome?.();}; }
+    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
   function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
-  let map=null, layer=null, lastSeq=0;
-  async function drawMap(data) {
-    mount();syncMapMode();if(!window.__yycjMapMode)return;
-    const seq=++lastSeq, rows=$('#hubMapRows'), groups=data.map_groups || [], items=data.items || [];
-    const list = group => { const ids=new Set(group?.lamp_ids || items.map(x=>x.lamp_id)); rows.innerHTML=`<p class="muted">${esc(group?.district || '全部区域')} · ${ids.size} 份资料${data.map_truncated?'（最多显示600份，请缩小筛选）':''}</p>`+items.filter(x=>ids.has(x.lamp_id)).map(x=>`<button class="hub-row" data-hub-lamp="${esc(x.lamp_id)}"><b>${esc(x.title)}</b><span>${esc(x.district || '其他')}${x.distance?' · '+esc(x.distance):''} ›</span></button>`).join(''); };
-    list();
-    const known=groups.filter(g=>g.lat!=null && g.lng!=null);$('#hubResultMap').classList.toggle('hidden',!known.length);
-    if(!known.length) { rows.insertAdjacentHTML('afterbegin','<p class="muted">当前结果暂无公开区中心，可查看下方列表。</p>');return; }
-    try {
-      const L=await window.__yycjLoadLeaflet();if(seq!==lastSeq || !window.__yycjMapMode)return;
-      if(!map) {
-        map=L.map('hubResultMap',{scrollWheelZoom:false}).setView([known[0].lat,known[0].lng],11);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:15,attribution:'© OpenStreetMap'}).addTo(map);
-        layer=L.layerGroup().addTo(map);
-      }
-      layer.clearLayers();const pts=[];
-      known.forEach(g=>{const pt=[g.lat,g.lng];pts.push(pt);L.marker(pt,{icon:L.divIcon({className:'hub-cluster',html:`<b>${g.count}</b><span>${esc(g.district)}</span>`,iconSize:[68,48]})}).addTo(layer).on('click',()=>list(g));});
-      map.invalidateSize();map.fitBounds(pts,{padding:[40,40],maxZoom:12});
-    } catch(e) { rows.insertAdjacentHTML('afterbegin','<p class="muted">地图加载失败，结果列表仍可使用。</p>'); }
-  }
-  window.addEventListener('yycj:home-data',ev=>drawMap(ev.detail));
+  let resultMap=null;
+  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:id=>{window.__yycjBack='home';show('detail');window.__yycjOpenLamp=id;fetchDetail(id);},loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
+  window.addEventListener('yycj:home-data',ev=>{syncMapMode();if(window.__yycjMapMode)controller()?.receive(ev.detail,ev.mapRequest||{});});
+  window.addEventListener('yycj:map-loading',ev=>controller()?.begin(ev.detail));
+  window.addEventListener('yycj:map-error',ev=>controller()?.error(ev.detail));
+  window.addEventListener('pagehide',ev=>{if(!ev.persisted){resultMap?.destroy();resultMap=null;}});
   mount();
   // Welcome's known 「我的」 target, after authentication finishes.
   if(new URLSearchParams(location.search).get('page')==='me') { let tries=0;const go=()=>{if($('#app')&&!$('#app').classList.contains('hidden')) {$('[data-nav="me"]')?.click();} else if(++tries<80) setTimeout(go,150);};go(); }

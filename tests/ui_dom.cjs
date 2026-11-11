@@ -62,11 +62,11 @@ async function admin() {
 async function guest() {
  const dom=new JSDOM(fs.readFileSync('miniapp/go.html','utf8'),{url:'https://test.invalid/go.html',runScripts:'outside-only',pretendToBeVisual:true});const w=dom.window,d=w.document;w.localStorage.setItem('yycj_token','test');w.localStorage.setItem('yycj_city','深圳');
  w.fetch=async path=>response(String(path).includes('ranking')?{items:[],rule:'测试规则',city:'深圳'}:{city:'深圳',links:[{key:'discussion',label:'官方讨论群',url:'https://t.me/city_test'}]});
- w.eval(fs.readFileSync('miniapp/community-ui.js','utf8'));
+ w.eval(fs.readFileSync('miniapp/map-results.js','utf8'));w.eval(fs.readFileSync('miniapp/community-ui.js','utf8'));
  assert(d.querySelector('.topbar > #hubHomeEntry'));assert.equal(d.querySelectorAll('#hubHomeEntry').length,1);assert(!d.querySelector('#topAdmin'));assert.equal(d.querySelector('#btnSearch').nextElementSibling.id,'hubMapToggle');assert(d.querySelector('#pins').compareDocumentPosition(d.querySelector('.search-row')) & 4);assert(d.querySelector('#hubMapToggle'));let loads=0;w.__yycjLoadHome=()=>loads++;
  d.querySelector('#hubMapToggle').click();assert(w.__yycjMapMode);assert.equal(loads,1);
  w.dispatchEvent(new w.CustomEvent('yycj:home-data',{detail:{items:[{lamp_id:'x',title:'测试',district:'南山'}],map_groups:[]}}));
- assert(d.querySelector('#feed').classList.contains('hidden'));assert(d.querySelector('#hubMapRows').textContent.includes('测试'));
+ assert(d.querySelector('#feed').classList.contains('hidden'));assert(d.querySelector('#hubMapUnlocated').textContent.includes('测试'));
  d.querySelector('#hubMapToggle').click();assert(!d.querySelector('#feed').classList.contains('hidden'));
  d.querySelector('#hubHomeEntry').click();await wait(30);assert(d.querySelector('#hubBody').textContent.includes('官方讨论群'));assert(!d.querySelector('#hubBody').textContent.includes('防失联导航'));
  d.querySelector('[data-hub="ranking"]').click();await wait(30);assert(d.querySelector('#hubBody').textContent.includes('不编造榜单'));

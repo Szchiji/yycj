@@ -1,0 +1,11 @@
+/* Local fixture rendering only. No live website, session, SDK auth or provider access. */
+const puppeteer=require('puppeteer-core'),path=require('node:path'),fs=require('node:fs');
+(async()=>{const dir=path.resolve(process.argv[2]||'/workspace/yycj-map-upgrade-review'),browser=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});const evidence=[];
+try{for(const name of ['overview','selected','chooser','empty','error','loading','desktop']){
+ const page=await browser.newPage(),errors=[];await page.setViewport({width:name==='desktop'?1280:390,height:900,deviceScaleFactor:1});await page.setRequestInterception(true);page.on('request',r=>r.url().startsWith('file://'+dir+'/')||r.url().startsWith('data:')?r.continue():r.abort());page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('file://'+path.join(dir,'map-'+name+'.html'),{waitUntil:'load'});await page.waitForFunction(()=>document.body.dataset.mapReviewReady==='1',{timeout:12000});await new Promise(r=>setTimeout(r,150));
+ const info=await page.evaluate(()=>({status:document.querySelector('#hubMapStatus')?.textContent,selected:!document.querySelector('#hubMapSelection')?.classList.contains('hidden'),selectedTitle:document.querySelector('.hub-map-card-text>b')?.textContent,photoLoaded:!!document.querySelector('#hubMapSelection img')?.naturalWidth,clusters:[...document.querySelectorAll('.hub-map-marker')].map(x=>x.textContent),calls:window.__mapReviewCalls,mapBounds:document.querySelector('#hubResultMap')?.getBoundingClientRect().toJSON()}));
+ if(errors.length)throw Error(name+': '+errors.join(';'));if(name==='selected'&&(!info.selected||!info.photoLoaded))throw Error('selected card/photo fixture did not render');if(name==='empty'&&!info.status.includes('此区域暂无'))throw Error('empty fixture not applied');if(name==='error'&&!info.status.includes('加载失败'))throw Error('error fixture not applied');
+ await page.screenshot({path:path.join(dir,'map-'+name+'.png'),fullPage:false});evidence.push({name,...info,errors});await page.close();
+}fs.writeFileSync(path.join(dir,'render-evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence,null,2));}finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});
