@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional
+from pydantic import BaseModel
 
 from fastapi import Depends, HTTPException, Query
 
@@ -374,3 +375,28 @@ async def api_admin_ops_settings(
     )
     settings["updated_at"] = _ser_dt(settings.get("updated_at"))
     return {"ok": True, "settings": settings}
+
+
+class BoostBody(BaseModel):
+    lamp_id: str
+    level: int = 0
+    until_hours: Optional[int] = None  # from now, None = clear
+
+
+@router.post("/admin/listing/boost")
+async def api_admin_set_boost(
+    body: BoostBody,
+    admin_id: int = Depends(get_admin_user_id),
+) -> Dict[str, Any]:
+    """设置付费推广位（线下付款后调用）。level=0 清除。"""
+    await city_scope.guard(admin_id, "lamp", body.lamp_id)
+    from datetime import datetime, timedelta
+    from bot.services.rank import set_boost
+    until = None
+    if body.level and body.until_hours:
+        until = datetime.utcnow() + timedelta(hours=int(body.until_hours))
+    try:
+        data = await set_boost(body.lamp_id, body.level, until)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "boost": data}

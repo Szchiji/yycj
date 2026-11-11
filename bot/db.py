@@ -55,6 +55,10 @@ _ALTER_STATEMENTS = [
     # Home feed: WHERE status='active' AND city=? ORDER BY feed_pinned DESC, feed_pin_order, created_at DESC.
     # Additive, IF NOT EXISTS; the lamps table is small so the build lock is brief.
     "CREATE INDEX IF NOT EXISTS ix_lamps_feed ON lamps (status, city, feed_pinned DESC, feed_pin_order, created_at DESC)",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS hot_score INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS boost_level INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE lamps ADD COLUMN IF NOT EXISTS boost_until TIMESTAMP",
+    "CREATE INDEX IF NOT EXISTS ix_lamps_hot ON lamps (status, city, hot_score DESC, created_at DESC)",
     # 首页筛选: 价格档 (status, city, price) and 标签 (array overlap, GIN)
     "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS sections JSONB DEFAULT '{}'::jsonb",
     "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS proofs JSONB DEFAULT '[]'::jsonb",
@@ -83,6 +87,9 @@ _ALTER_STATEMENTS = [
     "CREATE TABLE IF NOT EXISTS listing_edit_versions (version_id VARCHAR(36) PRIMARY KEY, lamp_id VARCHAR(36) NOT NULL, sequence INTEGER NOT NULL, recorded_at TIMESTAMP NOT NULL DEFAULT NOW(), source VARCHAR(32) NOT NULL, actor_id BIGINT, actor_kind VARCHAR(16) NOT NULL, operation_id VARCHAR(64), source_version_id VARCHAR(36), changed_fields JSONB NOT NULL DEFAULT '[]'::jsonb, snapshot JSONB NOT NULL DEFAULT '{}'::jsonb, media_fingerprint VARCHAR(64) NOT NULL DEFAULT '', applied BOOLEAN NOT NULL DEFAULT TRUE)",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_listing_edit_versions_seq ON listing_edit_versions (lamp_id, sequence)",
     "CREATE INDEX IF NOT EXISTS ix_listing_edit_versions_lamp_time ON listing_edit_versions (lamp_id, recorded_at DESC)",
+    "CREATE TABLE IF NOT EXISTS lamp_view_users (id SERIAL PRIMARY KEY, lamp_id VARCHAR(36) NOT NULL, user_id BIGINT NOT NULL, day DATE NOT NULL, created_at TIMESTAMP DEFAULT NOW())",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_lamp_view_user_day ON lamp_view_users (lamp_id, user_id, day)",
+    "CREATE INDEX IF NOT EXISTS ix_lamp_view_users_lamp ON lamp_view_users (lamp_id)",
 ]
 
 

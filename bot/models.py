@@ -136,6 +136,9 @@ class Lamp(Base):
     feed_pin_order: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     unlist_reason: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    hot_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    boost_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    boost_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Compatibility remnants: no longer displayed or used as user-credit / 口碑分.
     authenticity_score: Mapped[int] = mapped_column(Integer, default=80)
     credit_boost: Mapped[int] = mapped_column(Integer, default=0)

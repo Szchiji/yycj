@@ -171,7 +171,16 @@ label { font-size: .85rem; color: var(--muted); }
   object-fit: cover; border-radius: 8px; background: #0d1326;
 }
 .feed-card .cover-wrap .thumb { height: 200px; max-height: 200px; }
-.feed-card .thumb.ph { background: #1a2140; }
+.feed-card .thumb.ph, #pins .pin-cover.ph {
+  background: linear-gradient(150deg, #2a1a40 0%, #151b2f 55%, #0b1020 100%);
+  display: flex; align-items: center; justify-content: center; position: relative;
+}
+.ph-letter {
+  font-size: 2.2rem; font-weight: 800; color: rgba(255,255,255,.16); letter-spacing: 0;
+  user-select: none; pointer-events: none;
+}
+#pins .pin-cover.ph { position: absolute; inset: 0; }
+#pins .pin-cover.ph .ph-letter { font-size: 3.2rem; }
 .feed-card .body { flex: 1; min-width: 0; }
 .feed-card h3 { margin: 0 0 2px; font-size: .78rem; line-height: 1.2; }
 .feed-card p { display: none; }

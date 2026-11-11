@@ -42,8 +42,8 @@
     try { if (key) sessionStorage.setItem("yycj_area", JSON.stringify({ city: curCity(), key })); else sessionStorage.removeItem("yycj_area"); } catch (e) {}
   }
   // 排序：最新上架（默认）/ 评价多。放在「地区」面板顶部，首页布局不变；本次会话内记住。
-  function getSort() { try { const v = sessionStorage.getItem("yycj_sort") || ""; return (v === "reviews" || v === "near") ? v : ""; } catch (e) { return ""; } }
-  function setSort(v) { try { if (v === "reviews" || v === "near") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
+  function getSort() { try { const v = sessionStorage.getItem("yycj_sort") || ""; return (v === "reviews" || v === "near" || v === "hot") ? v : ""; } catch (e) { return ""; } }
+  function setSort(v) { try { if (v === "reviews" || v === "near" || v === "hot") sessionStorage.setItem("yycj_sort", v); else sessionStorage.removeItem("yycj_sort"); } catch (e) {} }
   // 价格档 / 标签 / 营业中 / 距离：跟地区一样，按城市记在本次会话里
   function filtKey() { return "yycj_filt_" + curCity(); }
   function getFilt() {
@@ -154,8 +154,11 @@
     const btn = $("#btnCity");
     if (btn) btn.textContent = (current || cities[0] || "城市") + " ▾";
   }
-  function imgTag(src, cls, eager) {
-    if (!src) return "<div class=\"" + cls + " ph\"></div>";
+  function imgTag(src, cls, eager, title) {
+    if (!src) {
+      const ch = String(title || "").trim().slice(0, 1) || "·";
+      return "<div class=\"" + cls + " ph\" data-ph=\"1\"><span class=\"ph-letter\">" + esc(ch) + "</span></div>";
+    }
     const load = eager ? "eager" : "lazy";
     return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\"" + (eager ? " fetchpriority=\"high\"" : "") + " />";
   }
@@ -181,7 +184,7 @@
     const cpn = t.coupon && window.__yycjCouponMode && window.__yycjCouponMode("badge") ? "<span class=\"badge-cpn\" title=\"" + esc(t.coupon.text || "") + "\">惠</span>" : "";
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
-      imgTag(img, "thumb", idx < 3) +
+      imgTag(img, "thumb", idx < 3, t.title) +
       // 收藏只在详情页；卡片左上角放营业状态书签
       open +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
@@ -193,7 +196,7 @@
     const t = (p && p.lamp) || p || {};
     // 轮播只放封面 + 称呼，不显示营业状态 / 营业时间
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
-      imgTag(cover(t), "pin-cover", idx === 0) +
+      imgTag(cover(t), "pin-cover", idx === 0, t.title) +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
   function paint() {
@@ -301,7 +304,7 @@
     if (btn) {
       const lbl = btn.querySelector(".area-lbl");
       if (lbl) {
-        const word = nAct ? "筛选·" + nAct : so === "near" ? "附近" : so === "reviews" ? "评价多" : k ? areaLabel(k) : "筛选";
+        const word = nAct ? "筛选·" + nAct : so === "near" ? "附近" : so === "reviews" ? "评价多" : so === "hot" ? "人气" : k ? areaLabel(k) : "筛选";
         lbl.innerHTML = "<i class=\"area-ic\" aria-hidden=\"true\"></i><span class=\"area-w\">" + esc(word) + "</span><i class=\"area-car\" aria-hidden=\"true\">▾</i>";
       }
       btn.classList.toggle("on", !!(nAct || so));
@@ -318,6 +321,7 @@
     const sortRow = "<div class=\"sort-row\" role=\"radiogroup\" aria-label=\"排序\"><span class=\"sort-k\">排序</span>" +
       "<button type=\"button\" class=\"sort-opt" + (!so ? " on" : "") + "\" data-sort=\"\">最新</button>" +
       "<button type=\"button\" class=\"sort-opt" + (so === "reviews" ? " on" : "") + "\" data-sort=\"reviews\">评价多</button>" +
+      "<button type=\"button\" class=\"sort-opt" + (so === "hot" ? " on" : "") + "\" data-sort=\"hot\">人气</button>" +
       "<button type=\"button\" class=\"sort-opt" + (so === "near" ? " on" : "") + "\" data-sort=\"near\">距我近</button></div>";
     const areaChips = ["<button type=\"button\" class=\"area-chip" + (k ? "" : " on") + "\" data-area=\"\">全部<i>" + (d.total || 0) + "</i></button>"]
       .concat((d.items || []).map((x) => "<button type=\"button\" class=\"area-chip" + (x.key === k ? " on" : "") + "\" data-area=\"" + esc(x.key) + "\">" + esc(x.key) + "<i>" + x.count + "</i></button>"));

@@ -74,6 +74,8 @@ def _ser_card(lamp: Dict[str, Any]) -> Dict[str, Any]:
         "cover_url": full.get("cover_url") or "",
         "feed_pinned": bool(full.get("feed_pinned")),
         "feed_pin_order": int(full.get("feed_pin_order") or 0),
+        "hot_score": int(full.get("hot_score") or 0),
+        "boost_level": int(full.get("boost_level") or 0),
         "media_count": len(media) or len(photos),
         "open_code": full.get("open_code") or lamp.get("open_code") or "",
         "open_text": full.get("open_text") or lamp.get("open_text") or "",
@@ -100,7 +102,7 @@ async def api_home(
     city: Optional[str] = None,
     q: Optional[str] = None,
     district: Optional[str] = Query(default=None, max_length=32),
-    sort: str = Query(default="new", pattern="^(new|reviews|near)$"),
+    sort: str = Query(default="new", pattern="^(new|reviews|near|hot)$"),
     lat: Optional[float] = None,
     lng: Optional[float] = None,
     price: Optional[str] = Query(default=None, max_length=16),
@@ -223,7 +225,7 @@ async def api_home(
             lat=None if computed else lat,
             lng=None if computed else lng,
             district=(district or "").strip() or None,
-            sort="reviews" if sort == "reviews" else "new",
+            sort=sort if sort in ("reviews", "hot") else "new",
             flt=flt,
         )
         scanned_count = len(items)
@@ -507,3 +509,18 @@ async def api_session_request(
         "coupon_codes": [h["code"] for h in held_all],
         "message": "已发送邀请，券码已带上 · 已复制券码，发给老师即可" if held_all else "已发送想聊聊邀请，等待对方在 Bot 中接受",
     }
+
+
+@router.get("/rank")
+async def api_rank(
+    city: Optional[str] = None,
+    limit: int = Query(default=20, ge=1, le=50),
+    user_id: int = Depends(get_current_user_id),
+) -> Dict[str, Any]:
+    """人气榜：按热度分 + 活跃推广位排序。"""
+    from bot.services.rank import top_by_hot
+    settings = await home_service.get_or_create_settings()
+    enabled = list(settings.get("enabled_cities") or [])
+    use_city = city if city in enabled else (enabled[0] if enabled else city)
+    items = await top_by_hot(use_city, limit)
+    return {"ok": True, "city": use_city, "items": items, "count": len(items)}

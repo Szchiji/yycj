@@ -49,6 +49,9 @@ def _lamp_to_dict(lamp: Lamp) -> Dict[str, Any]:
         "publisher_role": getattr(lamp, "publisher_role", None),
         "feed_pinned": bool(getattr(lamp, "feed_pinned", False)),
         "feed_pin_order": int(getattr(lamp, "feed_pin_order", 0) or 0),
+        "hot_score": int(getattr(lamp, "hot_score", 0) or 0),
+        "boost_level": int(getattr(lamp, "boost_level", 0) or 0),
+        "boost_until": getattr(lamp, "boost_until", None),
         "authenticity_score": lamp.authenticity_score,
         "credit_boost": lamp.credit_boost,
         "status": lamp.status,
@@ -245,11 +248,26 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                 d["review_count"] = int(n or 0)
                 items.append(d)
         else:
-            stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.created_at.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
+            by_hot = sort == "hot"
+            if by_hot:
+                from datetime import datetime
+                now = datetime.utcnow()
+                stmt = (select(Lamp).where(and_(*conditions))
+                        .order_by(
+                            Lamp.feed_pinned.desc(),
+                            Lamp.feed_pin_order.asc(),
+                            (Lamp.boost_until > now).desc().nullslast(),
+                            Lamp.boost_level.desc(),
+                            Lamp.hot_score.desc(),
+                            Lamp.created_at.desc(),
+                        ).offset(off).limit(limit))
+            else:
+                stmt = select(Lamp).where(and_(*conditions)).order_by(Lamp.feed_pinned.desc(), Lamp.feed_pin_order.asc(), Lamp.created_at.desc(), Lamp.updated_at.desc()).offset(off).limit(limit)
             res = await s.execute(stmt)
             items = [_lamp_to_dict(x) for x in res.scalars().all()]
     enriched = [attach_fuzzy_distance(x, lat, lng) for x in items]
-    if by_reviews:
+    by_hot = sort == "hot"
+    if by_reviews or by_hot:
         pass  # SQL order is final
     elif lat is not None and lng is not None:
         enriched.sort(key=lambda x: (0 if x.get("feed_pinned") else 1, x.get("_distance_km") if x.get("_distance_km") is not None else 1e9))

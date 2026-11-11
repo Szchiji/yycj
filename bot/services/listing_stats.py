@@ -1,7 +1,7 @@
 """浏览 / 收藏 / 匿名联系 counts (teacher 我的上架) and the admin per-city daily dashboard.
 
-浏览 is the only new data (table lamp_views: one counter per listing per Beijing day; every detail
-open counts, the owner's own opens don't).
+浏览 is the only new data (table lamp_views: one counter per listing per Beijing day; same guest +
+same listing + same Beijing day counts once via lamp_view_users; the owner's own opens don't).
 收藏 comes from favorites, 匿名联系 from sessions (one session = one 匿名联系 request), 评价 from reviews,
 新上架 from lamps.created_at; nothing existing is altered.
 """
@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from bot.db import session_scope
 from bot.models import Lamp, Review, Session
-from bot.models_extra import Favorite, LampView
+from bot.models_extra import Favorite, LampView, LampViewUser
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +29,23 @@ def bj_today() -> date:
 
 
 async def record_view(lamp_id: str, viewer_id: Optional[int], owner_id: Optional[int]) -> None:
-    """Count a detail open (+1 on today's Beijing-day counter). The owner's own opens never count."""
+    """Count a detail open (+1 on today's Beijing-day counter). Owner opens don't count.
+    Same guest + same listing + same Beijing day counts only once (insert into lamp_view_users
+    first; only a new row increments the counter)."""
     if not lamp_id or not viewer_id or (owner_id is not None and int(viewer_id) == int(owner_id)):
         return
     try:
         async with session_scope() as s:
-            stmt = pg_insert(LampView).values(lamp_id=str(lamp_id), day=bj_today(), views=1)
+            day = bj_today()
+            mark = pg_insert(LampViewUser).values(lamp_id=str(lamp_id), user_id=int(viewer_id), day=day)
+            res = await s.execute(mark.on_conflict_do_nothing(constraint="uq_lamp_view_user_day"))
+            if not res.rowcount:
+                return
+            stmt = pg_insert(LampView).values(lamp_id=str(lamp_id), day=day, views=1)
             await s.execute(stmt.on_conflict_do_update(constraint="uq_lamp_views_day", set_={"views": LampView.views + 1}))
+            # 浏览成功后异步重算热度分
+            from bot.services.rank import recompute_hot_soon
+            recompute_hot_soon(str(lamp_id))
     except Exception:
         logger.exception("record view failed %s", lamp_id)
 
