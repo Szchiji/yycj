@@ -7,7 +7,7 @@ from sqlalchemy import select,func
 from bot.api.routes_core import router
 from bot.api.deps import get_admin_user_id
 from bot.db import session_scope
-from bot.models import ExecutionRecord,ListingEditOperation,ListingRenewal
+from bot.models import ExecutionRecord,ListingEditOperation,ListingRenewal,ListingRelistOperation
 from bot.models_extra import LabelSyncState
 from bot.services import city_scope,home_service,execution_log
 from bot.services.admin_acl import is_super
@@ -36,16 +36,24 @@ async def public_rows(rows):
     async with session_scope() as s:
         edits={x.operation_id:x for x in (await s.execute(select(ListingEditOperation).where(ListingEditOperation.operation_id.in_(ids)))).scalars()} if ids else {}
         renewals={x.operation_id:x for x in (await s.execute(select(ListingRenewal).where(ListingRenewal.operation_id.in_(ids)))).scalars()} if ids else {}
+        relists={x.operation_id:x for x in (await s.execute(select(ListingRelistOperation).where(ListingRelistOperation.operation_id.in_(ids)))).scalars()} if ids else {}
         labels={x.city:x for x in (await s.execute(select(LabelSyncState).where(LabelSyncState.city.in_(cities)))).scalars()} if cities else {}
     out=[]
     for row in rows:
         retry=False;action=None;op=edits.get(row.operation_id)
         step='notification' if row.step=='notification' else 'channel'
-        if op and row.status in ('failed','not_configured','pending'):
+        if op and row.feature!='relist' and row.status in ('failed','not_configured','pending'):
             st=op.state or {};retry=bool(st.get(step+'_retryable')) and st.get(step+'_status') in ('failed','not_configured','pending');action='edit_'+step if retry else None
         renewal=renewals.get(row.operation_id)
-        if not op and renewal and row.step=='notification' and row.status=='failed':
+        if row.feature!='relist' and not op and renewal and row.step=='notification' and row.status=='failed':
             st=renewal.result or {};retry=st.get('channel_status')=='sent' and st.get('notify_status')=='failed' and bool(st.get('notification_retryable'));action='renewal_notification' if retry else None
+        if row.feature=='relist' and row.operation_id in relists:
+            from bot.services.relist_delivery import latest
+            current=(await latest([row.listing_id])).get(row.listing_id) or {}
+            st=relists[row.operation_id].state or {}
+            retry=bool(current.get('operation_id')==row.operation_id and current.get(step+'_retryable') and not current.get('superseded') and st.get(step+'_status') in ('failed','not_configured','pending') and row.status in ('failed','not_configured','pending','running'))
+            if step=='notification' and st.get('channel_status')!='synced':retry=False
+            action='relist_'+step if retry else None
         if row.retry_kind=='label_sync' and row.status=='failed':
             label=labels.get(row.city);retry=bool(label and label.failed and label.status!='running');action='label_sync' if retry else None
         out.append({'record_id':row.record_id,'operation_id':row.operation_id,'feature':row.feature,'step':row.step,
@@ -88,7 +96,10 @@ async def execution_retry(record_id:str,admin_id:int=Depends(get_admin_user_id))
     if not view['retryable']:raise HTTPException(status_code=409,detail='当前步骤不可直接重试；成功、关闭或不确定送达不会重发')
     try:
         action=view['retry_action']
-        if action.startswith('edit_'):
+        if action.startswith('relist_'):
+            from bot.services.relist_delivery import retry
+            await retry(row.operation_id,action.removeprefix('relist_'),admin_id,admin=True)
+        elif action.startswith('edit_'):
             from bot.services.listing_edits import retry
             await retry(row.operation_id,action.removeprefix('edit_'),admin_id,admin=True)
         elif action=='renewal_notification':

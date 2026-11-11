@@ -18,6 +18,11 @@ from bot.services.extras_store import save_extras, save_user_fields
 logger = logging.getLogger(__name__)
 
 
+class RelistBody(BaseModel):
+    operation_id: str = ""
+    expected_updated_at: str = ""
+
+
 class EditBody(BaseModel):
     operation_id: Optional[str] = None
     city: str
@@ -84,7 +89,11 @@ async def api_me_listings(user_id: int = Depends(get_current_user_id)) -> Dict[s
         logger.exception("teacher stats flags failed")
     from bot.services.listing_edits import latest
     states=await latest([x["lamp_id"] for x in items])
-    for x in items:x["edit_state"]=states.get(x["lamp_id"])
+    from bot.services.relist_delivery import latest as relist_latest
+    relists=await relist_latest([x["lamp_id"] for x in items])
+    for x in items:
+        x["edit_state"]=states.get(x["lamp_id"]);x["relist_state"]=relists.get(x["lamp_id"])
+        x["updated_at"]=_ser_dt(x.get("updated_at"))
     return {"ok": True, "items": items, "remind_lead_min": REMIND_LEAD_MIN, "stats_show": show}
 
 
@@ -211,13 +220,13 @@ async def api_me_unlist(lamp_id: str, user_id: int = Depends(get_current_user_id
 
 
 @router.post("/me/listings/{lamp_id}/relist")
-async def api_me_relist(lamp_id: str, user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
+async def api_me_relist(lamp_id: str, body: RelistBody = RelistBody(), user_id: int = Depends(get_current_user_id)) -> Dict[str, Any]:
     from bot.services import listing_ops
     try:
-        out = await listing_ops.teacher_relist(lamp_id, user_id)
+        out = await listing_ops.teacher_relist(lamp_id,user_id,operation_id=body.operation_id,expected_updated_at=body.expected_updated_at)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, **out}
+    return {"ok": True, "operation":out, "message":out.get("message")}
 
 
 @router.get("/me/todos")
@@ -311,3 +320,17 @@ async def api_me_edit_retry(operation_id: str,body: EditRetryBody,user_id: int=D
 @router.post("/admin/edit-operations/{operation_id}/retry")
 async def api_admin_edit_retry(operation_id: str,body: EditRetryBody,admin_id: int=Depends(get_admin_user_id)):
     return await _retry_edit(operation_id,body,admin_id,True)
+
+
+@router.post('/me/relist-operations/{key}/retry')
+async def api_me_relist_retry(key: str, body: EditRetryBody, user_id: int = Depends(get_current_user_id)):
+    from bot.services.relist_delivery import retry
+    try:return {'operation':await retry(key,body.step,user_id)}
+    except ValueError as exc:raise HTTPException(409,detail=str(exc)) from exc
+
+
+@router.post('/admin/relist-operations/{key}/retry')
+async def api_admin_relist_retry(key: str, body: EditRetryBody, admin_id: int = Depends(get_admin_user_id)):
+    from bot.services.relist_delivery import retry
+    try:return {'operation':await retry(key,body.step,admin_id,admin=True)}
+    except ValueError as exc:raise HTTPException(409,detail=str(exc)) from exc

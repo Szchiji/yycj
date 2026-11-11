@@ -136,8 +136,9 @@ def compact_id(lamp_id: str) -> str:
 
 LINK_LABELS = (("s", "查看详情"), ("r", "查看评价"), ("w", "写评价"))
 # Telegram HTML (esp. iOS) collapses ordinary spaces between adjacent <a> tags, so the old
-# " · ".join(...) looked stuck together as 查看详情查看评价写评价. Non-breaking spaces keep the dots.
-LINK_SEP_HTML = "&nbsp;·&nbsp;"
+# " · ".join(...) looked stuck together as 查看详情查看评价写评价. Use a real U+00A0 NBSP;
+# the named entity &nbsp; is not supported in Bot API HTML and shows up literally.
+LINK_SEP_HTML = "\u00a0·\u00a0"
 
 
 def link_labels_from_site(site: dict | None = None) -> list[tuple[str, str]]:
@@ -184,6 +185,17 @@ def links_html(bot_username: str, lamp_id: str, *, labels=None, sep: str | None 
             parts.append(f'<a href="{html.escape(u, quote=True)}">{html.escape(label)}</a>')
     joiner = LINK_SEP_HTML if sep is None else sep
     return joiner.join(parts)
+
+
+def footer_text(site: dict | None = None, *, extra: str = "") -> str:
+    """Plain footer using the same labels, hide-if-empty rules, and separator as channel HTML links.
+    For admin preview (rendered as text, not HTML tags). ``extra`` is an optional trailing label
+    such as the community location link text."""
+    parts = [label for _, label in link_labels_from_site(site)]
+    extra = str(extra or "").strip()[:16]
+    if extra:
+        parts.append(extra)
+    return LINK_SEP_HTML.join(parts)
 
 
 def caption_html(plain: str, links: str = "", *, limit: int = 1024) -> str:

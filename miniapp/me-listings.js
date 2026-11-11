@@ -110,9 +110,10 @@
       danger: true,
     });
   }
-  async function postUnlist(id, relist) {
+  async function postUnlist(id, relist, payload) {
     const r = await fetch("/api/me/listings/" + encodeURIComponent(id) + (relist ? "/relist" : "/unlist"), {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token() },
+      ...(relist?{body:JSON.stringify(payload)}:{}),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.detail || "操作失败");
@@ -187,7 +188,7 @@
             ? `<p class="shift-note muted">已到期，请联系管理员续期后再上架。</p>`
             : (x.status === "hidden" ? `<p class="shift-note muted">管理员或平台下架的条目，不能自己恢复。</p>` : ""));
         const acts = `<div class="ls-acts">${x.status === "active" ? `<button class="btn danger" type="button" data-unlist="${esc(x.lamp_id)}">下架</button>` : ""}${canRelist ? `<button class="btn primary" type="button" data-relist="${esc(x.lamp_id)}">重新上架</button>` : ""}
-          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state)||""}`;
+          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state)||""}${window.__yycjEditUI?.html(x.relist_state)||""}`;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${exp}</div>${statsHtml(x, show)}${hiddenNote}${acts}</div>
@@ -208,8 +209,10 @@
       });
       box.querySelectorAll("[data-relist]").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          try { await postUnlist(btn.getAttribute("data-relist"), true); toast("已重新上架"); load(); }
-          catch (e) { toast(e.message || String(e)); }
+          try { const id=btn.getAttribute("data-relist"),item=items.find(x=>x.lamp_id===id);btn.disabled=true;
+            const key='relist:'+id,body=window.__yycjEditUI.request({expected_updated_at:item.updated_at},key);
+            const result=await postUnlist(id,true,body);window.__yycjEditUI.clear(key);toast(result.message||'重新上架已处理，请查看分步交付状态');load(); }
+          catch (e) { btn.disabled=false;toast(e.message || String(e)); }
         });
       });
       box.querySelectorAll("[data-edit]").forEach((btn) => {

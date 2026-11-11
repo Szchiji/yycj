@@ -60,9 +60,9 @@ def test_assets_built_and_versioned():
     vs = set()
     for page in ("index.html", "go.html"):
         vs |= set(re.findall(r"app\.bundle\.(?:js|css)\?v=(\w+)", _read(page)))
-    assert vs == {"20261110h","20261110g"}
+    assert vs == {"20261111d","20261110g"}
     for page in ("index.html", "go.html"):
-        assert "app.bundle.js?v=20261110h" in _read(page)
+        assert "app.bundle.js?v=20261111d" in _read(page)
         assert "app.bundle.css?v=20261110g" in _read(page)
 
 
