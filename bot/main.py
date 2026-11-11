@@ -42,6 +42,7 @@ from bot.db import close_db, connect_db
 from bot.handlers import register_handlers
 from bot.middlewares import ErrorLogMiddleware
 from bot.services import anti_brush, credit_service, session_service
+from bot.services import staging_guard
 
 logging.basicConfig(
     level=logging.INFO,
@@ -127,10 +128,21 @@ async def job_expire_listings() -> None:
 def _schedule_jobs() -> None:
     if scheduler.running:
         return
-    scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True)
-    scheduler.add_job(job_purge_session_messages, "interval", minutes=30, id="purge_session_messages", replace_existing=True)
-    scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True)
-    scheduler.add_job(job_expire_listings, "interval", minutes=30, id="expire_listings", replace_existing=True)
+    db_jobs = staging_guard.db_jobs_enabled()
+    telegram_jobs = staging_guard.telegram_jobs_enabled()
+    if not db_jobs and not telegram_jobs:
+        logger.warning(
+            "Staging: scheduler not started; DB and Telegram jobs stay off until "
+            "STAGING_ENABLE_DB_JOBS=1 and/or STAGING_ENABLE_TELEGRAM_JOBS=1"
+        )
+        return
+    if db_jobs:
+        scheduler.add_job(job_expire_sessions, "interval", minutes=5, id="expire_sessions", replace_existing=True)
+        scheduler.add_job(job_purge_session_messages, "interval", minutes=30, id="purge_session_messages", replace_existing=True)
+        scheduler.add_job(job_daily_credit, "cron", hour=0, minute=5, id="daily_credit", replace_existing=True)
+        scheduler.add_job(job_expire_listings, "interval", minutes=30, id="expire_listings", replace_existing=True)
+    else:
+        logger.warning("Staging: DB maintenance jobs off until STAGING_ENABLE_DB_JOBS=1")
     scheduler.start()
 
 
@@ -165,6 +177,8 @@ async def _setup_webhook() -> bool:
 async def _startup() -> None:
     global _ready, _startup_error
     try:
+        # Isolation gate first: no DB migration, Redis, scheduler, backfill, or Telegram writes yet.
+        staging_guard.assert_startup_isolation()
         if not settings.bot_token:
             raise RuntimeError("请设置环境变量 BOT_TOKEN")
         logging.getLogger().setLevel(settings.log_level.upper())
@@ -173,60 +187,78 @@ async def _startup() -> None:
             logging.getLogger(_quiet).setLevel(logging.WARNING)
         await connect_db()
         logger.info("Database connected")
-        try:
-            from bot.services import home_service
-            from bot.services.demo_purge import purge_demo_listings
-            home_service.seed_demo_if_empty = purge_demo_listings
-            purged = await purge_demo_listings()
-            if purged.get("purged"):
-                logger.info("Demo purged: %s", purged.get("lamp_ids"))
-        except Exception:
-            logger.exception("demo purge skipped")
+        await staging_guard.assert_runtime_isolation()
+        if staging_guard.demo_purge_enabled():
+            try:
+                from bot.services import home_service
+                from bot.services.demo_purge import purge_demo_listings
+                home_service.seed_demo_if_empty = purge_demo_listings
+                purged = await purge_demo_listings()
+                if purged.get("purged"):
+                    logger.info("Demo purged: %s", purged.get("lamp_ids"))
+            except Exception:
+                logger.exception("demo purge skipped")
+        elif staging_guard.staging_requested():
+            logger.warning("Staging: demo purge off until STAGING_ENABLE_DEMO_PURGE=1")
         await anti_brush.allow("__warmup__", limit=1, window_sec=1)
         _schedule_jobs()
-        try:
-            from bot.services import bot_info
-            await bot_info.refresh_bot_identity(bot)
-        except Exception:
-            logger.exception("bot identity refresh skipped")
+        hooks = staging_guard.bot_hooks_enabled()
+        if hooks:
+            try:
+                from bot.services import bot_info
+                await bot_info.refresh_bot_identity(bot)
+            except Exception:
+                logger.exception("bot identity refresh skipped")
+        elif staging_guard.staging_requested():
+            logger.warning("Staging: getMe / bot identity refresh off until STAGING_ENABLE_BOT_HOOKS=1")
         try:
             from bot.services import bot_info
             await bot_info.startup_maintenance(scheduler)
         except Exception:
             logger.exception("startup maintenance skipped")
         if settings.use_webhook:
-            if not settings.webhook_secret:
-                logger.warning("WEBHOOK_SECRET is not set: webhook requests are not authenticated")
-            await _setup_webhook()
+            if hooks:
+                if not settings.webhook_secret:
+                    logger.warning("WEBHOOK_SECRET is not set: webhook requests are not authenticated")
+                await _setup_webhook()
+            else:
+                logger.warning("Staging: setWebhook skipped until STAGING_ENABLE_BOT_HOOKS=1")
         else:
             logger.warning("WEBHOOK_HOST 未配置：仅 HTTP 健康检查；本地请走 polling")
         webapp = settings.normalized_webapp_url
         if webapp:
             menu_url = _menu_webapp_url(webapp)
             logger.info("WEBAPP_URL=%s (menu=%s)", settings.webapp_url, menu_url)
+            if hooks:
+                try:
+                    await _tg_call("set_chat_menu_button", lambda: bot.set_chat_menu_button(
+                        menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=menu_url))
+                    ))
+                    logger.info("Chat menu button set -> %s", menu_url)
+                except Exception:
+                    logger.exception("set_chat_menu_button failed")
+            elif staging_guard.staging_requested():
+                logger.warning("Staging: set_chat_menu_button skipped until STAGING_ENABLE_BOT_HOOKS=1")
+        if hooks:
             try:
-                await _tg_call("set_chat_menu_button", lambda: bot.set_chat_menu_button(
-                    menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=menu_url))
+                await _tg_call("set_my_commands", lambda: bot.set_my_commands(
+                    [
+                        BotCommand(command="start", description="打开欢迎"),
+                        BotCommand(command="help", description="使用说明"),
+                        BotCommand(command="admin", description="管理后台（管理员）"),
+                    ]
                 ))
-                logger.info("Chat menu button set -> %s", menu_url)
+                logger.info("Bot commands set: /start /help /admin")
             except Exception:
-                logger.exception("set_chat_menu_button failed")
-        try:
-            await _tg_call("set_my_commands", lambda: bot.set_my_commands(
-                [
-                    BotCommand(command="start", description="打开欢迎"),
-                    BotCommand(command="help", description="使用说明"),
-                    BotCommand(command="admin", description="管理后台（管理员）"),
-                ]
-            ))
-            logger.info("Bot commands set: /start /help /admin")
-        except Exception:
-            logger.exception("set_my_commands failed")
+                logger.exception("set_my_commands failed")
+        elif staging_guard.staging_requested():
+            logger.warning("Staging: set_my_commands skipped until STAGING_ENABLE_BOT_HOOKS=1")
         if MINIAPP_DIR.is_dir():
             logger.info("Mini App static: %s -> /app", MINIAPP_DIR)
         _ready = True
         _startup_error = None
     except Exception as exc:
+        _ready = False
         _startup_error = str(exc)
         logger.exception("Startup failed: %s", exc)
 
@@ -372,38 +404,52 @@ if MINIAPP_DIR.is_dir():
 
 
 async def run_polling() -> None:
+    staging_guard.assert_startup_isolation()
     if not settings.bot_token:
         raise RuntimeError("请设置环境变量 BOT_TOKEN")
     logging.getLogger().setLevel(settings.log_level.upper())
     await connect_db()
+    await staging_guard.assert_runtime_isolation()
     await anti_brush.allow("__warmup__", limit=1, window_sec=1)
-    await bot.delete_webhook(drop_pending_updates=True)
+    hooks = staging_guard.bot_hooks_enabled()
+    if hooks:
+        await bot.delete_webhook(drop_pending_updates=True)
+    elif staging_guard.staging_requested():
+        logger.warning("Staging: deleteWebhook skipped until STAGING_ENABLE_BOT_HOOKS=1")
     _schedule_jobs()
     try:
         from bot.services import bot_info
         await bot_info.startup_maintenance(scheduler)
     except Exception:
         logger.exception("startup maintenance skipped")
-    me = await bot.get_me()
-    logger.info("Polling mode | Bot @%s", me.username)
+    if hooks:
+        me = await bot.get_me()
+        logger.info("Polling mode | Bot @%s", me.username)
+    else:
+        logger.info("Polling mode | bot identity skipped until STAGING_ENABLE_BOT_HOOKS=1")
     webapp = settings.normalized_webapp_url
-    if webapp:
+    if webapp and hooks:
         try:
             await bot.set_chat_menu_button(
                 menu_button=MenuButtonWebApp(text="首页", web_app=WebAppInfo(url=_menu_webapp_url(webapp)))
             )
         except Exception:
             logger.exception("set_chat_menu_button failed")
-    try:
-        await bot.set_my_commands(
-            [
-                BotCommand(command="start", description="打开欢迎"),
-                BotCommand(command="help", description="使用说明"),
-                BotCommand(command="admin", description="管理后台（管理员）"),
-            ]
-        )
-    except Exception:
-        logger.exception("set_my_commands failed")
+    elif webapp and staging_guard.staging_requested():
+        logger.warning("Staging: set_chat_menu_button skipped until STAGING_ENABLE_BOT_HOOKS=1")
+    if hooks:
+        try:
+            await bot.set_my_commands(
+                [
+                    BotCommand(command="start", description="打开欢迎"),
+                    BotCommand(command="help", description="使用说明"),
+                    BotCommand(command="admin", description="管理后台（管理员）"),
+                ]
+            )
+        except Exception:
+            logger.exception("set_my_commands failed")
+    elif staging_guard.staging_requested():
+        logger.warning("Staging: set_my_commands skipped until STAGING_ENABLE_BOT_HOOKS=1")
     try:
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:

@@ -18,3 +18,6 @@
 
 ## 未验收
 真实 OSM 底图渲染、Telegram 手机定位/触摸与弱网未验收。本整合不再重试此前被拒绝的 localhost 或 file 浏览器实图画验收路径，也不做隧道或生产探测。
+
+## 测试环境启动保护（本地准备）
+本地已增加 staging 启动隔离门禁与无 secret 配置示例，见 `docs/staging-isolation.md` 与 `.env.staging.example`。仅 `ENV=staging` 不能证明隔离。当前仍缺少专用测试机器人和独立资源，不部署、不创建收费资源。
