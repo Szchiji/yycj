@@ -108,3 +108,106 @@ body.side-open .side-mask {
 .cpn-admin .cpn-a-text{color:#E5CC8E;font-weight:600;}
 .cpn-admin .cpn-a-all{display:inline-flex!important;align-items:center;gap:6px;margin:4px 0 8px;font-size:13px;width:auto!important;}
 .cpn-admin .cpn-a-all input{width:auto!important;margin:0;}
+
+/* Listing cards on 上架资料: stack meta, status, and actions. The desktop
+   1fr/auto pick-item grid plus overflow-wrap:anywhere was shrinking
+   .edit-result to a 1–2 character column. */
+#adminListings > .pick-item,
+.workspace-body #workspaceLegacy #adminListings > .pick-item {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+#adminListings .edit-result,
+.workspace-body #workspaceLegacy #adminListings .edit-result {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 0;
+  grid-column: 1 / -1;
+}
+#adminListings .edit-result p,
+#adminListings .edit-result strong,
+#adminListings .edit-result a {
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
+}
+#adminListings .listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ad-line);
+}
+#adminListings .listing-actions > .btn,
+#adminListings .listing-more > summary {
+  min-height: 44px;
+  min-width: 44px;
+  flex: 1 1 136px;
+  padding: 0 14px;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+#adminListings .listing-actions > .btn.danger {
+  flex: 1 1 112px;
+}
+#adminListings .listing-more {
+  position: relative;
+  flex: 1 1 112px;
+  min-width: 0;
+}
+#adminListings .listing-more > summary {
+  list-style: none;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--ad-line);
+  background: #1a2233;
+  color: var(--ad-text);
+}
+#adminListings .listing-more > summary::-webkit-details-marker,
+#adminListings .listing-more > summary::marker { display: none; content: none; }
+#adminListings .listing-more-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 8;
+  min-width: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--ad-line);
+  background: var(--ad-card);
+  box-shadow: 0 10px 28px rgba(0,0,0,.4);
+}
+#adminListings .listing-more-menu .btn {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  justify-content: center;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  #adminListings .listing-actions > .btn,
+  #adminListings .listing-more {
+    flex: 1 1 calc(50% - 10px);
+  }
+}
