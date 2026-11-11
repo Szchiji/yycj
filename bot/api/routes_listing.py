@@ -334,3 +334,86 @@ async def api_admin_relist_retry(key: str, body: EditRetryBody, admin_id: int = 
     from bot.services.relist_delivery import retry
     try:return {'operation':await retry(key,body.step,admin_id,admin=True)}
     except ValueError as exc:raise HTTPException(409,detail=str(exc)) from exc
+
+
+class RestoreBody(BaseModel):
+    operation_id: Optional[str] = None
+    expected_updated_at: str = ""
+    confirm: bool = False
+    include_media: bool = False
+
+
+async def _history_access(lamp_id, actor, admin):
+    from bot.services import listing_history, city_scope, search_service
+    if admin:
+        await city_scope.guard(actor, "lamp", lamp_id)
+        return
+    lamp = await search_service.get_lamp(lamp_id)
+    if not lamp or int(lamp.get("user_id") or 0) != int(actor):
+        raise HTTPException(status_code=404, detail="找不到你的资料")
+
+
+@router.get("/me/listings/{lamp_id}/edit-history")
+async def api_me_edit_history(lamp_id: str, user_id: int = Depends(get_current_user_id)):
+    from bot.services import listing_history
+    await _history_access(lamp_id, user_id, False)
+    try:
+        return await listing_history.history(lamp_id, user_id, admin=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/admin/listings/{lamp_id}/edit-history")
+async def api_admin_edit_history(lamp_id: str, admin_id: int = Depends(get_admin_user_id)):
+    from bot.services import listing_history
+    await _history_access(lamp_id, admin_id, True)
+    try:
+        return await listing_history.history(lamp_id, admin_id, admin=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/me/listings/{lamp_id}/edit-history/{version_id}")
+async def api_me_edit_history_preview(lamp_id: str, version_id: str, user_id: int = Depends(get_current_user_id)):
+    from bot.services import listing_history
+    await _history_access(lamp_id, user_id, False)
+    try:
+        return await listing_history.preview(lamp_id, version_id, user_id, admin=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/admin/listings/{lamp_id}/edit-history/{version_id}")
+async def api_admin_edit_history_preview(lamp_id: str, version_id: str, admin_id: int = Depends(get_admin_user_id)):
+    from bot.services import listing_history
+    await _history_access(lamp_id, admin_id, True)
+    try:
+        return await listing_history.preview(lamp_id, version_id, admin_id, admin=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+async def _restore(lamp_id, version_id, body, actor, admin):
+    from bot.services import listing_history, credit_service
+    await _history_access(lamp_id, actor, admin)
+    if not admin and (await credit_service.ensure_user(actor)).get("is_shadowed"):
+        raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法恢复资料")
+    try:
+        result = await listing_history.restore(
+            lamp_id, version_id, actor, body.operation_id,
+            admin=admin, expected_updated_at=body.expected_updated_at,
+            confirm=body.confirm, include_media=body.include_media,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "operation": result}
+
+
+@router.post("/me/listings/{lamp_id}/edit-history/{version_id}/restore")
+async def api_me_restore(lamp_id: str, version_id: str, body: RestoreBody, user_id: int = Depends(get_current_user_id)):
+    return await _restore(lamp_id, version_id, body, user_id, False)
+
+
+@router.post("/admin/listings/{lamp_id}/edit-history/{version_id}/restore")
+async def api_admin_restore(lamp_id: str, version_id: str, body: RestoreBody, admin_id: int = Depends(get_admin_user_id)):
+    return await _restore(lamp_id, version_id, body, admin_id, True)

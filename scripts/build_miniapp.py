@@ -18,11 +18,11 @@ MINI = Path(__file__).resolve().parent.parent / "miniapp"
 
 CSS = [
     "styles.css", "home-fix.css", "home-inline.css", "theme-emerald.css",
-    "status-badge.css", "hours.css", "area-filter.css", "upgrades.css", "place-pick.css", "coupons.css", "me-layout.css", "community.css", "entry-announcement.css", "edit-state-ui.css",
+    "status-badge.css", "hours.css", "area-filter.css", "upgrades.css", "place-pick.css", "coupons.css", "me-layout.css", "community.css", "entry-announcement.css", "edit-state-ui.css", "edit-history-ui.css",
 ]
 JS = [
     "cover.js", "net-cache.js", "resilience.js", "app.js", "home-ui.js", "hours-picker.js",
-    "edit-state-ui.js", "publish-ui.js", "me-listings.js", "detail-fix.js", "detail-kit.js", "role-nav.js", "fav.js",
+    "edit-state-ui.js", "edit-history-ui.js", "publish-ui.js", "me-listings.js", "detail-fix.js", "detail-kit.js", "role-nav.js", "fav.js",
     "share.js", "keyboard-fix.js", "deep-open.js", "detail-xhs.js", "review-back.js", "review-kit.js",
     "detail-guard.js", "swipe-back.js", "me-polish.js", "admin-go.js", "role-gate.js", "place-pick.js", "coupons.js", "me-layout.js", "community-ui.js", "entry-announcement.js",
 ]
