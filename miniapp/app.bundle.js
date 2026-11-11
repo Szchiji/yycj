@@ -434,11 +434,8 @@ try {
     const btn = $("#btnCity");
     if (btn) btn.textContent = (current || cities[0] || "城市") + " ▾";
   }
-  function imgTag(src, cls, eager, title) {
-    if (!src) {
-      const ch = String(title || "").trim().slice(0, 1) || "·";
-      return "<div class=\"" + cls + " ph\" data-ph=\"1\"><span class=\"ph-letter\">" + esc(ch) + "</span></div>";
-    }
+  function imgTag(src, cls, eager) {
+    if (!src) return "<div class=\"" + cls + " ph\"></div>";
     const load = eager ? "eager" : "lazy";
     return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\"" + (eager ? " fetchpriority=\"high\"" : "") + " />";
   }
@@ -464,7 +461,7 @@ try {
     const cpn = t.coupon && window.__yycjCouponMode && window.__yycjCouponMode("badge") ? "<span class=\"badge-cpn\" title=\"" + esc(t.coupon.text || "") + "\">惠</span>" : "";
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
-      imgTag(img, "thumb", idx < 3, t.title) +
+      imgTag(img, "thumb", idx < 3) +
       // 收藏只在详情页；卡片左上角放营业状态书签
       open +
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
@@ -476,7 +473,7 @@ try {
     const t = (p && p.lamp) || p || {};
     // 轮播只放封面 + 称呼，不显示营业状态 / 营业时间
     return "<div class=\"pin-card short\" data-id=\"" + esc(t.lamp_id || "") + "\">" +
-      imgTag(cover(t), "pin-cover", idx === 0, t.title) +
+      imgTag(cover(t), "pin-cover", idx === 0) +
       "<div class=\"pin-copy\"><b>" + esc(t.title || "") + "</b></div></div>";
   }
   function paint() {

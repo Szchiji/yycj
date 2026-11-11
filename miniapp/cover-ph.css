@@ -1,0 +1,10 @@
+/* No-photo card: gradient + first letter, instead of a flat empty block. */
+.feed-card .thumb.ph, #pins .pin-cover.ph, .pin-cover.ph {
+  background: linear-gradient(150deg, #2a1a40 0%, #151b2f 55%, #0b1020 100%) !important;
+  display: flex !important; align-items: center; justify-content: center; position: relative;
+}
+.ph-letter {
+  font-size: 2.2rem; font-weight: 800; color: rgba(255,255,255,.16);
+  user-select: none; pointer-events: none; line-height: 1;
+}
+#pins .pin-cover.ph .ph-letter, .pin-cover.ph .ph-letter { font-size: 3.2rem; }

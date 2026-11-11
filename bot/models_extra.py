@@ -23,7 +23,7 @@ class Favorite(Base):
 
 
 class LampView(Base):
-    """浏览次数：每条资料每个北京日一行，每次打开详情 +1（老师看自己的不算）。Additive table, no migration."""
+    """浏览次数：每条资料每个北京日一行。同一客人同一天只计一次（老师看自己的不算）。"""
     __tablename__ = "lamp_views"
     __table_args__ = (UniqueConstraint("lamp_id", "day", name="uq_lamp_views_day"),)
 
@@ -31,6 +31,18 @@ class LampView(Base):
     lamp_id: Mapped[str] = mapped_column(String(36), index=True)
     day: Mapped[date] = mapped_column(Date, index=True)  # Asia/Shanghai calendar day
     views: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class LampViewUser(Base):
+    """去重：同一客人同一资料同一北京日只贡献 1 次浏览。插入成功才给 lamp_views +1。"""
+    __tablename__ = "lamp_view_users"
+    __table_args__ = (UniqueConstraint("lamp_id", "user_id", "day", name="uq_lamp_view_user_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class ReviewNotice(Base):
