@@ -20,3 +20,16 @@ def test_review_export_is_actual_assets_but_offline_and_outside_static(tmp_path)
 
 def test_export_refuses_production_static_output():
     with pytest.raises(ValueError):module.export(ROOT/'miniapp/review-fixture')
+
+
+def test_layout_review_covers_compact_desktop_and_mobile_variants(tmp_path):
+    module.export(tmp_path/'review')
+    for name in ['desktop-messages.html','desktop-community.html','desktop-channel.html','desktop-logs-list.html','desktop-logs.html']:
+        text=(tmp_path/'review'/name).read_text()
+        assert 'ws-config-groups' in text and 'ws-button-card' in text and 'ws-log-primary' in text
+        assert "connect-src 'none'" in text and '<script src=' not in text
+    for name in ['mobile-community.html','mobile-messages.html','mobile-logs-list.html']:
+        text=(tmp_path/'review'/name).read_text()
+        assert 'width:390px' in text and 'srcdoc=' in text
+    launcher=(tmp_path/'review/review-index.html').read_text()
+    assert 'desktop-messages.html' in launcher and '不是线上截图' in launcher

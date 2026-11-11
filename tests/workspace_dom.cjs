@@ -80,6 +80,40 @@ async function create(options={}){
   a.$('#workspaceSave').click();await until(()=>a.w.yycjWorkspace.saving,'save busy');assert(a.$('#ws_popup_announcement_title').disabled);const select=a.$('#workspaceScope');select.value='深圳';select.dispatchEvent(new a.w.Event('change',{bubbles:true}));assert.equal(a.w.yycjWorkspace.city,'广州');a.$('[data-work="logs"]').click();assert.equal(a.w.yycjWorkspace.page,'settings');release();await until(()=>!a.w.yycjWorkspace.saving,'save released');assert(!a.w.yycjWorkspace.dirty);
   cases++;
  }finally{a.close()}}
+ {const a=await create();try{
+  await a.city('深圳');await a.nav('messages','approval');await until(()=>a.$('[data-bmode]'),'compact message editor');
+  assert(!a.$('.pagehead .breadcrumb'),'do not repeat page title in breadcrumb');
+  assert.deepEqual([...a.w.document.querySelectorAll('.ws-config-group>h2')].map(x=>x.textContent),['通知内容','消息按钮']);
+  assert.equal(a.w.document.querySelectorAll('#workspaceScope').length,1);assert.equal(a.w.document.querySelectorAll('#workspaceSave').length,1);
+  a.$('[data-bmode]').value='custom';a.$('[data-bmode]').dispatchEvent(new a.w.Event('change',{bubbles:true}));a.$('[data-badd]').click();
+  assert(a.$('.ws-button-card .ws-button-head'));assert(a.$('.ws-button-card .ws-button-fields [data-bkey="target"]'));assert(a.$('[aria-label="上移按钮1"]'));
+  const editor=a.$('#wsButtons_approval_buttons')._buttonEditor,previous=JSON.stringify(editor.value()),calls=a.fixture.state.calls.filter(x=>x.method==='POST').length;
+  a.$('.ws-preview-panel').open=false;await wait(40);assert.equal(JSON.stringify(editor.value()),previous);assert.equal(a.fixture.state.calls.filter(x=>x.method==='POST').length,calls);
+  a.w.confirm=()=>false;a.$('[data-work="settings"]').click();await wait(40);assert.equal(a.w.yycjWorkspace.page,'messages');
+  a.$('#btnMenu').click();assert.equal(a.$('#btnMenu').getAttribute('aria-expanded'),'true');assert(a.$('#sideMask').classList.contains('open'));a.w.document.dispatchEvent(new a.w.KeyboardEvent('keydown',{key:'Escape'}));assert.equal(a.$('#btnMenu').getAttribute('aria-expanded'),'false');assert(!a.$('#sideMask').classList.contains('open'));
+  assert.equal(a.errors.length,0,a.errors.join('\n'));cases++;
+ }finally{a.close()}}
+ {const a=await create();try{
+  await a.city('深圳');await a.nav('settings','community');await until(()=>a.$('#ws_community_enabled'),'grouped community settings');
+  assert.deepEqual([...a.w.document.querySelectorAll('.ws-config-group>h2')].map(x=>x.textContent),['社区入口','位置入口','首页联系入口']);
+  for(const f of a.w.yycjWorkspace.config.fields.filter(x=>x.section==='community'))assert(a.$('#ws_'+f.key),'field preserved: '+f.key);
+  assert(a.$('.ws-type-bool>.toggle'));assert(a.$('.ws-effective:not([open])'));assert.equal(a.w.yycjWorkspace.changed.size,0);
+  await a.city('__global');await a.nav('settings','channel');await until(()=>a.$('#ws_listing_fields'),'advanced field stays mounted');
+  const advanced=a.$('.ws-advanced');assert(advanced&&!advanced.open);assert(advanced.contains(a.$('#ws_listing_fields')));
+  for(const f of a.w.yycjWorkspace.config.fields.filter(x=>x.section==='channel'))assert(a.$('#ws_'+f.key),'channel field preserved: '+f.key);
+  advanced.open=true;a.input('#ws_listing_fields','[]');a.$('#workspaceSave').click();await wait(140);
+  const saved=a.fixture.state.calls.filter(x=>x.method==='POST'&&x.path==='/api/admin/workspace/config').at(-1);assert.deepEqual(saved.body.changes,{listing_fields:[]});assert.equal(saved.body.city,null);
+  assert(!a.fixture.state.calls.some(x=>x.path.endsWith('/retry')||x.path.includes('/renew')));cases++;
+ }finally{a.close()}}
+ {const a=await create();try{
+  await a.city('深圳');await a.nav('logs');await until(()=>a.$('#wsLogQuery'),'compact log filter');
+  assert(a.$('.ws-log-primary #wsLogFeature'));assert(a.$('.ws-log-id #wsLogSearchBy'));assert(!a.$('.ws-log-advanced').open);
+  a.$('.ws-log-advanced').open=true;a.input('#wsLogSince','2026-11-10T12:00');a.input('#wsLogUntil','2026-11-11T12:00');a.$('#wsLogQuery').click();await wait(80);
+  assert(a.$('#wsLogTimeSummary').textContent.includes('2026-11-10 12:00'));const query=a.fixture.state.calls.filter(x=>x.path==='/api/admin/executions').at(-1).query;assert.equal(query.since,'2026-11-10T04:00:00.000Z');assert.equal(query.until,'2026-11-11T04:00:00.000Z');
+  a.$('[data-wlog="log-unknown"]').click();await until(()=>a.$('.ws-detail-meta'),'structured log detail');assert(a.$('.ws-detail-meta').textContent.includes('coupon-example-op'));assert(a.$('.ws-stage-head'));assert(!a.$('[data-wretry]'));
+  const css=fs.readFileSync(path.join(ROOT,'miniapp/workspace.css'),'utf8');assert(css.includes('.workspace-body .ws-config-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))'));assert(css.includes('.workspace-body .ws-button-fields{grid-template-columns:1fr'));assert(css.includes('.workspace-body #sideMask.open'));assert(css.includes('calc(112px + env(safe-area-inset-bottom))'));assert(css.includes('font-size:16px;min-height:44px'));
+  assert.equal(a.w.yycjWorkspace.changed.size,0);assert(a.fixture.state.calls.filter(x=>x.method==='POST').every(x=>x.path==='/api/auth'));cases++;
+ }finally{a.close()}}
  {
   const os=require('node:os');const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yycj-workspace-export-'));
   cp.execFileSync(process.env.PYTHON||'python3',['scripts/export_workspace_review.py','--output',path.join(dir,'review')],{cwd:ROOT,env:{...process.env,PYTHONPATH:ROOT}});
