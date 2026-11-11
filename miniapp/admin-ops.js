@@ -124,7 +124,7 @@
           <strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${zhStatus(x.status)} · ${x.expires_at ? ("到期 " + String(x.expires_at).slice(0,10)) : "无截止"}</div>
         </div>
-        ${window.__yycjEditUI?.html(x.edit_state,"admin")||""}${window.__yycjEditUI?.html(x.relist_state,"admin")||""}
+        ${window.__yycjEditUI?.html(x.edit_state,"admin",{card:true})||""}${window.__yycjEditUI?.html(x.relist_state,"admin",{card:true})||""}
         ${listingActions(x)}
       </div>`).join("") || "<p class='muted'>暂无资料</p>";
   }

@@ -188,7 +188,7 @@
             ? `<p class="shift-note muted">已到期，请联系管理员续期后再上架。</p>`
             : (x.status === "hidden" ? `<p class="shift-note muted">管理员或平台下架的条目，不能自己恢复。</p>` : ""));
         const acts = `<div class="ls-acts">${x.status === "active" ? `<button class="btn danger" type="button" data-unlist="${esc(x.lamp_id)}">下架</button>` : ""}${canRelist ? `<button class="btn primary" type="button" data-relist="${esc(x.lamp_id)}">重新上架</button>` : ""}
-          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state)||""}${window.__yycjEditUI?.html(x.relist_state)||""}`;
+          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state,"me",{card:true})||""}${window.__yycjEditUI?.html(x.relist_state,"me",{card:true})||""}`;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${exp}</div>${statsHtml(x, show)}${hiddenNote}${acts}</div>

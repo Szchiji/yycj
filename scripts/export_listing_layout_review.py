@@ -44,6 +44,27 @@ LISTINGS = [
         },
     },
     {
+        "lamp_id": "xiaolan",
+        "title": "小兰",
+        "city": "深圳",
+        "status": "active",
+        "expires_at": "2026-12-15T16:00:00Z",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "unlist_reason": None,
+        "edit_state": {
+            "operation_id": "example-edit-xiaolan",
+            "text_saved": True,
+            "review_status": "none",
+            "media_status": "unchanged",
+            "action": "text",
+            "channel_status": "failed",
+            "channel_retryable": True,
+            "notification_status": "not_required",
+            "notification_retryable": False,
+            "album": "https://t.me/example/1002",
+        },
+    },
+    {
         "lamp_id": "xiaoqing",
         "title": "小青",
         "city": "深圳",
@@ -119,6 +140,9 @@ BOOTSTRAP = r'''
           const card=document.querySelector('[data-fill-proxy="xiaohong"]')?.closest('.listing-card');
           const more=card?.querySelector('.listing-more');
           if(more) more.open=true;
+        }
+        if(start.focusFail){
+          document.querySelector('[data-fill-proxy="xiaolan"]')?.closest('.listing-card')?.scrollIntoView({block:'center'});
         }
         if(start.relistAlert){
           const btn=document.querySelector('[data-fill-proxy="xiaohong"]')?.closest('.listing-card')?.querySelector('.listing-more-menu [data-list="relist"]');
@@ -207,6 +231,7 @@ def export(destination: Path):
         "mobile-listings.html": {"openMore": False, "autoConfirm": True},
         "desktop-listings.html": {"openMore": False, "autoConfirm": True},
         "mobile-more.html": {"openMore": True, "autoConfirm": True},
+        "mobile-failure.html": {"focusFail": True, "autoConfirm": True},
         "mobile-relist-alert.html": {"openMore": True, "relistAlert": True, "autoConfirm": True},
         "desktop-hidden.html": {"openMore": False, "autoConfirm": True},
     }
@@ -219,11 +244,11 @@ def export(destination: Path):
 <h1>上架资料卡片布局（未上线）</h1>
 <p>实际 desk.html / CSS / JS，数据为标明的内存示例。不连接生产，不发送 Telegram。手机页请用 390×844 查看；桌面页 1280×900。</p>
 <ul>
-<li><a href="mobile-listings.html">手机 · 上架资料列表（小红状态全文）</a></li>
-<li><a href="mobile-more.html">手机 · 小红「更多」展开（重新上架不在主操作行）</a></li>
+<li><a href="mobile-listings.html">手机 · 成功修改后的小红（无大块状态栏，与小明同样紧凑）</a></li>
+<li><a href="mobile-failure.html">手机 · 频道同步失败的小兰（紧凑可重试状态）</a></li>
+<li><a href="mobile-more.html">手机 · 小红「更多」展开</a></li>
+<li><a href="desktop-listings.html">桌面 · 紧凑列表</a></li>
 <li><a href="mobile-relist-alert.html">手机 · 已上架点重新上架（提示文案保持原样）</a></li>
-<li><a href="desktop-listings.html">桌面 · 上架资料列表</a></li>
-<li><a href="desktop-hidden.html">桌面 · 与手机同一数据（含已下架「小青」）</a></li>
 </ul>
 <p>截图 PNG 与 LAYOUT-REVIEW.md 在本目录。本包不是线上验收证明。</p>"""
     )
