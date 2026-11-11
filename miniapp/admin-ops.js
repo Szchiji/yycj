@@ -112,7 +112,7 @@
           <strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${zhStatus(x.status)} · ${x.expires_at ? ("到期 " + String(x.expires_at).slice(0,10)) : "无截止"}</div>
         </div>
-        ${window.__yycjEditUI?.html(x.edit_state,"admin")||""}
+        ${window.__yycjEditUI?.html(x.edit_state,"admin")||""}${window.__yycjEditUI?.html(x.relist_state,"admin")||""}
         <div class="row">
           <button class="btn" data-fill-proxy="${esc(x.lamp_id)}">修改资料</button>
           <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期…</button>

@@ -77,6 +77,8 @@ async def unlist_lamp(lamp_id: str, *, reason: str = "admin") -> Dict[str, Any]:
         was_live = lamp.status == LampStatus.ACTIVE.value
         city = lamp.city or ""
         lamp.status = LampStatus.HIDDEN.value
+        from bot.services.relist_delivery import invalidate
+        await invalidate(s,lamp_id)
         lamp.unlist_reason = (reason or "admin")[:64]
         lamp.feed_pinned = False
         lamp.updated_at = datetime.utcnow()
@@ -175,33 +177,9 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
 
 
 
-@serialized
-async def relist_lamp(lamp_id: str) -> Dict[str, Any]:
-    async with session_scope() as s:
-        res = await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))
-        lamp = res.scalar_one_or_none()
-        if not lamp:
-            raise ValueError("资料不存在")
-        if lamp.expires_at and lamp.expires_at <= datetime.utcnow():
-            raise ValueError("已过期，请先续期")
-        was_live = lamp.status == LampStatus.ACTIVE.value
-        lamp.status = LampStatus.ACTIVE.value
-        lamp.unlist_reason = None
-        lamp.updated_at = datetime.utcnow()
-        await s.flush()
-        out = {"lamp_id": lamp.lamp_id, "status": lamp.status, "expires_at": lamp.expires_at}
-        city = lamp.city or ""
-    if not was_live:   # 重新上架 = 上新
-        await _directory_on_live(lamp_id, city)
-        try:
-            from bot.services import search_service
-            from bot.services.broadcast import update_broadcast
-            full = await search_service.get_lamp(lamp_id)
-            if full:
-                await update_broadcast(full, full.get("extras") if isinstance(full, dict) else None)
-        except Exception:
-            logger.exception("refresh channel after relist failed")
-    return out
+async def relist_lamp(lamp_id: str, *, actor_id: int, operation_id: str, expected_updated_at, admin: bool = True) -> Dict[str, Any]:
+    from bot.services.relist_delivery import restore
+    return await restore(lamp_id,actor_id,operation_id,expected_updated_at,admin=admin)
 
 
 async def expire_due_lamps() -> int:
@@ -300,21 +278,8 @@ async def teacher_unlist(lamp_id: str, user_id: int) -> Dict[str, Any]:
     return await unlist_lamp(lamp_id, reason=TEACHER_UNLIST)
 
 
-async def teacher_relist(lamp_id: str, user_id: int) -> Dict[str, Any]:
-    """Self-restore only for a teacher-unlisted, still-valid listing. No re-review if materials are unchanged."""
-    async with session_scope() as s:
-        lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == lamp_id))).scalar_one_or_none()
-        if not lamp:
-            raise ValueError("资料不存在")
-        if int(lamp.user_id) != int(user_id):
-            raise ValueError("这不是你的资料")
-        if lamp.status == LampStatus.ACTIVE.value:
-            return {"lamp_id": lamp.lamp_id, "status": lamp.status, "expires_at": lamp.expires_at}
-        if lamp.unlist_reason != TEACHER_UNLIST:
-            raise ValueError("管理员或平台下架的条目，不能自己恢复")
-        if lamp.expires_at and lamp.expires_at <= datetime.utcnow():
-            raise ValueError("已过期，请联系管理员续期")
-    return await relist_lamp(lamp_id)
+async def teacher_relist(lamp_id: str, user_id: int, *, operation_id: str, expected_updated_at) -> Dict[str, Any]:
+    return await relist_lamp(lamp_id,actor_id=user_id,operation_id=operation_id,expected_updated_at=expected_updated_at,admin=False)
 
 
 async def list_listed(limit: int = 100, cities: Optional[set] = None) -> List[Dict[str, Any]]:

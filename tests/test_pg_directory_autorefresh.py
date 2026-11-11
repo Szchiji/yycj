@@ -98,7 +98,7 @@ def test_directory_auto_refresh_on_new_listing():
             fake.calls.clear()
             waits.clear()
             await listing_ops.set_listing_expiry(ids[2], days=7)
-            await listing_ops.relist_lamp(ids[4])
+            await listing_ops.relist_lamp(ids[4],actor_id=1,operation_id=str(uuid.uuid4()),expected_updated_at=(await search_service.get_lamp(ids[4]))['updated_at'].isoformat())
             assert list(cd._pending) == [ON] and len(waits) == 1
             gate.set()
             await asyncio.sleep(0.05)

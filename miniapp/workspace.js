@@ -7,7 +7,7 @@
  const NAV={overview:'总览',review:'审核与上架',messages:'消息与按钮',settings:'站点与城市配置',logs:'执行日志',system:'系统与权限'};
  const TABS={review:{media:'媒体审核',audit:'待审上架',reviews:'评价审核',listings:'上架资料',coupons:'优惠管理',pin:'卡片置顶',carousel:'精选轮播'},messages:{approval:'老师成功通知',welcome:'欢迎消息 · 全站',channelguide:'频道正文链接'},settings:{community:'本城社区',popup:'进入弹窗',announcement:'首页公告',cards:'首页展示',rules:'规则与通知',channel:'频道帖文案'},system:{permissions:'角色与负责城市',system:'运行配置',teacher:'老师数据展示',users:'用户管理',more:'举报与风控',stats:'统计看板'}};
  const SUB={overview:'先处理需要决定的事，再查看日常运行。',review:'文字即时同步；媒体审核保持旧媒体和当前状态。',messages:'私聊消息可排按钮；频道始终保留正文文字链接。',settings:'逐字段看清继承与生效值，只保存当前工作页。',logs:'按操作查看真实步骤；不确定送达不提供盲目重发。',system:'复用现有授权边界，不引入新的登录或权限政策。'};
- const LABEL={welcome:'欢迎消息',approval_notification:'老师成功通知',listing_broadcast:'频道上架推送',renewal:'续期',listing_edit:'资料交付',label_sync:'频道链接同步',coupon_push:'优惠推送',featured_review:'精选评价推送',directory:'按区目录'};
+ const LABEL={relist:'重新上架',welcome:'欢迎消息',approval_notification:'老师成功通知',listing_broadcast:'频道上架推送',renewal:'续期',listing_edit:'资料交付',label_sync:'频道链接同步',coupon_push:'优惠推送',featured_review:'精选评价推送',directory:'按区目录'};
  const STATUS={running:'执行中 / 待核对',sent:'已发送',synced:'已同步',failed:'明确失败',unknown:'送达不明',skipped:'按条件跳过',not_configured:'未配置目标',no_post:'无原帖',stale:'已失效',pending:'待执行'};
  const SOURCE={business:'业务触发',scheduled:'定时任务',scheduled_retry:'既有定时恢复',listing_event:'上 / 下架变更',manual:'手动刷新',review_approval:'评价审核',label_sync:'链接同步'};
  Object.assign(W,{tab:'',summary:null,config:null,draft:{},changed:new Set(),loadSerial:0,ready:false});

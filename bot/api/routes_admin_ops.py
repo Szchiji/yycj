@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete as sql_delete, select
 
 from bot.api.deps import get_admin_user_id, get_super_user_id
+from bot.api.routes_listing import RelistBody
 from bot.api.routes_core import BanBody, LampOpBody, _ser_dt, _ser_user, router
 from bot.config import get_settings
 from bot.db import session_scope
@@ -192,7 +193,10 @@ async def api_admin_listings(
         it["updated_at"] = _ser_dt(it.get("updated_at"))
     from bot.services.listing_edits import latest
     states=await latest([x["lamp_id"] for x in items])
-    for it in items:it["edit_state"]=states.get(it["lamp_id"])
+    from bot.services.relist_delivery import latest as relist_latest
+    relists=await relist_latest([x["lamp_id"] for x in items])
+    for it in items:
+        it["edit_state"]=states.get(it["lamp_id"]);it["relist_state"]=relists.get(it["lamp_id"])
     return {"ok": True, "items": items}
 
 
@@ -220,14 +224,13 @@ async def api_admin_delete_lamp(lamp_id: str, admin_id: int = Depends(get_admin_
 
 
 @router.post("/admin/listings/{lamp_id}/relist")
-async def api_admin_relist(lamp_id: str, admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
+async def api_admin_relist(lamp_id: str, body: RelistBody = RelistBody(), admin_id: int = Depends(get_admin_user_id)) -> Dict[str, Any]:
     await city_scope.guard(admin_id, "lamp", lamp_id)
     try:
-        data = await listing_ops.relist_lamp(lamp_id)
+        data = await listing_ops.relist_lamp(lamp_id,actor_id=admin_id,operation_id=body.operation_id,expected_updated_at=body.expected_updated_at)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    data["expires_at"] = _ser_dt(data.get("expires_at"))
-    return {"ok": True, **data}
+    return {"ok": True, "operation":data, "message":data.get("message")}
 
 
 @router.post("/admin/listings/{lamp_id}/renew")

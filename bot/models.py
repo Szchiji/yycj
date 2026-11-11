@@ -312,6 +312,17 @@ class ListingEditOperation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ListingRelistOperation(Base):
+    """Operational delivery checkpoints for one hidden->active transition; never renews."""
+    __tablename__ = 'listing_relist_operations'
+    operation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    lamp_id: Mapped[str] = mapped_column(String(64), index=True)
+    actor_id: Mapped[int] = mapped_column(BigInteger)
+    state: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class ExecutionRecord(Base):
     """Safe operational metadata only: never message bodies or credentials."""
     __tablename__='execution_records'

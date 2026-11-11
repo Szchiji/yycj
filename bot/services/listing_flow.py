@@ -37,6 +37,7 @@ async def list_my_lamps(user_id: int) -> List[Dict[str, Any]]:
                 "status": x.status,
                 "expires_at": x.expires_at,
                 "unlist_reason": x.unlist_reason,
+                "updated_at": x.updated_at,
                 "media": media,
                 "tags": list(x.tags or []),
                 "approx_label": x.approx_label,
