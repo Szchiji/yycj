@@ -230,3 +230,8 @@
  .workspace-body #sideMask.open{display:block;position:fixed;inset:64px 0 0;background:#02050bb3;z-index:44}
 }
 .workspace-body .ws-protected .empty-locked{padding:10px 12px;text-align:left;font-size:12px}
+
+/* Listing cards: always one column so action rows (修改资料 / 续期 / 下架 / 更多) stay on one line on desktop and status text keeps full width. */
+.workspace-body #workspaceLegacy #pane-listings > h3{display:none}
+.workspace-body #workspaceLegacy #adminListings{grid-template-columns:1fr}
+.workspace-body #workspaceLegacy #adminListings > .pick-item:has(.edit-result){grid-column:1/-1}

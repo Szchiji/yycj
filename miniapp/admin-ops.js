@@ -102,24 +102,30 @@
     catch (e) { alert(e.message || String(e)); }
   });
 
+  function listingActions(x) {
+    const id = esc(x.lamp_id);
+    const on = x.status === "active";
+    const proxy = `<button class="btn" type="button" data-fill-proxy="${id}">修改资料</button>`;
+    const renew = `<button class="btn" type="button" data-list="renew" data-id="${id}">续期</button>`;
+    const relist = `<button class="btn${on ? "" : " primary"}" type="button" data-list="relist" data-id="${id}">重新上架</button>`;
+    const unlist = on ? `<button class="btn danger" type="button" data-list="unlist" data-id="${id}">下架</button>` : "";
+    const del = `<button class="btn danger" type="button" data-list="delete" data-id="${id}" data-title="${esc(x.title || "")}">删除</button>`;
+    // Active cards keep 重新上架 in 更多 so it is not beside 下架 / 续期 (easy mis-tap). Hidden cards show it as a primary action. Handlers stay on data-list / data-fill-proxy.
+    const extra = on ? relist + del : del;
+    return `<div class="listing-actions">${proxy}${renew}${on ? unlist : relist}<details class="listing-more"><summary>更多</summary><div class="listing-more-menu">${extra}</div></details></div>`;
+  }
   function renderListingCards(items) {
     const status=window.yycjWorkspace?.listingStatus;if(status)items=(items||[]).filter(x=>x.status===status);
     const box = $("#adminListings");
     if (!box) return;
     box.innerHTML = (items || []).map((x) => `
-      <div class="pick-item">
+      <div class="pick-item listing-card${x.status === "active" ? " is-active" : " is-hidden"}">
         <div class="meta">
           <strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${zhStatus(x.status)} · ${x.expires_at ? ("到期 " + String(x.expires_at).slice(0,10)) : "无截止"}</div>
         </div>
         ${window.__yycjEditUI?.html(x.edit_state,"admin")||""}${window.__yycjEditUI?.html(x.relist_state,"admin")||""}
-        <div class="row">
-          <button class="btn" data-fill-proxy="${esc(x.lamp_id)}">修改资料</button>
-          <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期…</button>
-          <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
-          <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
-          <button class="btn danger" data-list="delete" data-id="${esc(x.lamp_id)}" data-title="${esc(x.title || "")}">删除</button>
-        </div>
+        ${listingActions(x)}
       </div>`).join("") || "<p class='muted'>暂无资料</p>";
   }
   function renderPick(boxId, items, action) {
@@ -150,7 +156,7 @@
       if ($("#adminListings")) $("#adminListings").innerHTML = "<p class='muted'>列表加载失败</p>";
     }
   }
-  window.yycjAdminListings={reload:loadListings,clear(){listingCache=[];window.__yycjListings=[];for(const id of ["adminListings","feedPinResults","pinResults"]){const box=document.getElementById(id);if(box)box.innerHTML='<p class="muted">正在读取当前范围…</p>';}}};
+  window.yycjAdminListings={reload:loadListings,render:renderListingCards,clear(){listingCache=[];window.__yycjListings=[];for(const id of ["adminListings","feedPinResults","pinResults"]){const box=document.getElementById(id);if(box)box.innerHTML='<p class="muted">正在读取当前范围…</p>';}}};
   $("#btnListingSearch")?.addEventListener("click", () => {
     renderListingCards(listingCache.filter((x) => matchQ(x, ($("#listingQ")?.value || "").trim())));
   });
