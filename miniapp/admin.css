@@ -203,7 +203,7 @@ body.side-open .side-mask {
 #adminListings .pick-item:has(.listing-more[open]),
 .workspace-body #workspaceLegacy #adminListings .pick-item:has(.listing-more[open]) {
   z-index: 6;
-  padding-bottom: 116px;
+  padding-bottom: 176px;
 }
 #adminListings .listing-more-menu .btn {
   width: 100%;

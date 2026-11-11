@@ -71,6 +71,7 @@
     if (b && dead.has(b)) { const cur = getTok(); if (cur && cur !== b) opts = withTok(opts, cur); }
     let res = null, err = null, timeouts = 0;
     for (let k = 0; k < (isLamp ? 3 : 1); k += 1) {
+      if(init?.signal?.aborted)throw new DOMException("Aborted", "AbortError");
       if (timeouts >= 2) break;
       if (k) await sleep(k === 1 ? 500 : 1500);
       let o = opts, timer = 0;
@@ -79,7 +80,7 @@
         timer = setTimeout(() => { timeouts += 1; ctl.abort(); }, 6000);
         o = Object.assign({}, opts || {}, { signal: ctl.signal });
       }
-      try { res = await raw(input, o); err = null; } catch (e) { res = null; err = e; } finally { clearTimeout(timer); }
+      try { res = await raw(input, o); err = null; } catch (e) { if(init?.signal?.aborted)throw e;res = null; err = e; } finally { clearTimeout(timer); }
       if (res && res.status === 401) {
         const sentTok = bearerOf(o);
         if (sentTok) dead.add(sentTok);

@@ -38,7 +38,7 @@
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open", "service", "map_results", "coupon", "place"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.
@@ -74,6 +74,8 @@
         if (u.pathname === "/api/home") {
           stats.home += 1;
           const q = u.searchParams;
+          // Explicit map searches need fresh, cancellable transport, never a list/meta cache hit.
+          if(q.get("map_results") === "1") return raw(input, init);
           const city = q.get("city") || "";
           const lim = q.get("limit") || "";
           const meta = (lim === "1" || lim === "30") && !q.get("q") && !q.get("offset");
@@ -82,6 +84,7 @@
           let hit = null;
           for (let i = homes.length - 1; i >= 0 && !hit; i -= 1) {
             const e = homes[i];
+            if (e.auth !== auth) continue;
             if (e.key === key && fresh(e, FEED_TTL)) hit = e;
             else if (meta && fresh(e, META_TTL) && (!city || e.city === city || (lim === "1" && !city))) hit = e;
           }
@@ -94,7 +97,7 @@
           }
           // The feed is the same for every user, so a 200 answered with an older token is fine
           // to share; a failed request is never reused.
-          const e = track({ key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
+          const e = track({ auth, key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
           homes.push(e);
           if (homes.length > 12) homes.shift();
           return serve(e, init);

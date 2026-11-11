@@ -312,6 +312,25 @@ class ListingEditOperation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+
+class ListingEditVersion(Base):
+    """Proven editable-field snapshots only. Not a full backup or pre-feature backfill."""
+    __tablename__ = "listing_edit_versions"
+    version_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    lamp_id: Mapped[str] = mapped_column(String(36), index=True)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    operation_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    source_version_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    changed_fields: Mapped[list] = mapped_column(JSONB, default=list)
+    snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    media_fingerprint: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    applied: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+
 class ListingRelistOperation(Base):
     """Operational delivery checkpoints for one hidden->active transition; never renews."""
     __tablename__ = 'listing_relist_operations'

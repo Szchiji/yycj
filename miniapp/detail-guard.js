@@ -74,20 +74,21 @@
     try { if (!document.querySelector("#yycjGallery .yc-slide") && window.__yycjPaintGallery) window.__yycjPaintGallery(id); } catch (e) {}
     try { if (window.__yycjLoadDetailExtras) window.__yycjLoadDetailExtras(id); } catch (e) {}
   }
-  let seq = 0;
+  let seq = 0, controller=null;
   async function ensure(id, attempt) {
+    controller?.abort();controller=new AbortController();const ctl=controller;const timeout=setTimeout(()=>ctl.abort(),8000);
     const my = ++seq;
     const t0 = Date.now();
-    const live = () => my === seq && currentId() === id;
+    const live = () => my === seq && currentId() === id && shown();
     if (attempt > 1) state("loading");
     const slow = setTimeout(() => { if (live() && shown()) state("loading"); }, 700);
     let data = null, status = "";
     try {
-      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
+      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() }, signal:ctl.signal });
       status = String(r.status);
       if (r.ok) data = await r.json();
     } catch (e) { status = e && e.name === "AbortError" ? "timeout" : "net"; }
-    clearTimeout(slow);
+    clearTimeout(timeout);clearTimeout(slow);
     if (!live()) return;
     const ms = Date.now() - t0;
     if (data && (data.lamp || data.item)) {
@@ -107,7 +108,7 @@
   }
   let last = "";
   function check() {
-    if (!shown()) { last = ""; return; }
+    if (!shown()) { last = "";++seq;controller?.abort();controller=null;return; }
     const id = currentId();
     if (!id || id === last) return;
     last = id;

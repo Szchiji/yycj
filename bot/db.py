@@ -80,7 +80,11 @@ _ALTER_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS ix_coupon_claims_batch_id ON coupon_claims (batch_id)",
     "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS post_chat VARCHAR(64)",
     "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS post_mid INTEGER",
+    "CREATE TABLE IF NOT EXISTS listing_edit_versions (version_id VARCHAR(36) PRIMARY KEY, lamp_id VARCHAR(36) NOT NULL, sequence INTEGER NOT NULL, recorded_at TIMESTAMP NOT NULL DEFAULT NOW(), source VARCHAR(32) NOT NULL, actor_id BIGINT, actor_kind VARCHAR(16) NOT NULL, operation_id VARCHAR(64), source_version_id VARCHAR(36), changed_fields JSONB NOT NULL DEFAULT '[]'::jsonb, snapshot JSONB NOT NULL DEFAULT '{}'::jsonb, media_fingerprint VARCHAR(64) NOT NULL DEFAULT '', applied BOOLEAN NOT NULL DEFAULT TRUE)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_listing_edit_versions_seq ON listing_edit_versions (lamp_id, sequence)",
+    "CREATE INDEX IF NOT EXISTS ix_listing_edit_versions_lamp_time ON listing_edit_versions (lamp_id, recorded_at DESC)",
 ]
+
 
 
 async def _ensure_columns(engine) -> None:

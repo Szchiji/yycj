@@ -1,4 +1,4 @@
-"""First-batch edit workflow: atomic review + operational checkpoints, no audit/restore."""
+"""Edit workflow: atomic review + operational checkpoints; proven history is recorded on apply."""
 from __future__ import annotations
 import hashlib
 import json
@@ -85,7 +85,7 @@ async def _invalidate(s,posts):
                 op.state=st;op.updated_at=datetime.utcnow()
 
 
-async def submit(lamp_id,actor_id,payload,operation_id,*,admin=False):
+async def submit(lamp_id,actor_id,payload,operation_id,*,admin=False,history_source=None,source_version_id=None):
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,64}",str(operation_id or "")):
         raise EditConflict("请刷新页面后重试（缺少防重复操作编号）")
     digest=request_hash(payload)
@@ -115,6 +115,8 @@ async def submit(lamp_id,actor_id,payload,operation_id,*,admin=False):
             s.add(op)
             active=live(lamp)
             old_city=lamp.city
+            from bot.services import listing_history
+            before=await listing_history.capture(s,lamp)
             if admin or active:
                 await apply_text(s,lamp,payload);st["text_saved"]=True
                 if active:st.update(action="text",channel_status="pending",channel_retryable=True)
@@ -134,6 +136,12 @@ async def submit(lamp_id,actor_id,payload,operation_id,*,admin=False):
                 st.update(post_id=post_id,review_status="pending",media_status="pending" if changed else "unchanged")
                 op.post_id=post_id;created_post=(post_id,lamp.user_id,data)
             st["directory_cities"]=[old_city,lamp.city] if active and old_city!=lamp.city else []
+            if st.get("text_saved") or st.get("media_status")=="approved_admin":
+                await listing_history.record_applied(
+                    s,lamp,before=before,
+                    source=history_source or ("admin_edit" if admin else "teacher_edit"),
+                    actor_id=actor_id,actor_kind="admin" if admin else "teacher",
+                    operation_id=operation_id,source_version_id=source_version_id)
             op.state=dict(st)
         if created_post:
             from bot.services.listing_notify import notify_admins_new_post
@@ -222,9 +230,15 @@ async def review(post_id,approve,*,notify=True,actor_id=None):
                 if approve and stale:
                     post.status=PostStatus.REJECTED.value;st.update(review_status="stale",media_status="stale" if st.get("media_status")=="pending" else "unchanged",channel_status="not_required",channel_retryable=False)
                 elif approve:
+                    from bot.services import listing_history
+                    before=await listing_history.capture(s,lamp)
                     if data["edit_workflow_v2"]=="full":await apply_text(s,lamp,data)
                     if fingerprint(lamp.media)!=fingerprint(data.get("media")):
                         apply_media(lamp,data["media"])
+                    await listing_history.record_applied(
+                        s,lamp,before=before,source="review_approved",
+                        actor_id=actor_id,actor_kind="admin" if actor_id is not None else "system",
+                        operation_id=key,source_version_id=data.get("_restore_version_id"))
                     post.status=PostStatus.APPROVED.value
                     st.update(text_saved=True,review_status="approved",media_status="approved" if st.get("media_status")=="pending" else "unchanged",expected_media_revision=lamp.media_revision or 0,
                               action="repost" if live(lamp) else "none",channel_status="pending" if live(lamp) else "not_required",

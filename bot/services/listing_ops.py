@@ -162,6 +162,10 @@ async def delete_lamp(lamp_id: str) -> Dict[str, Any]:
         await s.execute(sql_delete(Favorite).where(Favorite.lamp_id == lamp_id))
         await s.execute(sql_delete(LampView).where(LampView.lamp_id == lamp_id))
         await s.execute(sql_delete(Report).where(Report.lamp_id == lamp_id))
+        from bot.models import ListingEditVersion, ListingEditOperation, ListingRelistOperation
+        await s.execute(sql_delete(ListingEditVersion).where(ListingEditVersion.lamp_id == lamp_id))
+        await s.execute(sql_delete(ListingEditOperation).where(ListingEditOperation.lamp_id == lamp_id))
+        await s.execute(sql_delete(ListingRelistOperation).where(ListingRelistOperation.lamp_id == lamp_id))
         await s.execute(sql_delete(Lamp).where(Lamp.lamp_id == lamp_id))
 
     await _directory_on_live(lamp_id, city)  # 硬删 → 刷新该城目录（城市在删前记下）

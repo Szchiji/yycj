@@ -95,7 +95,7 @@ try {
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open", "service", "map_results", "coupon", "place"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.
@@ -131,6 +131,8 @@ try {
         if (u.pathname === "/api/home") {
           stats.home += 1;
           const q = u.searchParams;
+          // Explicit map searches need fresh, cancellable transport, never a list/meta cache hit.
+          if(q.get("map_results") === "1") return raw(input, init);
           const city = q.get("city") || "";
           const lim = q.get("limit") || "";
           const meta = (lim === "1" || lim === "30") && !q.get("q") && !q.get("offset");
@@ -139,6 +141,7 @@ try {
           let hit = null;
           for (let i = homes.length - 1; i >= 0 && !hit; i -= 1) {
             const e = homes[i];
+            if (e.auth !== auth) continue;
             if (e.key === key && fresh(e, FEED_TTL)) hit = e;
             else if (meta && fresh(e, META_TTL) && (!city || e.city === city || (lim === "1" && !city))) hit = e;
           }
@@ -151,7 +154,7 @@ try {
           }
           // The feed is the same for every user, so a 200 answered with an older token is fine
           // to share; a failed request is never reused.
-          const e = track({ key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
+          const e = track({ auth, key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
           homes.push(e);
           if (homes.length > 12) homes.shift();
           return serve(e, init);
@@ -238,6 +241,7 @@ try {
     if (b && dead.has(b)) { const cur = getTok(); if (cur && cur !== b) opts = withTok(opts, cur); }
     let res = null, err = null, timeouts = 0;
     for (let k = 0; k < (isLamp ? 3 : 1); k += 1) {
+      if(init?.signal?.aborted)throw new DOMException("Aborted", "AbortError");
       if (timeouts >= 2) break;
       if (k) await sleep(k === 1 ? 500 : 1500);
       let o = opts, timer = 0;
@@ -246,7 +250,7 @@ try {
         timer = setTimeout(() => { timeouts += 1; ctl.abort(); }, 6000);
         o = Object.assign({}, opts || {}, { signal: ctl.signal });
       }
-      try { res = await raw(input, o); err = null; } catch (e) { res = null; err = e; } finally { clearTimeout(timer); }
+      try { res = await raw(input, o); err = null; } catch (e) { if(init?.signal?.aborted)throw e;res = null; err = e; } finally { clearTimeout(timer); }
       if (res && res.status === 401) {
         const sentTok = bearerOf(o);
         if (sentTok) dead.add(sentTok);
@@ -327,28 +331,28 @@ try {
   }
   function setFilt(patch) {
     const o = Object.assign({}, getFilt(), patch || {});
-    ["price", "tags", "open", "radius", "at", "lat", "lng", "np", "cpn"].forEach((k) => { if (!o[k]) delete o[k]; });
+    ["price", "tags", "service", "open", "radius", "at", "lat", "lng", "np", "cpn"].forEach((k) => { if (!o[k]) delete o[k]; });
     try {
       if (Object.keys(o).length) sessionStorage.setItem(filtKey(), JSON.stringify(o));
       else sessionStorage.removeItem(filtKey());
     } catch (e) {}
   }
-  function clearFilt() { try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
+  function clearFilt() { locCancel?.(); try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
   // 面板里改的选项只在「查看结果」/ 关闭面板 / 重置时生效；appliedSig 记住信息流当前用的是哪一组条件
   function filtSig() { return JSON.stringify([curCity(), getArea(), getSort(), getFilt()]); }
   let appliedSig = null;
   function activeFiltCount() {
     const f = getFilt();
-    return [getArea(), f.price, f.tags, f.open, f.radius, f.cpn].filter(Boolean).length;
+    return [getArea(), f.price, f.tags, f.service && f.service!=="all" ? f.service : f.open, f.radius, f.cpn].filter(Boolean).length;
   }
-  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, hasPlace = false;
+  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, locCancel = null, hasPlace = false;
   // 常用位置 (我的) is the default centre: the server applies it when no lat/lng/区 is sent; np=1 turns it off for this session
   function placeOn(f) { f = f || getFilt(); return hasPlace && !f.np && !(f.lat && f.lng) && !f.at; }
   function token() { return localStorage.getItem("yycj_token") || ""; }
   function cacheKey(city, qq) {
     const f = getFilt();
     return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort()
-      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "") + "_" + (f.np || "") + "_" + (f.cpn || "");
+      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.service || f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "") + "_" + (f.np || "") + "_" + (f.cpn || "");
   }
   function readCache(city, qq) {
     try {
@@ -370,7 +374,7 @@ try {
   function stopTimer() { if (carouselTimer) { clearTimeout(carouselTimer); carouselTimer = 0; } }
   // The carousel timer only runs while it can actually be seen: home view shown, page visible,
   // carousel on screen, not being touched. Otherwise no timer is pending at all.
-  function canRun() { return !paused && !touching && pinsSeen && homeVisible(); }
+  function canRun() { return !window.__yycjMapMode && !paused && !touching && pinsSeen && homeVisible(); }
   function arm() {
     if (!canRun()) { stopTimer(); return; }
     if (!carouselTimer) carouselTimer = setTimeout(tick, carouselMs);
@@ -386,14 +390,19 @@ try {
   }
   window.__yycjPauseUi = pauseMedia;
   window.__yycjResumeUi = resumeWork;
-  async function api(path) {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
+  async function api(path, controller) {
+    const ctl = controller || new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, 8000);
     try {
       const r = await fetch(path, { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
-      const data = await r.json().catch(() => ({}));
+      const data = await r.json().catch(e => { if (ctl.signal.aborted || path.includes("map_results=1")) throw e; return {}; });
       if (!r.ok) throw new Error(data.detail || r.statusText || ("HTTP " + r.status));
+      if (path.includes("map_results=1") && (!Array.isArray(data?.items) || !Array.isArray(data?.map_groups))) throw new Error("地图结果无效，请重试");
       return data;
+    } catch (e) {
+      if (timedOut) { const error = new Error("请求超时，请重试"); error.name = "TimeoutError"; throw error; }
+      throw e;
     } finally {
       clearTimeout(timer);
     }
@@ -480,8 +489,9 @@ try {
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
-  function applyData(data, reset) {
+  function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
+    mapOptions=data.map_filter_options||null;mapOptionsCity=data.city||curCity();
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
     carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
@@ -494,19 +504,36 @@ try {
     offset = lastItems.length;
     paint();
     $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
-    window.dispatchEvent(new CustomEvent("yycj:home-data", {detail:data}));
+    const homeEvent=new CustomEvent("yycj:home-data", {detail:data});homeEvent.mapRequest=mapRequest;window.dispatchEvent(homeEvent);
     const ann = $("#announce");
     if (ann && data.announcement && data.announcement.text) {
       ann.classList.remove("hidden");
       ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
     }
   }
-  let loadSequence = 0;
-  async function loadFeed(reset) {
-    if (!token() || document.hidden) return;
+  let loadSequence = 0, loadCtl = null, mapBusy = false, mapDirty = false, mapOptions = null, mapOptionsCity = "";
+  function cancelLoad(){if(!loadCtl)return;loadCtl.abort();loadCtl=null;++loadSequence;mapBusy=false;window.dispatchEvent(new CustomEvent('yycj:map-cancel'));paintMapFilters();}
+  function markMapDirty(){if(!window.__yycjMapMode)return;if(!mapDirty){cancelLoad();mapDirty=true;window.dispatchEvent(new CustomEvent('yycj:map-pending'));}paintMapFilters();}
+  function paintMapFilters(){
+    const el=$('#hubMapFilters');if(!el)return;el.classList.toggle('hidden',!window.__yycjMapMode);const f=getFilt(),service=f.service||(f.open?'open':'all'),area=getArea();
+    const opts=mapOptionsCity===curCity()&&mapOptions?.districts?mapOptions.districts:(lastAreas?.items||[]).map(x=>({key:x.key,label:x.key}));
+    const list=[{key:'',label:'全部地区'},...opts];if(area&&!list.some(x=>x.key===area))list.push({key:area,label:area==='__missing__'?'未标注地区':area});
+    el.innerHTML='<label><span class="sr-only">行政地区</span><select aria-label="行政地区" data-map-region>'+list.map(x=>'<option value="'+esc(x.key)+'"'+(x.key===area?' selected':'')+'>'+esc(x.label)+'</option>').join('')+'</select></label><label><span class="sr-only">服务状态</span><select aria-label="服务状态" data-map-service>'+[['all','全部状态'],['open','营业中'],['rest','休息中']].map(([key,label])=>'<option value="'+key+'"'+(service===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label><button type="button" class="btn" data-map-filter-apply'+(mapBusy?' disabled':'')+'>'+(mapBusy?'搜索中…':'查看结果')+'</button>'+(mapDirty?'<p role="status">筛选已改 · 点击查看结果后更新</p>':'');
+  }
+  window.__yycjMapFilters={paint:paintMapFilters,signature:()=>JSON.stringify([q,filtSig()]),get:()=>({city:curCity(),district:getArea(),service:getFilt().service||(getFilt().open?'open':'all'),pending:mapDirty}),set:patch=>{if(patch.district!==undefined)setArea(patch.district);if(patch.service!==undefined)setFilt({service:patch.service,open:patch.service==='open'?'1':''});markMapDirty();paintArea();},apply:()=>{q=($('#homeQ')?.value||'').trim();appliedSig=null;toggleArea(false);return window.__yycjLoadHome();}};
+  window.__yycjCancelHome=cancelLoad;
+  window.addEventListener('yycj:home-data',ev=>{if(ev.detail.city&&ev.detail.city!==curCity())return;mapOptions=ev.detail.map_filter_options||null;mapOptionsCity=curCity();cities=ev.detail.enabled_cities||cities;fillCities(cities,curCity());if(ev.detail.districts)lastAreas=ev.detail.districts;mapDirty=false;mapBusy=false;paintMapFilters();});
+  window.addEventListener('yycj:map-loading',()=>{mapDirty=false;mapBusy=true;paintMapFilters();});
+  window.addEventListener('yycj:map-error',()=>{mapBusy=false;paintMapFilters();});
+  async function loadFeed(reset, options = {}) {
+    if (!token() || document.hidden || !homeVisible()) return;
+    cancelLoad();const ctl=new AbortController();loadCtl=ctl;mapDirty=false;mapBusy=true;paintMapFilters();
     const seq = ++loadSequence, mapMode = !!window.__yycjMapMode;
     paused = false;
     arm();
+    const requestCity=curCity(),requestSig=filtSig();
+    const mapRequest={seq,city:requestCity,area:options.mapArea||null};
+    if(mapMode)window.dispatchEvent(new CustomEvent("yycj:map-loading",{detail:mapRequest}));
     try {
       if (reset) offset = 0;
       const city = localStorage.getItem("yycj_city") || "";
@@ -523,7 +550,7 @@ try {
       const f = getFilt();
       if (f.price) params.set("price", f.price);
       if (f.tags) params.set("tags", f.tags);
-      if (f.open) params.set("open", "1");
+      params.set("service", f.service || (f.open ? "open" : "all"));
       if (f.cpn) params.set("coupon", "1");
       if (f.radius) params.set("radius", String(f.radius));
       if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
@@ -531,15 +558,18 @@ try {
       if (f.np) params.set("place", "0");
       if(window.__yycjMapMode) params.set("map_results", "1");
       appliedSig = filtSig();
-      const data = await api("/api/home?" + params.toString());
-      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity()) return;
-      applyData(data, reset);
+      const data = await api("/api/home?" + params.toString(), ctl);
+      if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity() || requestSig !== filtSig()) return;
+      applyData(data, reset, mapRequest);
       window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
+      if(ctl.signal.aborted && e.name!=="TimeoutError")return;
+      if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode || requestCity!==curCity() || requestSig!==filtSig())return;
+      if(mapMode){window.dispatchEvent(new CustomEvent("yycj:map-error",{detail:{...mapRequest,message:e.message}}));return;}
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
-    }
+    } finally {if(seq===loadSequence){loadCtl=null;mapBusy=false;paintMapFilters();}}
   }
   function areaLabel(k) { return k.length <= 3 ? k : k.slice(0, 2) + "…"; }
   function paintArea() {
@@ -558,6 +588,8 @@ try {
       btn.classList.toggle("long", true);
       btn.setAttribute("aria-label", "筛选" + (nAct ? "，已选" + nAct + "项" : ""));
     }
+    if(window.__yycjMapMode&&appliedSig!==null&&appliedSig!==filtSig())markMapDirty();
+    paintMapFilters();
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
@@ -575,9 +607,9 @@ try {
     const tagChips = (facets.tags || []).map((t) =>
       "<button type=\"button\" class=\"area-chip" + (pickedTags.has(t.tag) ? " on" : "") + "\" data-tag=\"" + esc(t.tag) + "\">" + esc(t.tag) + "<i>" + t.count + "</i></button>"
     ).join("") || "<span class=\"muted\">暂无标签</span>";
-    const openChip = "<button type=\"button\" class=\"area-chip" + (f.open ? " on" : "") + "\" data-open=\"1\">营业中</button>" +
-      // 优惠 (option B): 「有优惠」 next to 营业中
-      (window.__yycjCouponMode && window.__yycjCouponMode("filter") ? "<button type=\"button\" class=\"area-chip" + (f.cpn ? " on" : "") + "\" data-cpn=\"1\">有优惠</button>" : "");
+    const service=f.service||(f.open?'open':'all');
+    const openChip = [['all','全部状态'],['open','营业中'],['rest','休息中']].map(([key,label])=>'<button type="button" class="area-chip'+(service===key?' on':'')+'" data-service="'+key+'">'+label+'</button>').join('') +
+      (window.__yycjCouponMode && window.__yycjCouponMode("filter") ? '<button type="button" class="area-chip'+(f.cpn?' on':'')+'" data-cpn="1">有优惠</button>' : '');
     const usePlace = placeOn(f);
     const hasLoc = !!(f.lat && f.lng) || !!f.at || usePlace;
     const radii = (facets.radii && facets.radii.length) ? facets.radii : [3, 5, 10];
@@ -614,24 +646,34 @@ try {
   function askLocation() {
     if (locBusy) return;
     locBusy = true;
-    const done = (lat, lng) => {
-      try { const g = window.yycjPlace && window.yycjPlace.wgs2gcj(+lat, +lng); if (g) { lat = g[0]; lng = g[1]; } } catch (e) {}
-      setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "", np: "" }); locBusy = false; paintArea();
+    const city = curCity(); let settled = false;
+    const finish = fn => {
+      if (settled) return; settled = true; clearTimeout(timer); locBusy = false; locCancel = null;
+      if (city === curCity() && homeVisible()) fn();
     };
-    const fail = () => { locBusy = false; paintArea(); try { window.__yycjToast && window.__yycjToast("定位失败，可选区作中心"); } catch (e) {} };
+    const fail = () => finish(() => { paintArea(); try { window.__yycjToast?.("定位失败，可选区作中心"); } catch (e) {} });
+    const timer = setTimeout(fail, 8000);
+    const cancel = () => finish(() => {}); locCancel = cancel;
+    const done = (lat, lng) => {
+      if (settled) return;
+      if (city !== curCity() || !homeVisible()) { cancel(); return; }
+      if (lat == null || lng == null || !Number.isFinite(+lat) || !Number.isFinite(+lng) || Math.abs(+lat)>90 || Math.abs(+lng)>180) { fail(); return; }
+      try { const g = window.yycjPlace && window.yycjPlace.wgs2gcj(+lat, +lng); if (g) { lat = g[0]; lng = g[1]; } } catch (e) {}
+      finish(() => { setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "", np: "" }); paintArea(); });
+    };
     try {
       const tg = window.Telegram && window.Telegram.WebApp;
-      if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
+      if (tg?.LocationManager?.init && tg.LocationManager.getLocation) {
         tg.LocationManager.init(() => {
-          try { tg.LocationManager.getLocation((loc) => loc && loc.latitude != null ? done(loc.latitude, loc.longitude) : fail()); }
+          if (settled || city !== curCity() || !homeVisible()) { cancel(); return; }
+          try { tg.LocationManager.getLocation((loc) => loc ? done(loc.latitude, loc.longitude) : fail()); }
           catch (e) { fail(); }
         });
         return;
       }
-    } catch (e) {}
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
-    } else fail();
+      if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+      else fail();
+    } catch (e) { fail(); }
   }
   async function toggleArea(open) {
     const panel = $("#areaPanel");
@@ -688,7 +730,7 @@ try {
     const f = getFilt();
     if (f.price) params.set("price", f.price);
     if (f.tags) params.set("tags", f.tags);
-    if (f.open) params.set("open", "1");
+    params.set("service", f.service || (f.open ? "open" : "all"));
     if (f.cpn) params.set("coupon", "1");
     if (f.radius) params.set("radius", String(f.radius));
     if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
@@ -698,10 +740,10 @@ try {
   };
   window.__yycjCloseArea = function () { toggleArea(false); };
   window.__yycjPlaceChanged = function () { lastFacets = null; offset = 0; setFilt({ np: "" }); };
-  window.__yycjLoadHome = function () { paused = false; return loadFeed(true); };
+  window.__yycjLoadHome = function (options) { paused = false; return loadFeed(true, options); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
+    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; window.__yycjLoadHome(); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest && ev.target.closest("[data-nav='home']")) {
       if (lastItems.length) paint();
@@ -737,20 +779,21 @@ try {
     if (ev.target.closest && ev.target.closest("#areaPanel [data-cpn]")) {
       setFilt({ cpn: getFilt().cpn ? "" : "1" }); paintArea(); return;
     }
+    const serviceChip=ev.target.closest?.('#areaPanel [data-service]');if(serviceChip){setFilt({service:serviceChip.dataset.service,open:serviceChip.dataset.service==='open'?'1':''});paintArea();return;}
     if (ev.target.closest && ev.target.closest("#areaPanel [data-open]")) {
       setFilt({ open: getFilt().open ? "" : "1" }); paintArea(); return;
     }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { if (!placeOn()) askLocation(); return; }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"gps\"]")) { askLocation(); return; }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"place\"]")) {
-      setFilt({ lat: "", lng: "", at: "", np: "" }); paintArea(); return;
+      locCancel?.(); setFilt({ lat: "", lng: "", at: "", np: "" }); paintArea(); return;
     }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"0\"]")) {
-      setFilt({ lat: "", lng: "", at: "", radius: "", np: hasPlace ? "1" : "" }); if (getSort() === "near") setSort(""); paintArea(); return;
+      locCancel?.(); setFilt({ lat: "", lng: "", at: "", radius: "", np: hasPlace ? "1" : "" }); if (getSort() === "near") setSort(""); paintArea(); return;
     }
     const atChip = ev.target.closest && ev.target.closest("#areaPanel [data-at]");
     if (atChip) {
-      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", np: "", radius: getFilt().radius || "5" });
+      locCancel?.(); setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", np: "", radius: getFilt().radius || "5" });
       paintArea(); return;
     }
     const radChip = ev.target.closest && ev.target.closest("#areaPanel [data-radius]");
@@ -789,10 +832,13 @@ try {
       toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
-      loadFeed(true);
+      window.__yycjLoadHome();
     }
   }, true);
   mountGuide();
+  const toolbar=document.createElement('div');toolbar.id='hubMapFilters';toolbar.className='hub-map-filters hidden';$('#feed')?.insertAdjacentElement('beforebegin',toolbar);paintMapFilters();
+  toolbar.addEventListener('change',ev=>{if(ev.target.matches('[data-map-region]'))window.__yycjMapFilters.set({district:ev.target.value});if(ev.target.matches('[data-map-service]'))window.__yycjMapFilters.set({service:ev.target.value});});
+  toolbar.addEventListener('click',ev=>{if(ev.target.closest('[data-map-filter-apply]'))window.__yycjMapFilters.apply();});
   const qInput = $("#homeQ");
   if (qInput && !qInput.dataset.debounced) {
     qInput.dataset.debounced = "1";
@@ -817,9 +863,9 @@ try {
     arm();
   }
   (function watchCarousel() {
-    document.addEventListener("visibilitychange", arm);
+    document.addEventListener("visibilitychange", ()=>{if(document.hidden){cancelLoad();locCancel?.();}arm();});
     const view = $("#view-home");
-    if (view && window.MutationObserver) new MutationObserver(arm).observe(view, { attributes: true, attributeFilter: ["class"] });
+    if (view && window.MutationObserver) new MutationObserver(()=>{if(!homeVisible()){cancelLoad();locCancel?.();}arm();}).observe(view, { attributes: true, attributeFilter: ["class"] });
     const pins = $("#pins");
     if (pins && window.IntersectionObserver) {
       new IntersectionObserver((es) => { pinsSeen = es.some((e) => e.isIntersecting); arm(); }).observe(pins);
@@ -1049,6 +1095,153 @@ try {
   window.__yycjEditUI={html,request,clear,actionable};
 })();
 ;} catch (e) { try { console.error("edit-state-ui.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "edit-state-ui.js" }); } catch (x) {} }
+/* ---- edit-history-ui.js ---- */
+try {
+// Compact modification history / restore preview. No automatic restore.
+(() => {
+  if (window.__yycjHistoryUI) return;
+  const esc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const token = () => localStorage.getItem('yycj_token') || '';
+  const FIELD = {city:'城市',title:'称呼',tags:'标签',price:'价位数字',price_text:'价位',description:'介绍',district:'区域',approx_label:'大致位置',extras:'自定义栏',hours:'营业时间',media:'图片/视频'};
+
+  function panel() {
+    let el = document.getElementById('yycjHistory');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'yycjHistory';
+    el.className = 'hist-overlay hidden';
+    el.innerHTML = '<div class="hist-panel" role="dialog" aria-modal="true" aria-labelledby="histTitle"></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', (ev) => { if (ev.target === el) close(); });
+    return el;
+  }
+  function box() { return panel().querySelector('.hist-panel'); }
+  function close() { panel().classList.add('hidden'); box().innerHTML = ''; }
+  function shanghai(iso) {
+    if (!iso) return '时间未记录';
+    const d = new Date(String(iso).endsWith('Z') || /[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z');
+    if (Number.isNaN(d.getTime())) return esc(iso);
+    return new Intl.DateTimeFormat('zh-CN', { timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }).format(d) + '（中国时区 UTC+8）';
+  }
+  function show(v) {
+    if (v == null || v === '') return '（空）';
+    if (Array.isArray(v)) {
+      if (!v.length) return '（空）';
+      if (v.every((x) => x && (x.file_id || x.url || x.type))) return v.map((x) => (x.type === 'video' ? '视频' : '图片') + ' ' + String(x.file_id || x.url || '').slice(0, 10)).join('、');
+      if (v.every((x) => typeof x === 'string')) return v.join('、');
+      return v.map((x) => (x && (x.start || x.label || JSON.stringify(x)))).join('；');
+    }
+    if (typeof v === 'object') {
+      const parts = Object.entries(v).filter(([, val]) => val != null && val !== '').map(([k, val]) => k + '：' + val);
+      return parts.join('；') || '（空）';
+    }
+    return String(v);
+  }
+  async function api(scope, path, opt) {
+    const r = await fetch('/api/' + scope + '/listings/' + path, {
+      method: (opt && opt.method) || 'GET',
+      headers: { Authorization:'Bearer ' + token(), 'Content-Type':'application/json' },
+      body: opt && opt.body ? JSON.stringify(opt.body) : undefined,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '操作失败');
+    return data;
+  }
+  function renderList(scope, lampId, data) {
+    const items = data.items || [];
+    const rows = items.map((x) => {
+      const fields = (x.current_changed_labels || x.changed_labels || []).join('、') || (x.source === 'baseline' ? '当时原文' : '无字段变化');
+      const media = x.media_available ? '' : (x.changed_fields || []).includes('media') || (x.current_changed_fields || []).includes('media') ? ' · 旧媒体不可用' : '';
+      return `<button type="button" class="hist-item" data-hist-ver="${esc(x.version_id)}" ${x.restorable ? '' : 'data-same="1"'}>
+        <strong>${esc(shanghai(x.recorded_at))}</strong>
+        <span>${esc(x.source_label || '')} · ${esc(x.actor_label || '')}</span>
+        <span>${esc(fields)}${esc(media)}${x.restorable ? '' : ' · 与当前相同'}</span>
+      </button>`;
+    }).join('') || `<p class="hist-empty muted">还没有可证明的修改记录。上线前的改动不会补造，也就不能恢复。</p>`;
+    box().innerHTML = `<div class="hist-actions" style="margin-top:0"><h3 id="histTitle" style="flex:1">修改记录</h3><button type="button" class="btn hist-close">关闭</button></div>
+      <p class="hist-note">${esc(data.notice || '')}</p>
+      ${rows}`;
+    box().querySelector('.hist-close').onclick = close;
+    box().querySelectorAll('[data-hist-ver]').forEach((b) => {
+      b.onclick = () => preview(scope, lampId, b.getAttribute('data-hist-ver')).catch((e) => { toast(e.message); });
+    });
+  }
+  async function open(scope, lampId) {
+    const host = panel();
+    host.classList.remove('hidden');
+    box().innerHTML = '<p class="muted">正在读取可证明的修改记录…</p>';
+    try { renderList(scope, lampId, await api(scope, encodeURIComponent(lampId) + '/edit-history')); }
+    catch (e) { box().innerHTML = `<p class="hist-empty">${esc(e.message || '读取失败')}</p><div class="hist-actions"><button type="button" class="btn hist-close">关闭</button></div>`; box().querySelector('.hist-close').onclick = close; }
+  }
+  async function preview(scope, lampId, versionId) {
+    box().innerHTML = '<p class="muted">正在读取这一版预览…</p>';
+    const data = await api(scope, encodeURIComponent(lampId) + '/edit-history/' + encodeURIComponent(versionId));
+    const v = data.version || {};
+    const cur = data.current || {};
+    const snap = v.snapshot || {};
+    const keys = v.current_changed_fields && v.current_changed_fields.length ? v.current_changed_fields : Object.keys(FIELD);
+    const diffs = keys.map((k) => `<li><b>${esc(FIELD[k] || k)}</b>当前：${esc(show(cur[k]))}<br>这一版：${esc(show(snap[k]))}</li>`).join('');
+    const mediaBlock = (v.can_restore_media || (v.current_changed_fields || []).includes('media'))
+      ? (v.media_available
+        ? '<label class="hist-check"><input type="checkbox" id="histMedia"><span>同时恢复图片/视频。老师恢复新媒体仍须按现有规则审核，不会绕过审核，也不会改有效期或上架状态。</span></label>'
+        : `<p class="hist-warn">旧图片/视频已不可用，不能恢复该版本媒体，也不会清空现有媒体。可仅恢复文字和营业时间。</p>`)
+      : '';
+    const can = v.restorable;
+    box().innerHTML = `<div class="hist-actions" style="margin-top:0"><button type="button" class="btn hist-back">返回记录</button><button type="button" class="btn hist-close">关闭</button></div>
+      <h3 id="histTitle">预览后再决定是否恢复</h3>
+      <p class="hist-note">${esc(shanghai(v.recorded_at))} · ${esc(v.source_label || '')} · ${esc(v.actor_label || '')}</p>
+      <p class="hist-note">恢复会作为一次新的修改提交，走现有校验、权限、审核、频道同步和通知重试；不会回滚上架状态、有效期、信用、统计或发布记录。</p>
+      <ul class="hist-diff">${diffs || '<li class="muted">与当前没有可恢复的字段差异</li>'}</ul>
+      ${mediaBlock}
+      ${can ? '<label class="hist-check"><input type="checkbox" id="histConfirm"><span>我已核对预览，确认把这一版作为一次新的修改提交。</span></label>' : '<p class="hist-note">这一版与当前资料相同，无需恢复。</p>'}
+      <div class="hist-actions"><button type="button" class="btn primary" id="histRestore" ${can ? 'disabled' : 'disabled'}>确认恢复</button></div>
+      <p class="hist-retry muted" id="histErr"></p>`;
+    box().querySelector('.hist-close').onclick = close;
+    box().querySelector('.hist-back').onclick = () => open(scope, lampId);
+    const confirm = box().querySelector('#histConfirm');
+    const btn = box().querySelector('#histRestore');
+    const err = box().querySelector('#histErr');
+    if (confirm) confirm.onchange = () => { btn.disabled = !confirm.checked; };
+    btn.onclick = async () => {
+      if (!confirm || !confirm.checked) return;
+      btn.disabled = true;
+      if (confirm) confirm.disabled = true;
+      const media = box().querySelector('#histMedia');
+      const key = 'restore:' + lampId + ':' + versionId;
+      try {
+        const body = window.__yycjEditUI
+          ? window.__yycjEditUI.request({ expected_updated_at: cur.updated_at, confirm: true, include_media: !!(media && media.checked) }, key)
+          : { operation_id: 'restore-' + Date.now(), expected_updated_at: cur.updated_at, confirm: true, include_media: !!(media && media.checked) };
+        const result = await api(scope, encodeURIComponent(lampId) + '/edit-history/' + encodeURIComponent(versionId) + '/restore', { method:'POST', body });
+        window.__yycjEditUI && window.__yycjEditUI.clear(key);
+        box().innerHTML = `<h3>恢复已作为新修改提交</h3>${window.__yycjEditUI ? window.__yycjEditUI.html(result.operation, scope) : '<p>请到资料处理状态查看结果。</p>'}<div class="hist-actions"><button type="button" class="btn hist-close">关闭</button></div>`;
+        box().querySelector('.hist-close').onclick = close;
+      } catch (e) {
+        err.textContent = e.message || '恢复失败';
+        btn.disabled = false;
+        if (confirm) confirm.disabled = false;
+      }
+    };
+  }
+  function toast(msg) {
+    const el = document.getElementById('toast') || document.getElementById('status');
+    if (!el) { alert(msg); return; }
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 2800);
+  }
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest && ev.target.closest('[data-history]');
+    if (!b) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const more = b.closest('details');
+    if (more) more.removeAttribute('open');
+    open(b.getAttribute('data-history-scope') || (b.closest('#adminListings, #workspaceLegacy') ? 'admin' : 'me'), b.getAttribute('data-history')).catch((e) => toast(e.message));
+  });
+  window.__yycjHistoryUI = { open, close };
+})();
+;} catch (e) { try { console.error("edit-history-ui.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "edit-history-ui.js" }); } catch (x) {} }
 /* ---- publish-ui.js ---- */
 try {
 (() => {
@@ -1468,7 +1661,8 @@ try {
             ? `<p class="shift-note muted">已到期，请联系管理员续期后再上架。</p>`
             : (x.status === "hidden" ? `<p class="shift-note muted">管理员或平台下架的条目，不能自己恢复。</p>` : ""));
         const acts = `<div class="ls-acts">${x.status === "active" ? `<button class="btn danger" type="button" data-unlist="${esc(x.lamp_id)}">下架</button>` : ""}${canRelist ? `<button class="btn primary" type="button" data-relist="${esc(x.lamp_id)}">重新上架</button>` : ""}
-          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button></div>${window.__yycjEditUI?.html(x.edit_state,"me",{card:true})||""}${window.__yycjEditUI?.html(x.relist_state,"me",{card:true})||""}`;
+          <button class="btn" type="button" data-edit="${esc(x.lamp_id)}">修改资料</button>
+          <details class="ls-more"><summary>更多</summary><div class="ls-more-menu"><button class="btn" type="button" data-history="${esc(x.lamp_id)}" data-history-scope="me">修改记录</button></div></details></div>${window.__yycjEditUI?.html(x.edit_state,"me",{card:true})||""}${window.__yycjEditUI?.html(x.relist_state,"me",{card:true})||""}`;
         return `<div class="pick-item" style="margin:8px 0" data-lamp="${esc(x.lamp_id)}">
           <div><strong>${esc(x.title || "")}</strong>
           <div class="muted">${esc(x.city || "")} · ${esc(st)} · ${exp}</div>${statsHtml(x, show)}${hiddenNote}${acts}</div>
@@ -1553,6 +1747,8 @@ try {
     window.__yycjLampFetch = true;
     const rawFetch = window.fetch.bind(window);
     const memo = new Map();
+    window.__yycjDropLampCache=id=>{for(const key of memo.keys())if(key.startsWith(String(id)+'|'))memo.delete(key);};
+    const serve=(p,init)=>{const out=p.then(r=>r.clone()),sig=init?.signal;if(!sig)return out;if(sig.aborted)return Promise.reject(new DOMException('Aborted','AbortError'));return new Promise((res,rej)=>{const abort=()=>rej(new DOMException('Aborted','AbortError'));sig.addEventListener('abort',abort,{once:true});out.then(r=>{sig.removeEventListener('abort',abort);res(r)},e=>{sig.removeEventListener('abort',abort);rej(e)});});};
     const RE = /^(?:https?:\/\/[^/]+)?\/api\/lamps\/([^/?#]+)(\?[^#]*)?$/;
     window.fetch = function (input, init) {
       try {
@@ -1567,11 +1763,11 @@ try {
           const key = id + "|" + q + "|" + auth;
           let e = memo.get(key);
           if (!e && !q) memo.forEach((x, k) => { if (!e && k.startsWith(id + "|") && k.endsWith("|" + auth)) e = x; });
-          if (e) return e.p.then((r) => r.clone());
+          if (e) return serve(e.p,init);
           const ent = { p: rawFetch(input, init), t: now, done: false };
           memo.set(key, ent);
           ent.p.then((r) => { ent.done = true; ent.t = Date.now(); if (!r.ok) memo.delete(key); }, () => memo.delete(key));
-          return ent.p.then((r) => r.clone());
+          return serve(ent.p,init);
         }
       } catch (e) {}
       return rawFetch(input, init);
@@ -1942,8 +2138,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     if (tg && tg.onEvent) tg.onEvent("backButtonClicked", closeViewer);
   } catch (e) {}
   window.addEventListener("popstate", closeViewer);
+  let gallerySequence=0;
   async function paint(id) {
-    if (!id) return;
+    if (!id) return;const my=++gallerySequence;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
     try {
@@ -1951,7 +2148,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
         headers: { Authorization: "Bearer " + token() },
         cache: "no-store",
       });
+      if (!r.ok) return;
       const data = await r.json();
+      if (my!==gallerySequence || !box || box.getAttribute("data-lamp") !== String(id) || document.getElementById("view-detail")?.classList.contains("hidden")) return;
       const cache = window.__yycjLampCache;
       delete cache[id];
       cache[id] = data;
@@ -3367,20 +3566,21 @@ try {
     try { if (!document.querySelector("#yycjGallery .yc-slide") && window.__yycjPaintGallery) window.__yycjPaintGallery(id); } catch (e) {}
     try { if (window.__yycjLoadDetailExtras) window.__yycjLoadDetailExtras(id); } catch (e) {}
   }
-  let seq = 0;
+  let seq = 0, controller=null;
   async function ensure(id, attempt) {
+    controller?.abort();controller=new AbortController();const ctl=controller;const timeout=setTimeout(()=>ctl.abort(),8000);
     const my = ++seq;
     const t0 = Date.now();
-    const live = () => my === seq && currentId() === id;
+    const live = () => my === seq && currentId() === id && shown();
     if (attempt > 1) state("loading");
     const slow = setTimeout(() => { if (live() && shown()) state("loading"); }, 700);
     let data = null, status = "";
     try {
-      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
+      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() }, signal:ctl.signal });
       status = String(r.status);
       if (r.ok) data = await r.json();
     } catch (e) { status = e && e.name === "AbortError" ? "timeout" : "net"; }
-    clearTimeout(slow);
+    clearTimeout(timeout);clearTimeout(slow);
     if (!live()) return;
     const ms = Date.now() - t0;
     if (data && (data.lamp || data.item)) {
@@ -3400,7 +3600,7 @@ try {
   }
   let last = "";
   function check() {
-    if (!shown()) { last = ""; return; }
+    if (!shown()) { last = "";++seq;controller?.abort();controller=null;return; }
     const id = currentId();
     if (!id || id === last) return;
     last = id;
@@ -3850,18 +4050,30 @@ try {
     dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sq) * Math.PI); dLng = (dLng * 180.0) / (a / sq * Math.cos(rad) * Math.PI);
     return [lat + dLat, lng + dLng];
   }
-  function locate() {
+  function locate(signal) {
     return new Promise((res) => {
-      const done = (la, ln) => res(wgs2gcj(+la, +ln)), fail = () => res(null);
+      let settled = false;
+      const finish = p => { if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener("abort", fail); res(p); };
+      const fail = () => finish(null), timer = setTimeout(fail, 8000);
+      if (signal?.aborted) { fail(); return; }
+      signal?.addEventListener("abort", fail, { once: true });
+      const done = (la, ln) => {
+        if (settled) return;
+        if (la == null || ln == null || !Number.isFinite(+la) || !Number.isFinite(+ln) || Math.abs(+la)>90 || Math.abs(+ln)>180) { fail(); return; }
+        finish(wgs2gcj(+la, +ln));
+      };
       try {
         const tg = window.Telegram && window.Telegram.WebApp;
-        if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
-          tg.LocationManager.init(() => { try { tg.LocationManager.getLocation((l) => (l && l.latitude != null ? done(l.latitude, l.longitude) : fail())); } catch (e) { fail(); } });
+        if (tg?.LocationManager?.init && tg.LocationManager.getLocation) {
+          tg.LocationManager.init(() => {
+            if (settled) return;
+            try { tg.LocationManager.getLocation((l) => l ? done(l.latitude, l.longitude) : fail()); } catch (e) { fail(); }
+          });
           return;
         }
-      } catch (e) {}
-      if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
-      else fail();
+        if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+        else fail();
+      } catch (e) { fail(); }
     });
   }
   let leaflet = null;
@@ -3869,8 +4081,15 @@ try {
     if (window.L && window.L.map) return Promise.resolve(window.L);
     if (leaflet) return leaflet;
     leaflet = new Promise((res, rej) => {
-      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "./vendor/leaflet/leaflet.css?v=" + V; document.head.appendChild(css);
-      const s = document.createElement("script"); s.src = "./vendor/leaflet/leaflet.js?v=" + V; s.onload = () => res(window.L); s.onerror = () => { leaflet = null; rej(new Error("地图加载失败")); };
+      let settled = false;
+      const s = document.createElement("script"); s.src = "./vendor/leaflet/leaflet.js?v=" + V;
+      const finish = error => {
+        if (settled) return; settled = true; clearTimeout(timer); s.onload = s.onerror = null;
+        if (error) { s.remove(); leaflet = null; rej(new Error("地图加载失败")); } else res(window.L);
+      };
+      const timer = setTimeout(() => finish(true), 8000);
+      if (!document.querySelector('link[data-yycj-leaflet]')) { const css = document.createElement("link"); css.dataset.yycjLeaflet = "1"; css.rel = "stylesheet"; css.href = "./vendor/leaflet/leaflet.css?v=" + V; document.head.appendChild(css); }
+      s.onload = () => finish(!window.L?.map); s.onerror = () => finish(true);
       document.head.appendChild(s);
     });
     return leaflet;
@@ -3920,11 +4139,12 @@ try {
     }
     setTimeout(() => pick.map.invalidateSize(), 60);
     return new Promise((res) => {
+      let closed = false, locCtl = null;
       const onClick = async (ev) => {
         const b = ev.target.closest && ev.target.closest("[data-pp]"); if (!b) return;
         const k = b.getAttribute("data-pp");
-        if (k === "me") { b.disabled = true; const p = await locate(); b.disabled = false; if (p) pick.map.setView(p, 15); else toast("定位失败，请手动拖动地图"); return; }
-        sheet.removeEventListener("click", onClick); sheet.classList.add("hidden");
+        if (k === "me") { if (b.disabled) return; b.disabled = true; locCtl = new AbortController(); const p = await locate(locCtl.signal); if (closed) return; b.disabled = false; if (p) pick.map.setView(p, 15); else toast("定位失败，请手动拖动地图"); return; }
+        closed = true; locCtl?.abort(); sheet.querySelector('[data-pp="me"]').disabled = false; sheet.removeEventListener("click", onClick); sheet.classList.add("hidden");
         if (k === "ok") { const c = pick.map.getCenter(); res({ lat: +c.lat.toFixed(5), lng: +c.lng.toFixed(5) }); }
         else res(k === "clear" ? "clear" : null);
       };
@@ -4602,6 +4822,118 @@ try {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watch); else watch();
 })();
 ;} catch (e) { try { console.error("me-layout.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "me-layout.js" }); } catch (x) {} }
+/* ---- map-results.js ---- */
+try {
+// Privacy-safe results map. Only server-published district centres are mapped, never listing coordinates.
+(() => {
+ 'use strict';
+ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const valid=p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180;
+ const same=(a,b)=>a&&b&&['south','west','north','east'].every(k=>Math.abs(a[k]-b[k])<0.0001);
+ const inside=(p,b)=>!b||(p.lat>=b.south&&p.lat<=b.north&&p.lng>=b.west&&p.lng<=b.east);
+ function points(data){
+  const byId=new Map((data.items||[]).slice(0,600).map(x=>[String(x.lamp_id),x])),out=[],seen=new Set();
+  for(const g of data.map_groups||[]){
+   // Deliberately ignore any coordinate-like fields on listing cards.
+   const p={lat:g.lat,lng:g.lng};if(!valid(p))continue;
+   for(const id of g.lamp_ids||[]){const key=String(id),item=byId.get(key);if(item&&!seen.has(key)&&(!data.city||!item.city||item.city===data.city)){out.push({...p,item});seen.add(key);}}
+  }
+  return out;
+ }
+ function clusters(rows,project,radius=52){
+  // Connected components of nearby projected pixels: no adjacent overlapping 44px targets.
+  const pts=rows.map(p=>project([p.lat,p.lng])),parent=rows.map((_,i)=>i);
+  const find=i=>parent[i]===i?i:(parent[i]=find(parent[i]));
+  for(let i=0;i<rows.length;i++)for(let j=0;j<i;j++)if(Math.hypot(pts[i].x-pts[j].x,pts[i].y-pts[j].y)<radius)parent[find(i)]=find(j);
+  const groups=new Map();rows.forEach((p,i)=>{const key=find(i);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p);});
+  const result=[...groups.values()];
+  // A connected ring can surround an isolated point: the marker centroids would
+  // overlap even though no original points are close. Merge overlapping targets
+  // until stable, using exactly the same geographic centroid as paint().
+  const centre=g=>project([g.reduce((s,p)=>s+p.lat,0)/g.length,g.reduce((s,p)=>s+p.lng,0)/g.length]);
+  let merged=true;while(merged){merged=false;const centres=result.map(centre);outer:for(let i=0;i<result.length;i++)for(let j=0;j<i;j++)if(Math.hypot(centres[i].x-centres[j].x,centres[i].y-centres[j].y)<radius){result[j].push(...result[i]);result.splice(i,1);merged=true;break outer;}}
+  return result;
+ }
+ class ResultMap{
+  constructor(host,{city,onSearch,onDetail,loadLeaflet}){
+   this.host=host;this.city=city;this.onSearch=onSearch;this.onDetail=onDetail;this.loadLeaflet=loadLeaflet;this.seq=0;this.epoch=0;this.rows=[];this.selected='';this.visible=true;this.busy=false;
+   host.innerHTML='<div class="hub-map-heading"><b>地图找资料</b><span id="hubMapCount"></span></div><p class="hub-map-privacy">仅按公开区中心展示，不代表资料具体位置</p><div class="hub-map-stage"><div id="hubResultMap" aria-label="本城资料区域地图"></div><button type="button" class="btn hub-search-area hidden" id="hubSearchArea">搜索此区域</button></div><div id="hubMapStatus" class="hub-map-status" role="status" aria-live="polite"></div><div id="hubMapTileStatus" class="hub-map-tile-status hidden" role="status"><span>底图暂不可用</span><button type="button" class="btn" data-map-tiles-retry>重试底图</button><button type="button" class="btn" data-map-list>查看列表</button></div><section id="hubMapSelection" class="hub-map-selection hidden" aria-label="已选资料"></section><section id="hubMapChooser" class="hub-map-chooser hidden" aria-label="同区域资料"></section><details id="hubMapUnlocated" class="hidden"><summary></summary><div></div></details>';
+   this.$=s=>host.querySelector(s);
+   this.click=e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-map-tiles-retry'))this.retryTiles();else if(b.hasAttribute('data-map-list')){if(!this.busy&&this.rows.length)this.choose(this.rows,true);}else if(b.id==='hubSearchArea')this.search();else if(b.hasAttribute('data-map-retry'))this.retry();else if(b.hasAttribute('data-map-select'))this.select(b.dataset.mapSelect);else if(b.hasAttribute('data-map-detail')){if(this.visible&&!this.busy&&this.detailIds?.has(String(b.dataset.mapDetail)))this.onDetail(b.dataset.mapDetail);}else if(b.hasAttribute('data-map-close'))this.deselect();else if(b.hasAttribute('data-map-choose'))this.choose(this.chosen||[],this.chosenAsList);};
+   host.addEventListener('click',this.click);
+  }
+  bounds(){if(!this.map||this.map.getZoom()==null)return null;const b=this.map.getBounds();return {south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()};}
+  status(text,retry=false){this.$('#hubMapStatus').innerHTML='<span>'+esc(text)+'</span>'+(retry?'<button type="button" class="btn" data-map-retry>'+ (this.meta?.area?'重试此区域':'重试加载')+'</button>':'');}
+  begin(meta){if(!this.visible)return;this.seq=meta.seq;this.meta=meta;this.busy=true;++this.epoch;this.rows=[];this.detailIds=new Set();this.$('#hubMapUnlocated').classList.add('hidden');this.$('#hubMapCount').textContent='读取中';this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.layer?.clearLayers();this.status('正在读取本城资料…');this.updateSearch();}
+  error(meta){if(!this.visible||meta.seq!==this.seq||meta.city!==this.city())return;this.busy=false;this.$('#hubMapCount').textContent='搜索失败';this.status('加载失败，请重试。未展示旧搜索结果。',true);this.updateSearch();}
+  updateSearch(){const b=this.$('#hubSearchArea');const moved=this.map&&!same(this.bounds(),this.searched);b.classList.toggle('hidden',!moved||!this.visible);b.disabled=this.busy;b.textContent=this.busy?'搜索中…':'搜索此区域';this.tileNotice();}
+  // Keep the entire active panel above the existing HTML navigation, including
+  // its close control. No SDK/native viewport or history integration.
+  reveal(el){const r=el.getBoundingClientRect();if(!r.height)return;const nav=document.querySelector('.bottom-nav')?.getBoundingClientRect(),bottom=Math.min(window.innerHeight,nav?.height?nav.top:window.innerHeight)-12;const delta=r.bottom>bottom?r.bottom-bottom:r.top<12?r.top-12:0;if(delta)window.scrollBy({top:delta,behavior:'auto'});}
+  tileNotice(){const e=this.$('#hubMapTileStatus');e.classList.toggle('hidden',!this.tileFailed);const retry=e.querySelector('[data-map-tiles-retry]');retry.disabled=!!this.tileRetrying;retry.textContent=this.tileRetrying?'重试中…':'重试底图';e.querySelector('[data-map-list]').disabled=this.busy||!this.rows.length;}
+  retryTiles(){if(!this.tiles||this.tileRetrying||!this.visible)return;this.tileRetrying=true;this.tileLoadFailed=false;this.tileNotice();clearTimeout(this.tileRetryTimer);this.tileRetryTimer=setTimeout(()=>{this.tileRetrying=false;this.tileFailed=true;this.tileNotice();},10000);this.tiles.redraw();}
+  search(){if(this.busy||!this.visible)return;this.onSearch(this.bounds());}
+  retry(){if(!this.busy&&this.visible)this.onSearch(this.meta?.area||null);}
+  async receive(data,meta={}){
+   if(!this.visible||(meta.seq&&meta.seq!==this.seq)||(meta.city&&meta.city!==this.city())||(data.city&&data.city!==this.city()))return;
+   const epoch=++this.epoch;this.meta=meta;this.busy=false;this.selected='';this.chosen=[];this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');
+   this.detailIds=new Set((data.items||[]).slice(0,600).filter(x=>!data.city||!x.city||x.city===data.city).map(x=>String(x.lamp_id)));
+   this.all=points(data);this.rows=this.all.filter(p=>inside(p,meta.area));this.data=data;
+   const mapped=new Set(this.all.map(p=>String(p.item.lamp_id))),missing=(data.items||[]).slice(0,600).filter(x=>!mapped.has(String(x.lamp_id))&&(!data.city||!x.city||x.city===data.city));
+   const unknown=this.$('#hubMapUnlocated');unknown.classList.toggle('hidden',!missing.length);unknown.open=false;unknown.querySelector('summary').textContent=missing.length+' 份无公开区中心 · 不参与区域筛选';unknown.querySelector('div').innerHTML=missing.map(x=>this.rowButton(x,'data-map-detail')).join('');
+   this.$('#hubMapCount').textContent=this.rows.length+' 份'+(meta.area?' · 此区域':missing.length?'可定位 / '+(this.rows.length+missing.length)+' 份结果':' · 本城');
+   this.$('.hub-map-stage').classList.toggle('hidden',!this.all.length&&!meta.area);
+   const suffix=data.map_truncated?' · 已达600份上限，请缩小现有筛选（区域搜索仅筛选这批结果）':'';
+   this.status((this.rows.length?'点圆点选资料，数字表示聚合数量':meta.area?'此区域暂无匹配资料，可移动地图后再搜索':missing.length?'暂无可定位资料，可展开下方列表':'暂无匹配资料，请调整城市或现有筛选')+suffix);
+   if(!this.all.length&&!this.map){this.$('#hubResultMap').classList.add('hidden');this.updateSearch();return;}
+   try{
+    const L=await this.loadLeaflet();if(epoch!==this.epoch||!this.visible)return;
+    if(!this.map){
+     this.L=L;this.map=L.map('hubResultMap',{scrollWheelZoom:false,zoomControl:false,maxZoom:15});L.control.zoom({position:'topright'}).addTo(this.map);
+     this.layer=L.layerGroup().addTo(this.map);
+     const tiles=this.tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:15,updateWhenIdle:true,keepBuffer:1,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(this.map);
+     tiles.on('loading',()=>{this.tileLoadFailed=false;});
+     tiles.on('tileerror',()=>{this.tileLoadFailed=true;this.tileFailed=true;this.tileNotice();});
+     tiles.on('load',()=>{clearTimeout(this.tileRetryTimer);this.tileRetrying=false;this.tileFailed=!!this.tileLoadFailed;this.tileNotice();});
+     this.onMove=()=>{if(this.restoring){this.paint();this.updateSearch();return;}this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());this.mapReady=true;
+    }
+    this.map.invalidateSize();
+    if(!meta.area&&this.all.length)this.map.fitBounds(this.all.map(p=>[p.lat,p.lng]),{padding:[42,42],maxZoom:12,animate:false});
+    // No invented city/point when nothing has a public centre. Retain the existing view if any.
+    if(!this.map.getZoom()&&!this.all.length){this.$('#hubResultMap').classList.add('hidden');this.updateSearch();return;}
+    this.$('#hubResultMap').classList.remove('hidden');this.searched=meta.area||this.bounds();this.paint();this.updateSearch();
+   }catch(e){if(epoch===this.epoch){if(this.map&&!this.mapReady){this.map.remove();this.map=null;this.layer=null;this.tiles=null;}this.status('地图加载失败，可重试或使用资料列表。',true);this.choose(this.rows,true);}}
+  }
+  rowButton(item,attr='data-map-select'){return '<button type="button" class="hub-map-row" '+attr+'="'+esc(item.lamp_id)+'"><b>'+esc(item.title||'未命名资料')+'</b><span>'+esc(item.district||'未标注地区')+(item.open_text?' · '+esc(item.open_text):'')+' ›</span></button>';}
+  paint(){if(!this.map)return;this.layer.clearLayers();if(this.busy||!this.visible||(this.data?.city&&this.data.city!==this.city()))return;
+   for(const group of clusters(this.rows,p=>this.map.project(p,this.map.getZoom()))){
+    const lat=group.reduce((s,p)=>s+p.lat,0)/group.length,lng=group.reduce((s,p)=>s+p.lng,0)/group.length;
+    const one=group.length===1,item=group[0].item,selected=group.some(p=>String(p.item.lamp_id)===this.selected);
+    const marker=this.L.marker([lat,lng],{keyboard:true,title:one?(item.title||'查看资料'):group.length+'份区域资料',icon:this.L.divIcon({className:'hub-map-marker'+(one?' is-single':'')+(selected?' is-selected':''),html:one?'<span aria-hidden="true">●</span>':'<b>'+group.length+'</b>',iconSize:[44,44],iconAnchor:[22,22]})}).addTo(this.layer);
+    marker.on('click',()=>{
+     if(one){this.select(item.lamp_id);return;}
+     const distinct=new Set(group.map(p=>p.lat+','+p.lng));
+     if(distinct.size>1&&this.map.getZoom()<15){const before=this.map.getZoom();this.map.fitBounds(group.map(p=>[p.lat,p.lng]),{padding:[56,56],maxZoom:Math.min(15,before+2),animate:false});if(this.map.getZoom()<=before)this.choose(group);}
+     else this.choose(group);
+    });
+   }
+  }
+  choose(group,list=false){this.chosen=group;this.chosenAsList=list;this.selected='';this.$('#hubMapSelection').classList.add('hidden');const e=this.$('#hubMapChooser');e.classList.remove('hidden');e.innerHTML='<div class="hub-chooser-title"><b>'+(list?'当前结果 ':'区域内 ')+group.length+' 份资料</b><button type="button" class="btn" data-map-close aria-label="关闭区域资料">×</button></div><p class="hub-map-privacy">仅按公开区中心展示，不偏移到虚构位置</p><div class="hub-map-options">'+group.map(p=>this.rowButton(p.item)).join('')+'</div>';this.paint();this.reveal(e);}
+  select(id){const p=this.rows.find(p=>String(p.item.lamp_id)===String(id));if(!p)return;this.selected=String(id);this.$('#hubMapChooser').classList.add('hidden');const x=p.item,el=this.$('#hubMapSelection');el.classList.remove('hidden');
+   // cover_url is supplied by the existing public card serializer; no synthetic portrait.
+   const cover=String(x.cover_url||'');const media=Number(x.media_count)>0&&/^(https?:\/\/|\/)/.test(cover)?'<img src="'+esc(cover)+'" alt="" loading="lazy">':'';
+   el.innerHTML=media+'<div class="hub-map-card-text"><b>'+esc(x.title||'未命名资料')+'</b><p>'+esc([x.city,x.district].filter(Boolean).join(' · '))+'</p>'+(x.open_text?'<span>'+esc(x.open_text)+'</span>':'')+'</div><button type="button" class="btn" data-map-detail="'+esc(id)+'">查看详情</button><button type="button" class="hub-map-close" data-map-close aria-label="关闭已选资料">×</button>'+(this.chosen?.length>1?'<button type="button" class="hub-map-siblings" data-map-choose>'+(this.chosenAsList?'当前结果 ':'同区域 ')+this.chosen.length+' 份 ›</button>':'');this.paint();this.reveal(el);
+  }
+  deselect(){this.selected='';this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');this.paint();}
+  cancel(){if(!this.busy)return;this.busy=false;this.$('#hubMapCount').textContent='未完成';this.status('搜索已取消，可重试。',true);this.updateSearch();}
+  pendingChanges(){++this.epoch;this.busy=false;this.rows=[];this.detailIds=new Set();this.$('#hubMapUnlocated').classList.add('hidden');this.deselect();this.$('#hubMapCount').textContent='待应用';this.status('筛选已改，点击查看结果后更新');this.updateSearch();}
+  resume(){this.restoring=true;try{this.map?.invalidateSize({pan:false});}finally{this.restoring=false;}this.paint();this.updateSearch();}
+  activate(on){this.visible=on;if(!on){++this.epoch;this.busy=false;this.deselect();}else this.map?.invalidateSize();}
+  destroy(){++this.epoch;clearTimeout(this.tileRetryTimer);this.host.removeEventListener('click',this.click);this.map?.remove();}
+ }
+ window.yycjResultMap={ResultMap,points,clusters,inside,same};
+})();
+;} catch (e) { try { console.error("map-results.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "map-results.js" }); } catch (x) {} }
 /* ---- community-ui.js ---- */
 try {
 // City community, shared-filter district map, and a light review ranking. No new bottom tab.
@@ -4640,31 +4972,20 @@ try {
   function mount() {
     const home=$('#view-home');if(!home) return;
     if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();window.__yycjLoadHome?.();}; }
-    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='<p class="muted">同一套搜索 / 筛选 · 按区中心聚合，并非资料精确位置</p><div id="hubResultMap"></div><div id="hubMapRows"></div>';$('#feed')?.insertAdjacentElement('beforebegin',w); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();controller()?.activate(!!window.__yycjMapMode);window.__yycjLoadHome?.();}; }
+    if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
-  function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
-  let map=null, layer=null, lastSeq=0;
-  async function drawMap(data) {
-    mount();syncMapMode();if(!window.__yycjMapMode)return;
-    const seq=++lastSeq, rows=$('#hubMapRows'), groups=data.map_groups || [], items=data.items || [];
-    const list = group => { const ids=new Set(group?.lamp_ids || items.map(x=>x.lamp_id)); rows.innerHTML=`<p class="muted">${esc(group?.district || '全部区域')} · ${ids.size} 份资料${data.map_truncated?'（最多显示600份，请缩小筛选）':''}</p>`+items.filter(x=>ids.has(x.lamp_id)).map(x=>`<button class="hub-row" data-hub-lamp="${esc(x.lamp_id)}"><b>${esc(x.title)}</b><span>${esc(x.district || '其他')}${x.distance?' · '+esc(x.distance):''} ›</span></button>`).join(''); };
-    list();
-    const known=groups.filter(g=>g.lat!=null && g.lng!=null);$('#hubResultMap').classList.toggle('hidden',!known.length);
-    if(!known.length) { rows.insertAdjacentHTML('afterbegin','<p class="muted">当前结果暂无公开区中心，可查看下方列表。</p>');return; }
-    try {
-      const L=await window.__yycjLoadLeaflet();if(seq!==lastSeq || !window.__yycjMapMode)return;
-      if(!map) {
-        map=L.map('hubResultMap',{scrollWheelZoom:false}).setView([known[0].lat,known[0].lng],11);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:15,attribution:'© OpenStreetMap'}).addTo(map);
-        layer=L.layerGroup().addTo(map);
-      }
-      layer.clearLayers();const pts=[];
-      known.forEach(g=>{const pt=[g.lat,g.lng];pts.push(pt);L.marker(pt,{icon:L.divIcon({className:'hub-cluster',html:`<b>${g.count}</b><span>${esc(g.district)}</span>`,iconSize:[68,48]})}).addTo(layer).on('click',()=>list(g));});
-      map.invalidateSize();map.fitBounds(pts,{padding:[40,40],maxZoom:12});
-    } catch(e) { rows.insertAdjacentHTML('afterbegin','<p class="muted">地图加载失败，结果列表仍可使用。</p>'); }
-  }
-  window.addEventListener('yycj:home-data',ev=>drawMap(ev.detail));
+  function syncMapMode() { window.__yycjMapFilters?.paint();const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
+  let resultMap=null,mapReturn=null;
+  function openMapDetail(id){const box=$('#detail');if(!box)return;mapReturn={city:city(),scope:window.__yycjMapFilters?.signature(),scroll:window.scrollY};window.__yycjBack='home';window.__yycjOpenLamp=id;box.innerHTML='';const gal=$('#yycjGallery');if(gal){gal.innerHTML='';gal.dataset.lamp='';}$('#view-detail .xhs-bar')?.remove();const name=$('#xhsTop .xt-name');if(name)name.textContent='';if(window.openLamp){window.__yycjDropLampCache?.(id);window.openLamp(id);return;}box.setAttribute('data-lamp',id);show('detail');if(!window.__yycjEnsureDetail)fetchDetail(id);}
+  const homeView=$('#view-home');if(homeView)new MutationObserver(()=>{if(homeView.classList.contains('hidden'))return;syncMapMode();if(window.__yycjMapMode&&mapReturn&&mapReturn.city===city()&&mapReturn.scope===window.__yycjMapFilters?.signature()){resultMap?.resume();window.scrollTo({top:mapReturn.scroll,behavior:'auto'});}mapReturn=null;}).observe(homeView,{attributes:true,attributeFilter:['class']});
+  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:openMapDetail,loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
+  window.addEventListener('yycj:home-data',ev=>{syncMapMode();if(window.__yycjMapMode)controller()?.receive(ev.detail,ev.mapRequest||{});});
+  window.addEventListener('yycj:map-loading',ev=>controller()?.begin(ev.detail));
+  window.addEventListener('yycj:map-cancel',()=>resultMap?.cancel());
+  window.addEventListener('yycj:map-pending',()=>resultMap?.pendingChanges());
+  window.addEventListener('yycj:map-error',ev=>controller()?.error(ev.detail));
+  window.addEventListener('pagehide',ev=>{if(!ev.persisted){resultMap?.destroy();resultMap=null;}});
   mount();
   // Welcome's known 「我的」 target, after authentication finishes.
   if(new URLSearchParams(location.search).get('page')==='me') { let tries=0;const go=()=>{if($('#app')&&!$('#app').classList.contains('hidden')) {$('[data-nav="me"]')?.click();} else if(++tries<80) setTimeout(go,150);};go(); }
