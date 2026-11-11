@@ -49,7 +49,7 @@ async def public_rows(rows):
         if row.retry_kind=='label_sync' and row.status=='failed':
             label=labels.get(row.city);retry=bool(label and label.failed and label.status!='running');action='label_sync' if retry else None
         out.append({'record_id':row.record_id,'operation_id':row.operation_id,'feature':row.feature,'step':row.step,
-          'city':row.city,'listing_id':row.listing_id,'actor_id':row.actor_id,'config_revision':row.config_revision,
+          'source':row.source,'city':row.city,'listing_id':row.listing_id,'actor_id':row.actor_id,'config_revision':row.config_revision,
           'target_ref':row.target_ref,'status':row.status,'reason_code':row.reason_code,
           'reason':execution_log.REASONS.get(row.reason_code,''),'started_at':iso(row.started_at),'finished_at':iso(row.finished_at),
           'retryable':bool(retry),'retry_action':action})

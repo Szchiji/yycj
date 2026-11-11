@@ -21,3 +21,5 @@ import bot.services.role_lock  # noqa: F401
 import bot.services.admin_acl  # noqa: F401
 
 __all__ = ["router"]
+
+from bot.api import routes_workspace  # noqa: F401,E402

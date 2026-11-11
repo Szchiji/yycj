@@ -22,6 +22,7 @@ from bot.models import Lamp, LampStatus
 from bot.models_extra import ChannelDirectory
 from bot.services import home_service
 
+from bot.services import execution_trace as delivery
 logger = logging.getLogger(__name__)
 MAX_PER_AREA = 30
 RETRY_CITY_AFTER = 300   # seconds: a city whose refresh failed on a transient error is tried once more
@@ -62,16 +63,18 @@ async def _drop_ref(city: str) -> None:
             await s.delete(ref)
 
 
+@delivery.traced("directory","retire",source="manual")
 async def _retire(chat: str, mid: int, city: str) -> None:
     """Remove an old directory message (switch off / channel moved). Delete; else mark it stopped."""
     from bot.main import bot
+    await delivery.current().identify(city=city,target="message:"+str(mid))
     try:
-        await bot.delete_message(chat_id=chat, message_id=mid)
+        await delivery.current().call(lambda:bot.delete_message(chat_id=chat,message_id=mid),"retire_delete")
         return
     except Exception:
         pass
     try:
-        await bot.edit_message_text(text=f"📖 {html.escape(city)} · 按区目录（已停用）", chat_id=chat, message_id=mid)
+        await delivery.current().call(lambda:bot.edit_message_text(text=f"📖 {html.escape(city)} · 按区目录（已停用）",chat_id=chat,message_id=mid),"retire_edit")
     except Exception:
         logger.warning("retire old directory for %s failed", city)
 
@@ -82,11 +85,13 @@ async def refresh_city(city: str) -> bool:
     return await _refresh_city(city) == "ok"
 
 
+@delivery.traced("directory","refresh",source="manual")
 async def _refresh_city(city: str) -> str:
     """ok / skip (off, nothing to show) / fail (Telegram error, logged)."""
     from bot.services.home_feed import feature_chat, ops_for_city
     from bot.services.tg_retry import is_transient, tg_call
     site = ops_for_city(await home_service.get_or_create_settings(), city)
+    await delivery.current().identify(city=city,revision=site.get("config_revision"),target="channel")
     ref_chat, ref_mid = await _ref(city)
     chat = feature_chat(site, "channel_directory") if site.get("channel_directory") else ""
     if ref_mid and ref_chat != chat:
@@ -94,6 +99,7 @@ async def _refresh_city(city: str) -> str:
         await _drop_ref(city)
         ref_chat, ref_mid = "", 0
     if not chat:
+        delivery.current().mark("skipped" if not site.get("channel_directory") else "not_configured","disabled" if not site.get("channel_directory") else "not_configured")
         return "skip"
     from bot.services import bot_info
     bot_name = (await bot_info.get_bot_identity()).get("username") or ""
@@ -113,8 +119,8 @@ async def _refresh_city(city: str) -> str:
     try:
         if ref_mid:
             try:
-                await tg_call(f"directory edit ({city})", lambda: bot.edit_message_text(
-                    text=text, chat_id=chat, message_id=ref_mid, disable_web_page_preview=True))
+                await tg_call(f"directory edit ({city})", lambda: delivery.current().call(lambda:bot.edit_message_text(
+                    text=text,chat_id=chat,message_id=ref_mid,disable_web_page_preview=True),"update"))
                 return "ok"
             except Exception as exc:
                 if "not modified" in str(exc).lower():
@@ -124,8 +130,8 @@ async def _refresh_city(city: str) -> str:
                     logger.warning("directory edit for %s failed after retries (%s); not posting a new one",
                                    city, type(exc).__name__)
                     return "fail"
-                logger.warning("directory edit failed (%s), posting new", str(exc)[:80])
-        msg = await tg_call(f"directory post ({city})", lambda: bot.send_message(chat, text, disable_web_page_preview=True))
+                logger.warning("directory edit failed (%s), posting new", type(exc).__name__)
+        msg = await tg_call(f"directory post ({city})", lambda: delivery.current().call(lambda:bot.send_message(chat,text,disable_web_page_preview=True),"create",send=True))
         async with session_scope() as s:
             ref = (await s.execute(select(ChannelDirectory).where(ChannelDirectory.city == city))).scalar_one_or_none()
             if ref:
@@ -133,11 +139,13 @@ async def _refresh_city(city: str) -> str:
             else:
                 s.add(ChannelDirectory(city=city, chat=chat, message_id=int(msg.message_id)))
         return "ok"
-    except Exception:
-        logger.exception("channel directory for %s failed", city)
+    except Exception as exc:
+        if delivery.current().ack:delivery.current().mark("unknown","delivery_unknown")
+        logger.warning("channel directory for %s failed (%s)",city,type(exc).__name__)
         return "fail"
 
 
+@delivery.origin("scheduled_retry")
 async def _retry_later(cities: List[str], delay: float = RETRY_CITY_AFTER, sleep=asyncio.sleep) -> int:
     """One more try for cities whose refresh failed (e.g. Bad Gateway at noon). Logged either way."""
     await sleep(delay)
@@ -178,6 +186,8 @@ async def on_listing_live(lamp_id: str = "", city: str = "") -> bool:
         from bot.services.home_feed import feature_chat, ops_for_city
         site = ops_for_city(await home_service.get_or_create_settings(), city)
         if not site.get("channel_directory") or not feature_chat(site, "channel_directory"):
+            from bot.services import execution_log
+            await execution_log.event("directory","schedule","skipped" if not site.get("channel_directory") else "not_configured","disabled" if not site.get("channel_directory") else "not_configured",city=city,listing_id=lamp_id or None,source="listing_event",revision=site.get("config_revision"),target="channel")
             return False
         t = _pending.get(city)
         if t is not None and not t.done():
@@ -205,6 +215,7 @@ async def on_cities_changed(cities) -> int:
     return n
 
 
+@delivery.origin("listing_event")
 async def _debounced_refresh(city: str) -> str:
     await _sleep(NEW_LISTING_DEBOUNCE)
     _pending.pop(city, None)    # listings going live from now on queue another refresh
@@ -220,6 +231,7 @@ async def _debounced_refresh(city: str) -> str:
     return st
 
 
+@delivery.origin("scheduled")
 async def job_refresh_all() -> int:
     """Every enabled city (each with its own channel / switch), plus cleanup of directories left in
     cities that were switched off or are no longer enabled."""

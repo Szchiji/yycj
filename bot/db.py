@@ -24,6 +24,7 @@ _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
 _ALTER_STATEMENTS = [
+    "ALTER TABLE execution_records ADD COLUMN IF NOT EXISTS source VARCHAR(32)",
     "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS config_revision INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_by BIGINT",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_pending_edit_v2 ON posts ((lamp_data->>'edit_lamp_id')) WHERE status='pending' AND lamp_data->>'edit_workflow_v2' IS NOT NULL",

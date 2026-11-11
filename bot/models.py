@@ -315,6 +315,7 @@ class ListingEditOperation(Base):
 class ExecutionRecord(Base):
     """Safe operational metadata only: never message bodies or credentials."""
     __tablename__='execution_records'
+    source: Mapped[Optional[str]] = mapped_column(String(32),nullable=True)
     record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     operation_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True,index=True)
     feature: Mapped[str] = mapped_column(String(32),index=True)

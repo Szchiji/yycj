@@ -7,7 +7,7 @@ const fixtures=JSON.parse(execFileSync(process.env.PYTHON || 'python3',['-c','im
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const response=data=>({ok:true,status:200,json:async()=>JSON.parse(JSON.stringify(data)),clone(){return response(data);}});
 async function admin() {
- const dom=new JSDOM(fs.readFileSync('miniapp/desk.html','utf8'),{url:'https://test.invalid/desk.html',runScripts:'outside-only',pretendToBeVisual:true});
+ const dom=new JSDOM(fs.readFileSync('miniapp/desk-legacy.html','utf8'),{url:'https://test.invalid/desk.html',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window,d=w.document, posts=[], alerts=[];
  w.localStorage.setItem('yycj_token','test');d.querySelector('#console').classList.remove('hidden');w.alert=x=>alerts.push(x);
  let settings={...fixtures.settings,enabled_cities:['深圳','广州'],bot_welcome_buttons:[{type:'webapp',label:'进入小程序',target:'home'}]};
@@ -24,7 +24,7 @@ async function admin() {
    return response({items:[],settings});
  };
  function cfg(){return {can_edit:true,can_edit_super:true,overrides,keys:fixtures.keys.map(k=>({...k,global:settings[k.key],override:overrides[k.key]??null}))};}
- // Same relevant execution order as the live desk, without its login / Telegram glue.
+ // Same relevant execution order as the authenticated legacy fallback, without its login / Telegram glue.
  for(const f of ['admin-cta.js','admin-kit.js','admin-proposal.js','admin-buttons.js','admin-city.js','admin-ops-users.js']) w.eval(fs.readFileSync('miniapp/'+f,'utf8'));
  await wait(1000);
  assert.equal(d.querySelectorAll('#ccGlobalFields > .ship-group').length,6);

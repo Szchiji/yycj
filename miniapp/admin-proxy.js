@@ -66,6 +66,7 @@
   const uploadedP = [];
   const uploadedE = [];
   function dirty() {
+    if(window.yycjWorkspace){window.yycjWorkspace.legacyDirty=false;window.yycjWorkspace.dirty=false;}
     localStorage.setItem("yycj_bust", String(Date.now()));
     if (window.yycjRefreshViews) window.yycjRefreshViews();
     document.getElementById("btnRefresh")?.click();
@@ -147,9 +148,29 @@
     uploadFiles([...(ev.target.files || [])], uploadedE, "editPreview", "editStatus");
     ev.target.value = "";
   });
+  function lockEditor(id) {
+    const w=window.yycjWorkspace;if(w?.editorBusy)return null;
+    if(w)w.editorBusy=true;
+    const nodes=[...document.querySelectorAll('#'+id+' input,#'+id+' textarea,#'+id+' select,#'+id+' button')],states=nodes.map(n=>n.disabled);
+    nodes.forEach(n=>n.disabled=true);
+    return ()=>{if(w)w.editorBusy=false;nodes.forEach((n,i)=>n.disabled=states[i])};
+  }
+  window.yycjAdminEditors={reset(){
+    uploadedP.length=0;uploadedE.length=0;
+    for(const prefix of ['proxy','edit']){
+      const box=document.getElementById(prefix==='proxy'?'proxyBox':'editBox');
+      box?.querySelectorAll('input,textarea').forEach(el=>{if(el.type==='checkbox')el.checked=el.defaultChecked;else el.value=''});
+      if(window.yycjHours)window.yycjHours.set(document.getElementById(prefix+'Hours'),[]);
+      preview(prefix+'Preview',[]);document.getElementById(prefix+'Status').textContent='';
+    }
+    document.getElementById('editOperationState').innerHTML='';for(const id of ['workspaceProxyDetails','workspaceEditDetails']){const d=document.getElementById(id);if(d)d.open=false;}
+    document.getElementById('proxyCity').value=window.yycjWorkspace?.mode==='city'?window.yycjWorkspace.city:'';
+  }};
   document.getElementById("btnProxy")?.addEventListener("click", async () => {
     const uid = parseInt(val("proxyUid"), 10);
     if (!uid) return alert("请填老师用户 ID");
+    if(uploadedP.some(x=>x.pending))return alert("媒体仍在上传，请完成后再上架");
+    const unlock=lockEditor("proxyBox");if(!unlock)return;
     try {
       const r = await fetch("/api/admin/listings/proxy", {
         method: "POST",
@@ -174,11 +195,13 @@
       alert("已代上架并按模板推送：" + ((data.lamp || {}).title || ""));
       uploadedP.length = 0; preview("proxyPreview", uploadedP);
       dirty();
-    } catch (e) { alert(e.message || String(e)); }
+    } catch (e) { alert(e.message || String(e)); } finally { unlock(); }
   });
   document.getElementById("btnEditSave")?.addEventListener("click", async () => {
     const id = val("editLampId");
     if (!id) return alert("请先在资料列表点「代改」");
+    if(uploadedE.some(x=>x.pending))return alert("媒体仍在上传，请完成后再保存");
+    const unlock=lockEditor("editBox");if(!unlock)return;
     try {
       const r = await fetch("/api/admin/listings/" + encodeURIComponent(id) + "/proxy-edit", {
         method: "POST",
@@ -202,10 +225,11 @@
       document.getElementById("editOperationState").innerHTML=window.__yycjEditUI.html(data.operation,"admin");
       uploadedE.length = 0; preview("editPreview", uploadedE);
       dirty();
-    } catch (e) { alert(e.message || String(e)); }
+    } catch (e) { alert(e.message || String(e)); } finally { unlock(); }
   });
   window.yycjFillProxy = function (item) {
     if (!item) return;
+    const details=document.getElementById("workspaceEditDetails");if(details)details.open=true;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ""; };
     const extras = item.extras || {};
     const resultBox=document.getElementById('editOperationState');if(resultBox)resultBox.innerHTML=window.__yycjEditUI?.html(item.edit_state,'admin')||'';
