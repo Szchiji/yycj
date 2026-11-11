@@ -57,7 +57,7 @@
       else sessionStorage.removeItem(filtKey());
     } catch (e) {}
   }
-  function clearFilt() { try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
+  function clearFilt() { locCancel?.(); try { sessionStorage.removeItem(filtKey()); } catch (e) {} setSort(""); setArea(""); }
   // 面板里改的选项只在「查看结果」/ 关闭面板 / 重置时生效；appliedSig 记住信息流当前用的是哪一组条件
   function filtSig() { return JSON.stringify([curCity(), getArea(), getSort(), getFilt()]); }
   let appliedSig = null;
@@ -65,7 +65,7 @@
     const f = getFilt();
     return [getArea(), f.price, f.tags, f.service && f.service!=="all" ? f.service : f.open, f.radius, f.cpn].filter(Boolean).length;
   }
-  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, hasPlace = false;
+  let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, locCancel = null, hasPlace = false;
   // 常用位置 (我的) is the default centre: the server applies it when no lat/lng/区 is sent; np=1 turns it off for this session
   function placeOn(f) { f = f || getFilt(); return hasPlace && !f.np && !(f.lat && f.lng) && !f.at; }
   function token() { return localStorage.getItem("yycj_token") || ""; }
@@ -112,12 +112,17 @@
   window.__yycjResumeUi = resumeWork;
   async function api(path, controller) {
     const ctl = controller || new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 8000);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, 8000);
     try {
       const r = await fetch(path, { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
-      const data = await r.json().catch(() => ({}));
+      const data = await r.json().catch(e => { if (ctl.signal.aborted || path.includes("map_results=1")) throw e; return {}; });
       if (!r.ok) throw new Error(data.detail || r.statusText || ("HTTP " + r.status));
+      if (path.includes("map_results=1") && (!Array.isArray(data?.items) || !Array.isArray(data?.map_groups))) throw new Error("地图结果无效，请重试");
       return data;
+    } catch (e) {
+      if (timedOut) { const error = new Error("请求超时，请重试"); error.name = "TimeoutError"; throw error; }
+      throw e;
     } finally {
       clearTimeout(timer);
     }
@@ -279,7 +284,7 @@
       window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
-      if(ctl.signal.aborted)return;
+      if(ctl.signal.aborted && e.name!=="TimeoutError")return;
       if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode || requestCity!==curCity() || requestSig!==filtSig())return;
       if(mapMode){window.dispatchEvent(new CustomEvent("yycj:map-error",{detail:{...mapRequest,message:e.message}}));return;}
       const feed = $("#feed");
@@ -361,24 +366,34 @@
   function askLocation() {
     if (locBusy) return;
     locBusy = true;
-    const done = (lat, lng) => {
-      try { const g = window.yycjPlace && window.yycjPlace.wgs2gcj(+lat, +lng); if (g) { lat = g[0]; lng = g[1]; } } catch (e) {}
-      setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "", np: "" }); locBusy = false; paintArea();
+    const city = curCity(); let settled = false;
+    const finish = fn => {
+      if (settled) return; settled = true; clearTimeout(timer); locBusy = false; locCancel = null;
+      if (city === curCity() && homeVisible()) fn();
     };
-    const fail = () => { locBusy = false; paintArea(); try { window.__yycjToast && window.__yycjToast("定位失败，可选区作中心"); } catch (e) {} };
+    const fail = () => finish(() => { paintArea(); try { window.__yycjToast?.("定位失败，可选区作中心"); } catch (e) {} });
+    const timer = setTimeout(fail, 8000);
+    const cancel = () => finish(() => {}); locCancel = cancel;
+    const done = (lat, lng) => {
+      if (settled) return;
+      if (city !== curCity() || !homeVisible()) { cancel(); return; }
+      if (lat == null || lng == null || !Number.isFinite(+lat) || !Number.isFinite(+lng) || Math.abs(+lat)>90 || Math.abs(+lng)>180) { fail(); return; }
+      try { const g = window.yycjPlace && window.yycjPlace.wgs2gcj(+lat, +lng); if (g) { lat = g[0]; lng = g[1]; } } catch (e) {}
+      finish(() => { setFilt({ lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2), at: "", np: "" }); paintArea(); });
+    };
     try {
       const tg = window.Telegram && window.Telegram.WebApp;
-      if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
+      if (tg?.LocationManager?.init && tg.LocationManager.getLocation) {
         tg.LocationManager.init(() => {
-          try { tg.LocationManager.getLocation((loc) => loc && loc.latitude != null ? done(loc.latitude, loc.longitude) : fail()); }
+          if (settled || city !== curCity() || !homeVisible()) { cancel(); return; }
+          try { tg.LocationManager.getLocation((loc) => loc ? done(loc.latitude, loc.longitude) : fail()); }
           catch (e) { fail(); }
         });
         return;
       }
-    } catch (e) {}
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
-    } else fail();
+      if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+      else fail();
+    } catch (e) { fail(); }
   }
   async function toggleArea(open) {
     const panel = $("#areaPanel");
@@ -491,14 +506,14 @@
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"1\"]")) { if (!placeOn()) askLocation(); return; }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"gps\"]")) { askLocation(); return; }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"place\"]")) {
-      setFilt({ lat: "", lng: "", at: "", np: "" }); paintArea(); return;
+      locCancel?.(); setFilt({ lat: "", lng: "", at: "", np: "" }); paintArea(); return;
     }
     if (ev.target.closest && ev.target.closest("#areaPanel [data-loc=\"0\"]")) {
-      setFilt({ lat: "", lng: "", at: "", radius: "", np: hasPlace ? "1" : "" }); if (getSort() === "near") setSort(""); paintArea(); return;
+      locCancel?.(); setFilt({ lat: "", lng: "", at: "", radius: "", np: hasPlace ? "1" : "" }); if (getSort() === "near") setSort(""); paintArea(); return;
     }
     const atChip = ev.target.closest && ev.target.closest("#areaPanel [data-at]");
     if (atChip) {
-      setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", np: "", radius: getFilt().radius || "5" });
+      locCancel?.(); setFilt({ at: atChip.getAttribute("data-at") || "", lat: "", lng: "", np: "", radius: getFilt().radius || "5" });
       paintArea(); return;
     }
     const radChip = ev.target.closest && ev.target.closest("#areaPanel [data-radius]");
@@ -568,9 +583,9 @@
     arm();
   }
   (function watchCarousel() {
-    document.addEventListener("visibilitychange", ()=>{if(document.hidden)cancelLoad();arm();});
+    document.addEventListener("visibilitychange", ()=>{if(document.hidden){cancelLoad();locCancel?.();}arm();});
     const view = $("#view-home");
-    if (view && window.MutationObserver) new MutationObserver(()=>{if(!homeVisible())cancelLoad();arm();}).observe(view, { attributes: true, attributeFilter: ["class"] });
+    if (view && window.MutationObserver) new MutationObserver(()=>{if(!homeVisible()){cancelLoad();locCancel?.();}arm();}).observe(view, { attributes: true, attributeFilter: ["class"] });
     const pins = $("#pins");
     if (pins && window.IntersectionObserver) {
       new IntersectionObserver((es) => { pinsSeen = es.some((e) => e.isIntersecting); arm(); }).observe(pins);
