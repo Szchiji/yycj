@@ -32,6 +32,8 @@ async function create(options={}){
   for(const act of ['renew','unlist','delete','relist'])assert(a.$(`[data-list="${act}"]`));
   assert(a.$('#workspaceLegacy').contains(a.$('#pane-listings')));
   assert(a.$('#workspaceProxyDetails')&&a.$('#workspaceEditDetails'));
+  assert(a.$('#wsListingsToolbar')&&a.$('#wsListingsToolbar').contains(a.$('#wsListingStatus'))&&a.$('#wsListingsToolbar').contains(a.$('#listingQ'))&&a.$('#wsListingsToolbar').contains(a.$('#btnListingSearch')),'listings status and search share one toolbar');
+  assert(a.$('.ws-editor-row')&&a.$('.ws-editor-row').contains(a.$('#workspaceProxyDetails'))&&a.$('.ws-editor-row').contains(a.$('#workspaceEditDetails')));
   assert(a.fixture.state.calls.filter(x=>x.path==='/api/admin/listings').at(-1).query.city==='深圳');
   a.$('[data-fill-proxy]').click();await until(()=>a.$('#editLampId').value,'fill existing editor');assert(a.$('#workspaceEditDetails').open);assert.equal(a.$('#editTitle').value,'示例资料 A');
   const n=a.fixture.state.calls.filter(x=>x.method==='POST').length;a.w.prompt=()=>null;a.$('[data-list="delete"]').click();await wait(30);assert.equal(a.fixture.state.calls.filter(x=>x.method==='POST').length,n);

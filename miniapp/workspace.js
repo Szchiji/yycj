@@ -41,15 +41,30 @@
  }
  async function legacy(ticket){const map={media:'audit',audit:'audit',reviews:'audit',coupons:'listings'};const pane=map[W.tab]||W.tab;const native=$('#workspaceNative');native.innerHTML='';const el=$('#pane-'+pane);if(!el){native.innerHTML='<div class="card muted">模块尚未就绪，请刷新后重试。</div>';return}$('#adminSide [data-pane="'+pane+'"]')?.click();$('#workspaceLegacy').append(el);el.classList.add('active');el.style.display='block';
   if(W.page==='review'){
-   if(pane==='audit')native.innerHTML='<div class="card ws-queue-filter"><input id="wsQueueSearch" aria-label="搜索当前队列" placeholder="搜索当前已读取队列（称呼 / ID / 文字）"><p class="muted small">仅筛选当前已读取队列，媒体与首次上架分开处理。</p></div>';
-   if(pane==='listings'&&W.tab==='listings')native.innerHTML=`<div class="card"><label for="wsListingStatus">资料状态</label><select id="wsListingStatus"><option value="">全部状态</option>${Object.entries({active:'已上架',hidden:'已下架',pending:'待审',rejected:'已拒',gray:'灰色'}).map(([k,v])=>`<option value="${k}" ${W.listingStatus===k?'selected':''}>${v}</option>`).join('')}</select></div>`;
+   if(pane==='audit')native.innerHTML='<div class="ws-queue-filter"><input id="wsQueueSearch" aria-label="搜索当前队列" placeholder="搜索当前已读取队列（称呼 / ID / 文字）"><p class="muted small">仅筛选已读取队列；媒体与首次上架分开处理。</p></div>';
+   if(pane==='listings'&&W.tab==='listings')native.innerHTML='';
    const posts=$('#adminPosts'),reviews=$('#adminReviews'),cpn=$('#cpnAdmin');if(posts)posts.classList.toggle('ws-legacy-hide',W.tab==='reviews');if(reviews)reviews.classList.toggle('ws-legacy-hide',W.tab!=='reviews');
    if(pane==='listings'&&!cpn&&W.tab==='coupons')native.innerHTML='<p class="muted">正在加载优惠管理…</p>';if(pane==='listings'){$$('#pane-listings > *').forEach(node=>node.classList.toggle('ws-legacy-hide',W.tab==='coupons'&&node!==cpn));if(cpn)cpn.classList.toggle('ws-legacy-hide',W.tab!=='coupons');}
    decoratePosts();
   }
-  if(pane==='listings'){setupEditors();}if(['listings','pin','carousel'].includes(pane))await window.yycjAdminListings?.reload();if(ticket!==W.loadSerial)return;if(['audit','pin','carousel','more'].includes(pane))await window.yycjAdminRefresh?.();if(ticket!==W.loadSerial)return;decoratePosts();decorateLegacy();if(pane==='users')$('#btnUserSearch')?.click();if(pane==='stats')$('#adminSide [data-pane="stats"]')?.click();
+  if(pane==='listings'){setupEditors();setupListingsChrome();}if(['listings','pin','carousel'].includes(pane))await window.yycjAdminListings?.reload();if(ticket!==W.loadSerial)return;if(['audit','pin','carousel','more'].includes(pane))await window.yycjAdminRefresh?.();if(ticket!==W.loadSerial)return;decoratePosts();decorateLegacy();if(pane==='users')$('#btnUserSearch')?.click();if(pane==='stats')$('#adminSide [data-pane="stats"]')?.click();
  }
- function setupEditors(){for(const[id,title,did]of[['proxyBox','代上架新资料','workspaceProxyDetails'],['editBox','修改已选资料（授权城市免审）','workspaceEditDetails']]){const box=$('#'+id);if(!box||box.parentElement.tagName==='DETAILS')continue;box.classList.remove('ws-legacy-hide');const details=document.createElement('details');details.id=did;details.className='ws-editor-details';const summary=document.createElement('summary');summary.textContent=title;details.append(summary);box.before(details);details.append(box);}}
+ function setupEditors(){for(const[id,title,did]of[['proxyBox','代上架新资料','workspaceProxyDetails'],['editBox','修改已选资料（授权城市免审）','workspaceEditDetails']]){const box=$('#'+id);if(!box||box.parentElement.tagName==='DETAILS')continue;box.classList.remove('ws-legacy-hide');const details=document.createElement('details');details.id=did;details.className='ws-editor-details';const summary=document.createElement('summary');summary.textContent=title;details.append(summary);box.before(details);details.append(box);}
+  const a=$('#workspaceProxyDetails'),b=$('#workspaceEditDetails');
+  if(a&&b&&!a.parentElement.classList.contains('ws-editor-row')){const row=document.createElement('div');row.className='ws-editor-row';a.before(row);row.append(a,b);}
+ }
+ function setupListingsChrome(){
+  const pane=$('#pane-listings');if(!pane||W.tab!=='listings')return;
+  let bar=$('#wsListingsToolbar');
+  if(!bar){
+   bar=document.createElement('div');bar.id='wsListingsToolbar';bar.className='ws-listings-toolbar';
+   bar.innerHTML=`<label class="ws-toolbar-field"><span>资料状态</span><select id="wsListingStatus" aria-label="资料状态"><option value="">全部状态</option>${Object.entries({active:'已上架',hidden:'已下架',pending:'待审',rejected:'已拒',gray:'灰色'}).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label><div class="ws-toolbar-search"></div>`;
+   const q=$('#listingQ'),btn=$('#btnListingSearch');
+   if(q&&btn){const row=q.closest('.row');bar.querySelector('.ws-toolbar-search').append(q,btn);if(row)row.classList.add('ws-legacy-hide');}
+   pane.prepend(bar);
+  }
+  const sel=$('#wsListingStatus');if(sel)sel.value=W.listingStatus||'';
+ }
  function decorateLegacy(){for(const table of $$('#workspaceLegacy table')){const labels=$$('thead th',table).map(x=>x.textContent.trim());for(const row of $$('tbody tr',table))$$('td',row).forEach((cell,i)=>{if(!cell.dataset.label)cell.dataset.label=labels[i]||'内容'})}if(W.page==='review'&&['listings','coupons'].includes(W.tab)){const cpn=$('#cpnAdmin');$$('#pane-listings > *').forEach(node=>node.classList.toggle('ws-legacy-hide',W.tab==='coupons'?node!==cpn:node===cpn));if(cpn&&W.tab==='coupons'&&$('#workspaceNative')?.firstChild)$('#workspaceNative').innerHTML='';}}
  function decoratePosts(){const posts=W.cache['/api/admin/posts/pending']?.items||[];for(const card of $$('#adminPosts > .card')){const id=card.querySelector('[data-admin="post-ok"]')?.dataset.id,p=posts.find(x=>x.post_id===id);if(!p)continue;const media=p.lamp_data?.edit_workflow_v2==='media';if(p.lamp_data?.edit_workflow_v2)card.querySelector('[data-admin="post-pin"]')?.classList.add('ws-legacy-hide');card.classList.toggle('ws-legacy-hide',W.page==='review'&&(W.tab==='media'?!media:W.tab==='audit'?media:W.tab==='reviews')||!!(W.queueQuery&&!card.textContent.toLowerCase().includes(W.queueQuery))); 
   if(!card.querySelector('[data-wpost]')){const b=document.createElement('button');b.type='button';b.className='btn small';b.dataset.wpost=id;b.textContent=media?'查看旧 / 新媒体与审批 →':'查看资料详情 →';card.prepend(b);}
