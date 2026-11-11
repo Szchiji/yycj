@@ -280,9 +280,12 @@ async def api_broadcast_preview(
     _: int = Depends(get_admin_user_id),
 ) -> Dict[str, Any]:
     from bot.services import bot_info
-    from bot.services.broadcast import fill_template
+    from bot.services.broadcast import fill_template, footer_text
+    from bot.services.community import safe_url
+    from bot.services.home_feed import ops_for_city
 
-    site = await home_service.get_or_create_settings()
+    raw_site = await home_service.get_or_create_settings()
+    site = raw_site
     tpl = (body.template or site.get("broadcast_template") or "").strip()
     lamp: Dict[str, Any] | None = None
     if body.lamp_id:
@@ -307,7 +310,14 @@ async def api_broadcast_preview(
     ident = await bot_info.get_bot_identity()
     name = ident.get("username") or ""
     link = "" if start_url(name, str(lamp.get("lamp_id") or ""), "s") else bot_info.bot_tme_url(name)
+    site = ops_for_city(raw_site, lamp.get("city"))
     text = fill_template(tpl, lamp, extras, link)
-    # the real post ends with these three text links (no buttons)
-    text = (text + "\n\n查看详情 · 查看评价 · 写评价").strip()
+    # Match the live channel footer (same labels / hide-if-empty / U+00A0 separator),
+    # but as plain text: the admin UI shows this via textContent, not as HTML tags.
+    location = safe_url(site.get("community_location_url")) if site.get("community_enabled", True) else ""
+    loc_label = str(site.get("link_label_location") or "").strip()[:16]
+    extra = loc_label if location and loc_label else ""
+    footer = footer_text(site, extra=extra)
+    if footer:
+        text = (text + "\n\n" + footer).strip()
     return {"ok": True, "text": text, "title": lamp.get("title"), "lamp_id": lamp.get("lamp_id")}
