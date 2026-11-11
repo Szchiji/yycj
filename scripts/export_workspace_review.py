@@ -33,11 +33,29 @@ def export(destination:Path):
  document.addEventListener('click',e=>{if(e.target.closest('a'))e.preventDefault()},true);
  const start=START;
  let tick=0;const timer=setInterval(()=>{if(++tick>120){clearInterval(timer);return}if(!window.yycjWorkspace?.ready||!document.querySelector('#workspaceView h1'))return;clearInterval(timer);
-  if(start.page!=='overview')document.querySelector('[data-work="'+start.page+'"]').click();
-  setTimeout(()=>{if(start.tab)document.querySelector('[data-wtab="'+start.tab+'"]')?.click();
-   if(start.log)setTimeout(()=>document.querySelector('[data-wlog="'+start.log+'"]')?.click(),350);
-   if(start.post)setTimeout(()=>document.querySelector('[data-wpost="'+start.post+'"]')?.click(),350);
-  },180);
+  const go=()=>{
+    const finish=()=>{
+      if(start.openMore){
+        const card=document.querySelector('[data-fill-proxy]')?.closest('.listing-card, .pick-item');
+        const more=card?.querySelector('.listing-more');
+        if(more) more.open=true;
+      }
+      if(start.focusFail){
+        const title=[...document.querySelectorAll('#adminListings .pick-item')].find(el=>el.textContent.includes('示例资料 C'));
+        title?.scrollIntoView({block:'center'});
+      }
+      document.body.dataset.workspaceReviewReady='1';
+    };
+    if(start.log)setTimeout(()=>{document.querySelector('[data-wlog="'+start.log+'"]')?.click();setTimeout(finish,200);},350);
+    else if(start.post)setTimeout(()=>{document.querySelector('[data-wpost="'+start.post+'"]')?.click();setTimeout(finish,200);},350);
+    else if(start.page==='review'&&(!start.tab||start.tab==='listings')){
+      let n=0;const w=setInterval(()=>{if(document.querySelector('#adminListings .pick-item')||++n>40){clearInterval(w);finish();}},50);
+    } else setTimeout(finish,120);
+  };
+  if(start.page!=='overview'){
+    document.querySelector('[data-work="'+start.page+'"]').click();
+    setTimeout(()=>{if(start.tab)document.querySelector('[data-wtab="'+start.tab+'"]')?.click();setTimeout(go,180);},180);
+  } else { setTimeout(go,120); }
  },100);
 })();'''.replace('FIXTURE_SOURCE',fixture).replace('METADATA',json.dumps(metadata,ensure_ascii=False)).replace('START',json.dumps(start))
         source=(ROOT/'miniapp/desk.html').read_text()
@@ -66,7 +84,11 @@ def export(destination:Path):
         return source
     starts={
       'index.html':{'page':'overview'},
+      'desktop-overview.html':{'page':'overview'},
       'desktop-review.html':{'page':'review','tab':'media','post':'post-media'},
+      'desktop-review-media.html':{'page':'review','tab':'media'},
+      'desktop-listings.html':{'page':'review','tab':'listings'},
+      'desktop-listings-more.html':{'page':'review','tab':'listings','openMore':True},
       'desktop-messages.html':{'page':'messages','tab':'approval'},
       'desktop-city.html':{'page':'settings','tab':'popup'},
       'desktop-community.html':{'page':'settings','tab':'community'},
@@ -96,8 +118,27 @@ def export(destination:Path):
 按钮预览在正式应用使用既有后台渲染器；离线包用明确标注的示例响应，不是后台集成测试。部分旧操作在本包会提示“未实现示例操作，已阻止”，正式UI仍连接原有受鉴权API。操作后刷新页面会恢复全部示例。
 ''')
     # Simple network-free launcher, separate from fixture pages whose anchors are intentionally blocked.
-    links=[('总览','index.html'),('消息与按钮 · 桌面','desktop-messages.html'),('社区配置 · 桌面','desktop-community.html'),('频道配置 · 桌面','desktop-channel.html'),('日志列表 · 桌面','desktop-logs-list.html'),('日志详情 · 桌面','desktop-logs.html'),('消息与按钮 · 390px','mobile-messages.html'),('城市弹窗 · 390px','mobile-city.html'),('社区配置 · 390px','mobile-community.html'),('日志列表 · 390px','mobile-logs-list.html'),('日志详情 · 390px','mobile-logs.html')]
-    launcher='<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>后台布局优化评审</title><style>body{background:#0b0f18;color:#dfeaff;font:16px/1.8 sans-serif;max-width:900px;margin:40px auto;padding:0 20px}a{display:block;padding:12px 16px;background:#171e2c;color:#9fc6ff;border:1px solid #293448;border-radius:8px;margin:10px 0}p{color:#98a7bd;font-size:14px}</style><h1>月影车姬 · 布局优化评审</h1><p>真实未合并HTML/CSS/JS，示例数据、内存操作、网络隔离。不是线上截图；生产未变。桌面建议1440×1000，移动页为390px容器。可直接导航六页；关闭/刷新会恢复示例。</p>'+''.join('<a href="'+url+'">'+label+'</a>' for label,url in links)+'</html>'
+    links=[
+      ('总览','index.html'),
+      ('总览 · 桌面','desktop-overview.html'),
+      ('审核与上架 · 上架资料','desktop-listings.html'),
+      ('上架资料 · 更多展开','desktop-listings-more.html'),
+      ('媒体审核队列','desktop-review-media.html'),
+      ('媒体审核抽屉','desktop-review.html'),
+      ('消息与按钮 · 桌面','desktop-messages.html'),
+      ('社区配置 · 桌面','desktop-community.html'),
+      ('频道配置 · 桌面','desktop-channel.html'),
+      ('进入弹窗 · 桌面','desktop-city.html'),
+      ('日志列表 · 桌面','desktop-logs-list.html'),
+      ('日志详情 · 桌面','desktop-logs.html'),
+      ('系统与权限 · 桌面','desktop-permissions.html'),
+      ('消息与按钮 · 390px iframe','mobile-messages.html'),
+      ('城市弹窗 · 390px iframe','mobile-city.html'),
+      ('社区配置 · 390px iframe','mobile-community.html'),
+      ('日志列表 · 390px iframe','mobile-logs-list.html'),
+      ('日志详情 · 390px iframe','mobile-logs.html'),
+    ]
+    launcher='<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>后台整体布局评审</title><style>body{background:#0b0f18;color:#dfeaff;font:16px/1.8 sans-serif;max-width:900px;margin:40px auto;padding:0 20px}a{display:block;padding:12px 16px;background:#171e2c;color:#9fc6ff;border:1px solid #293448;border-radius:8px;margin:10px 0}p{color:#98a7bd;font-size:14px}</style><h1>月影车姬 · 整体管理后台布局评审</h1><p>真实未合并HTML/CSS/JS，示例数据、内存操作、网络隔离。不是线上截图；生产未变。桌面建议1280×900，手机直接把同一HTML缩到390×844（不必用iframe页）。可直接导航六页；关闭/刷新会恢复示例。</p>'+''.join('<a href="'+url+'">'+label+'</a>' for label,url in links)+'</html>'
     (destination/'review-index.html').write_text(launcher)
     archive=destination.parent/(destination.name+'.zip')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
