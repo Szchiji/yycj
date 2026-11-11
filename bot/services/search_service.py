@@ -6,7 +6,7 @@ from html import escape as _h
 import math
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import String, and_, cast, func, or_, select
@@ -52,6 +52,7 @@ def _lamp_to_dict(lamp: Lamp) -> Dict[str, Any]:
         "authenticity_score": lamp.authenticity_score,
         "credit_boost": lamp.credit_boost,
         "status": lamp.status,
+        "expires_at": lamp.expires_at,
         "created_at": lamp.created_at,
         "updated_at": lamp.updated_at,
     }
@@ -143,10 +144,31 @@ def district_variants(key: str) -> List[str]:
     return [k, k + "区"] if k else []
 
 
-async def district_counts(city: str | None) -> Dict[str, Any]:
+def is_public_listing(lamp: Dict[str, Any]) -> bool:
+    """Public eligibility, separate from shop open/rest/wait/closed/unset state."""
+    if not lamp or lamp.get("status") != LampStatus.ACTIVE.value:
+        return False
+    exp = lamp.get("expires_at")
+    if exp is None:
+        return True
+    if isinstance(exp, str):
+        try:
+            exp = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    if not isinstance(exp, datetime):
+        return False
+    if exp.tzinfo:
+        exp = exp.astimezone(timezone.utc).replace(tzinfo=None)
+    return exp > datetime.utcnow()
+
+
+async def district_counts(city: str | None, *, public_only: bool = False) -> Dict[str, Any]:
     """Active listings per district in a city (one GROUP BY)."""
     async with session_scope() as s:
         conds = [Lamp.status == LampStatus.ACTIVE.value]
+        if public_only:
+            conds.append(or_(Lamp.expires_at.is_(None), Lamp.expires_at > datetime.utcnow()))
         if city:
             conds.append(Lamp.city == city)
         rows = (await s.execute(
@@ -156,7 +178,7 @@ async def district_counts(city: str | None) -> Dict[str, Any]:
     groups: Dict[str, int] = {}
     for name, n in rows:
         total += int(n)
-        k = district_key(name)
+        k = district_key(name) or ("__missing__" if public_only else "")
         if k:
             groups[k] = groups.get(k, 0) + int(n)
     items = sorted(({"key": k, "count": n} for k, n in groups.items()), key=lambda x: (-x["count"], x["key"]))
@@ -167,6 +189,8 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
     by_reviews = sort == "reviews"
     async with session_scope() as s:
         conditions = [Lamp.status == LampStatus.ACTIVE.value]
+        if getattr(flt, "public_only", False):
+            conditions.append(or_(Lamp.expires_at.is_(None), Lamp.expires_at > datetime.utcnow()))
         if flt is not None:
             # 价格档: strict (面议 / no number is not in any band); 标签: any of the picked tags
             lo, hi = flt.band
@@ -179,7 +203,9 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
                 conditions.append(Lamp.tags.overlap(tag_variants(flt.tags)))
         if city:
             conditions.append(Lamp.city == city)
-        if district and district_variants(district):
+        if district == "__missing__":
+            conditions.append(or_(Lamp.district.is_(None), func.trim(Lamp.district) == ""))
+        elif district and district_variants(district):
             conditions.append(func.trim(Lamp.district).in_(district_variants(district)))
         if price_min is not None:
             conditions.append(or_(Lamp.price.is_(None), Lamp.price >= price_min))

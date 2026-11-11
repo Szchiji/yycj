@@ -32,18 +32,30 @@
     dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sq) * Math.PI); dLng = (dLng * 180.0) / (a / sq * Math.cos(rad) * Math.PI);
     return [lat + dLat, lng + dLng];
   }
-  function locate() {
+  function locate(signal) {
     return new Promise((res) => {
-      const done = (la, ln) => res(wgs2gcj(+la, +ln)), fail = () => res(null);
+      let settled = false;
+      const finish = p => { if (settled) return; settled = true; clearTimeout(timer); signal?.removeEventListener("abort", fail); res(p); };
+      const fail = () => finish(null), timer = setTimeout(fail, 8000);
+      if (signal?.aborted) { fail(); return; }
+      signal?.addEventListener("abort", fail, { once: true });
+      const done = (la, ln) => {
+        if (settled) return;
+        if (la == null || ln == null || !Number.isFinite(+la) || !Number.isFinite(+ln) || Math.abs(+la)>90 || Math.abs(+ln)>180) { fail(); return; }
+        finish(wgs2gcj(+la, +ln));
+      };
       try {
         const tg = window.Telegram && window.Telegram.WebApp;
-        if (tg && tg.LocationManager && tg.LocationManager.getLocation) {
-          tg.LocationManager.init(() => { try { tg.LocationManager.getLocation((l) => (l && l.latitude != null ? done(l.latitude, l.longitude) : fail())); } catch (e) { fail(); } });
+        if (tg?.LocationManager?.init && tg.LocationManager.getLocation) {
+          tg.LocationManager.init(() => {
+            if (settled) return;
+            try { tg.LocationManager.getLocation((l) => l ? done(l.latitude, l.longitude) : fail()); } catch (e) { fail(); }
+          });
           return;
         }
-      } catch (e) {}
-      if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
-      else fail();
+        if (navigator.geolocation) navigator.geolocation.getCurrentPosition((p) => done(p.coords.latitude, p.coords.longitude), fail, { enableHighAccuracy: false, timeout: 8000 });
+        else fail();
+      } catch (e) { fail(); }
     });
   }
   let leaflet = null;
@@ -51,8 +63,15 @@
     if (window.L && window.L.map) return Promise.resolve(window.L);
     if (leaflet) return leaflet;
     leaflet = new Promise((res, rej) => {
-      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "./vendor/leaflet/leaflet.css?v=" + V; document.head.appendChild(css);
-      const s = document.createElement("script"); s.src = "./vendor/leaflet/leaflet.js?v=" + V; s.onload = () => res(window.L); s.onerror = () => { leaflet = null; rej(new Error("地图加载失败")); };
+      let settled = false;
+      const s = document.createElement("script"); s.src = "./vendor/leaflet/leaflet.js?v=" + V;
+      const finish = error => {
+        if (settled) return; settled = true; clearTimeout(timer); s.onload = s.onerror = null;
+        if (error) { s.remove(); leaflet = null; rej(new Error("地图加载失败")); } else res(window.L);
+      };
+      const timer = setTimeout(() => finish(true), 8000);
+      if (!document.querySelector('link[data-yycj-leaflet]')) { const css = document.createElement("link"); css.dataset.yycjLeaflet = "1"; css.rel = "stylesheet"; css.href = "./vendor/leaflet/leaflet.css?v=" + V; document.head.appendChild(css); }
+      s.onload = () => finish(!window.L?.map); s.onerror = () => finish(true);
       document.head.appendChild(s);
     });
     return leaflet;
@@ -102,11 +121,12 @@
     }
     setTimeout(() => pick.map.invalidateSize(), 60);
     return new Promise((res) => {
+      let closed = false, locCtl = null;
       const onClick = async (ev) => {
         const b = ev.target.closest && ev.target.closest("[data-pp]"); if (!b) return;
         const k = b.getAttribute("data-pp");
-        if (k === "me") { b.disabled = true; const p = await locate(); b.disabled = false; if (p) pick.map.setView(p, 15); else toast("定位失败，请手动拖动地图"); return; }
-        sheet.removeEventListener("click", onClick); sheet.classList.add("hidden");
+        if (k === "me") { if (b.disabled) return; b.disabled = true; locCtl = new AbortController(); const p = await locate(locCtl.signal); if (closed) return; b.disabled = false; if (p) pick.map.setView(p, 15); else toast("定位失败，请手动拖动地图"); return; }
+        closed = true; locCtl?.abort(); sheet.querySelector('[data-pp="me"]').disabled = false; sheet.removeEventListener("click", onClick); sheet.classList.add("hidden");
         if (k === "ok") { const c = pick.map.getCenter(); res({ lat: +c.lat.toFixed(5), lng: +c.lng.toFixed(5) }); }
         else res(k === "clear" ? "clear" : null);
       };

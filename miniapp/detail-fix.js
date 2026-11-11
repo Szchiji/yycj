@@ -10,6 +10,8 @@
     window.__yycjLampFetch = true;
     const rawFetch = window.fetch.bind(window);
     const memo = new Map();
+    window.__yycjDropLampCache=id=>{for(const key of memo.keys())if(key.startsWith(String(id)+'|'))memo.delete(key);};
+    const serve=(p,init)=>{const out=p.then(r=>r.clone()),sig=init?.signal;if(!sig)return out;if(sig.aborted)return Promise.reject(new DOMException('Aborted','AbortError'));return new Promise((res,rej)=>{const abort=()=>rej(new DOMException('Aborted','AbortError'));sig.addEventListener('abort',abort,{once:true});out.then(r=>{sig.removeEventListener('abort',abort);res(r)},e=>{sig.removeEventListener('abort',abort);rej(e)});});};
     const RE = /^(?:https?:\/\/[^/]+)?\/api\/lamps\/([^/?#]+)(\?[^#]*)?$/;
     window.fetch = function (input, init) {
       try {
@@ -24,11 +26,11 @@
           const key = id + "|" + q + "|" + auth;
           let e = memo.get(key);
           if (!e && !q) memo.forEach((x, k) => { if (!e && k.startsWith(id + "|") && k.endsWith("|" + auth)) e = x; });
-          if (e) return e.p.then((r) => r.clone());
+          if (e) return serve(e.p,init);
           const ent = { p: rawFetch(input, init), t: now, done: false };
           memo.set(key, ent);
           ent.p.then((r) => { ent.done = true; ent.t = Date.now(); if (!r.ok) memo.delete(key); }, () => memo.delete(key));
-          return ent.p.then((r) => r.clone());
+          return serve(ent.p,init);
         }
       } catch (e) {}
       return rawFetch(input, init);
@@ -399,8 +401,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     if (tg && tg.onEvent) tg.onEvent("backButtonClicked", closeViewer);
   } catch (e) {}
   window.addEventListener("popstate", closeViewer);
+  let gallerySequence=0;
   async function paint(id) {
-    if (!id) return;
+    if (!id) return;const my=++gallerySequence;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
     try {
@@ -408,7 +411,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
         headers: { Authorization: "Bearer " + token() },
         cache: "no-store",
       });
+      if (!r.ok) return;
       const data = await r.json();
+      if (my!==gallerySequence || !box || box.getAttribute("data-lamp") !== String(id) || document.getElementById("view-detail")?.classList.contains("hidden")) return;
       const cache = window.__yycjLampCache;
       delete cache[id];
       cache[id] = data;

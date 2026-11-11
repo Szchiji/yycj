@@ -28,10 +28,10 @@ def test_preview_serves_actual_html_and_bundle_with_separate_bootstrap(server):
     with urlopen(server + "/app/go.html?preview=home") as r:
         html = r.read().decode()
         assert '<script src="/preview-fixtures.js"></script>' in html
-        assert 'id="hubHomeEntry"' in html and 'app.bundle.js?v=20261111f' in html
+        assert 'id="hubHomeEntry"' in html and 'app.bundle.js?v=20261111k' in html
         assert 'src="./telegram-web-app.js' not in html
         assert "connect-src 'self'" in r.headers["Content-Security-Policy"]
-    with urlopen(server + "/app/app.bundle.js?v=20261111f") as r:
+    with urlopen(server + "/app/app.bundle.js?v=20261111k") as r:
         assert r.read() == (ROOT / "miniapp/app.bundle.js").read_bytes()
     # Production HTML is unchanged by preview injection and has no preview bootstrap.
     assert "preview-fixtures" not in (ROOT / "miniapp/go.html").read_text()

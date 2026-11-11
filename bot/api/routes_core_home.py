@@ -105,6 +105,7 @@ async def api_home(
     lng: Optional[float] = None,
     price: Optional[str] = Query(default=None, max_length=16),
     tags: Optional[str] = Query(default=None, max_length=160),
+    service: Optional[str] = Query(default=None, pattern="^(all|open|rest)$"),
     open_now: int = Query(default=0, ge=0, le=1, alias="open"),
     radius: Optional[float] = Query(default=None, ge=0, le=50),
     at: Optional[str] = Query(default=None, max_length=32),
@@ -117,9 +118,16 @@ async def api_home(
 ) -> Dict[str, Any]:
     base_settings = await home_service.get_or_create_settings()
     enabled = list(base_settings.get("enabled_cities") or [])
+    strict_public = bool(map_results or service is not None)
+    if open_now and service not in (None, "open"):
+        raise HTTPException(status_code=400, detail="服务状态条件冲突，请重新选择")
+    if strict_public and city and city not in enabled:
+        raise HTTPException(status_code=400, detail="城市未开放，请重新选择")
     use_city = city if city else (enabled[0] if enabled else None)
     if use_city and enabled and use_city not in enabled:
         use_city = enabled[0] if enabled else None
+    if strict_public and not use_city:
+        raise HTTPException(status_code=400, detail="请先选择已开放城市")
     # Per-city overrides (后台 → 站点设置 → 城市); unset keys keep the site-wide value.
     from bot.services.home_feed import ops_for_city
     settings = ops_for_city(base_settings, use_city)
@@ -131,7 +139,20 @@ async def api_home(
         limit, offset = 600, 0
 
     area_key = search_service.district_key(district) if district else ""
-    from bot.services.feed_filters import Filter, distance_label
+    from bot.services.feed_filters import CENTERS, Filter, distance_label
+    known_regions = {search_service.district_key(k) for k in CENTERS.get(use_city, {})} | {"__missing__"}
+    region_counts = None
+    if strict_public:
+        try:
+            region_counts = await search_service.district_counts(use_city, public_only=True)
+            if isinstance(region_counts, dict):
+                known_regions.update(x["key"] for x in region_counts.get("items", []))
+        except Exception:
+            logger.exception("public region options failed")
+            if area_key and area_key not in known_regions:
+                raise HTTPException(status_code=503, detail="地区选项暂时无法加载，请重试") from None
+        if area_key and area_key not in known_regions:
+            raise HTTPException(status_code=400, detail="地区不属于当前城市，请重新选择")
     # 价格档 / 标签 / 营业中 / 距离: the same rules for the feed and the carousel.
     near_src = "gps" if (lat is not None and lng is not None) else ""
     if not near_src and at:
@@ -153,7 +174,7 @@ async def api_home(
     except Exception:
         logger.exception("load place failed")
     flt = Filter(price=price, tags=tags, open_only=bool(open_now), lat=lat, lng=lng, radius=radius, sort=sort,
-                 exact_center=near_src != "at")
+                 exact_center=near_src != "at", service=service, public_only=strict_public)
     sort = flt.sort
     coupons_on = bool(settings.get("coupons_enabled", True))
     if coupon and coupons_on:
@@ -167,10 +188,12 @@ async def api_home(
         for p in pins_raw:
             try:
                 lamp = await _with_shop(p.get("lamp") or {})
+                if strict_public and not search_service.is_public_listing(lamp):
+                    continue
                 if use_city and lamp.get("city") and lamp.get("city") != use_city:
                     continue
                 # 地区筛选同时作用于轮播；该区没有轮播时前端自动隐藏轮播
-                if area_key and search_service.district_key(lamp.get("district")) != area_key:
+                if area_key and (search_service.district_key(lamp.get("district")) or "__missing__") != area_key:
                     continue
                 if not flt.match_sql_side(lamp) or not flt.match_python_side(lamp):
                     continue
@@ -227,6 +250,10 @@ async def api_home(
             items = pinned + fresh
     except Exception:
         logger.exception("home search failed")
+        # Map search must not disguise a failed query as an empty viewport.
+        # Preserve the historical list-mode contract; no internal error detail leaks.
+        if map_results:
+            raise HTTPException(status_code=503, detail="地图资料暂时无法加载，请重试") from None
         items = []
 
     announcement = None
@@ -260,8 +287,8 @@ async def api_home(
             logger.exception("coupon badges failed")
 
     # 地区筛选：当前城市各区在架数（仅首屏返回）。轮播不受筛选影响。
-    districts = None
-    if offset == 0:
+    districts = region_counts
+    if offset == 0 and districts is None:
         try:
             districts = await search_service.district_counts(use_city)
         except Exception:
@@ -286,7 +313,9 @@ async def api_home(
         "district": search_service.district_key(district) if district else "",
         "sort": sort,
         "districts": districts,
-        "filters": {"price": price or "", "tags": flt.tags, "open": int(flt.open_only),
+        "map_filter_options": {"districts": [{"key": k, "label": "未标注地区" if k == "__missing__" else k} for k in sorted(known_regions)], "services": ["all", "open", "rest"]} if strict_public else None,
+        "map_scanned_count": scanned_count if map_results else None,
+        "filters": {"service": flt.service, "price": price or "", "tags": flt.tags, "open": int(flt.open_only),
                     "radius": flt.radius, "near": bool(flt.center), "active": flt.active_count(area_key),
                     "near_src": near_src if flt.center else "", "has_place": has_place},
         "count": len(safe_items),
@@ -397,7 +426,7 @@ async def api_lamp_detail(
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
     lamp = await search_service.get_lamp(lamp_id)
-    if not lamp or lamp.get("status") != "active":
+    if not search_service.is_public_listing(lamp):
         raise HTTPException(status_code=404, detail="资料不存在或未上架")
     lamp = search_service.attach_fuzzy_distance(lamp, lat, lng)
     lamp.pop("_distance_km", None)
