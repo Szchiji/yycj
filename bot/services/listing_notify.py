@@ -10,7 +10,7 @@ from aiogram.types import InputMediaPhoto, InputMediaVideo
 
 from bot.config import get_settings
 from bot.keyboards import admin_post_kb
-from bot.services import credit_service, home_service
+from bot.services import home_service, users
 from bot.services.media_urls import is_http
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def _role_label(role: str) -> str:
 async def notify_admins_new_post(post_id: str, user_id: int, lamp_data: Dict[str, Any]) -> None:
     from bot.main import bot
 
-    u = await credit_service.ensure_user(user_id)
+    u = await users.ensure_user(user_id)
     uname = u.get("username") or "-"
     nick = u.get("full_name") or "-"
     role = _role_label(lamp_data.get("publisher_role") or u.get("role") or "")

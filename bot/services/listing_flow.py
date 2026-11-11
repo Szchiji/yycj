@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from bot.db import session_scope
 from bot.models import Lamp, LampStatus, Post, PostStatus, UserRole
-from bot.services import credit_service, listing_ops, search_service
+from bot.services import listing_ops, search_service, users
 from bot.services.media_urls import enrich_media
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ async def proxy_publish(
     approx_label: Optional[str] = None,
     publisher_role: str = UserRole.TEACHER.value,
 ) -> Dict[str, Any]:
-    await credit_service.ensure_user(target_user_id)
+    await users.ensure_user(target_user_id)
     media_list = list(media or [])
     photo_list = list(photos or [])
     if not media_list and not photo_list:

@@ -32,9 +32,6 @@ MENU_TEXTS = {
     # report
     "📝 月影报告",
     "📝 报告",
-    # credit / reputation
-    "🌸 兰花信用",
-    "🌸 口碑",
     # help
     "❓ 帮助",
     # homepage webapp button variants
@@ -169,8 +166,7 @@ async def end_session_cb(cb: CallbackQuery, bot: Bot) -> None:
         return
     data = await session_service.end_session(sid, settle=True)
     await cb.answer("会话已结束")
-    delta = (data or {}).get("settle_delta", 0)
-    text = f"🔚 会话已结束。\n本次口碑分变动：<code>{delta:+d}</code>"
+    text = "🔚 会话已结束。"
     if cb.message:
         await cb.message.answer(text, reply_markup=remove_kb())
     if data and cb.from_user:
@@ -187,12 +183,12 @@ async def praise_session(cb: CallbackQuery) -> None:
         return
     sid = cb.data.split(":", 1)[1]
     sess = await session_service.get_session(sid)
-    # Only the guest side (requester, user_a) may praise; the host can't boost their own score.
+    # Only the guest side (requester, user_a) may send a simple thank-you.
     if not sess or sess.get("user_a_id") != cb.from_user.id:
         await cb.answer("只有客人一方可以好评", show_alert=True)
         return
     await session_service.mark_praise(sid)
-    await cb.answer("已记录好评，结束时结算加成")
+    await cb.answer("已记录好评")
 
 
 @router.message(ActiveSessionFilter(), F.text | F.photo | F.video | F.document | F.voice | F.sticker)

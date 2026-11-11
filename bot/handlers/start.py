@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.config import get_settings
 from bot.keyboards import admin_webapp_kb, remove_kb, welcome_kb
-from bot.services import credit_service, home_service
+from bot.services import home_service, users
 from bot.services.share_gate import join_kb, missing_required, open_card_kb, parse_start_payload
 
 router = Router(name="start")
@@ -39,7 +39,7 @@ async def cmd_start(message: Message, command: CommandObject | None = None) -> N
     user = message.from_user
     if not user:
         return
-    await credit_service.ensure_user(
+    await users.ensure_user(
         user.id,
         username=user.username,
         full_name=user.full_name,

@@ -43,7 +43,7 @@
 
   // ---------- what "back" means right now ----------
   function sheetOpen() {
-    for (const id of ["guideSheet", "rulesSheet", "citySheet"]) {
+    for (const id of ["guideSheet", "citySheet"]) {
       const s = document.getElementById(id);
       if (s && shown(s) && getComputedStyle(s).display !== "none") return s;
     }
@@ -59,6 +59,17 @@
     if (shown(area) && shown(home)) return { move: [area], run: () => (window.__yycjCloseArea ? window.__yycjCloseArea() : area.classList.add("hidden")) };
     const drop = $("#cityDrop");
     if (shown(drop)) return { move: [drop], run: () => drop.classList.add("hidden") };
+    if (window.__yycjMapOverlayOpen && window.__yycjMapOverlayOpen()) {
+      const cho = $("#hubMapChooser");
+      const sel = $("#hubMapSelection");
+      const filt = $("#mapFullFilterPanel");
+      const layer = (cho && shown(cho) && cho) || (sel && shown(sel) && sel) || (filt && shown(filt) && filt) || $("#view-map");
+      return { move: [layer], run: () => window.__yycjCloseMapOverlays && window.__yycjCloseMapOverlays() };
+    }
+    if (window.__yycjMapFullOpen && window.__yycjMapFullOpen()) {
+      const page = $("#view-map");
+      return page ? { page, run: () => window.__yycjCloseMap && window.__yycjCloseMap() } : { move: [$("#app")], run: () => window.__yycjCloseMap && window.__yycjCloseMap() };
+    }
     if (shown(review)) return { page: review, bars: ["#revTop"], run: click("#revTop .xt-back") };
     if (shown(detail)) return { page: detail, bars: ["#xhsTop"], run: () => { const b = $("#xhsTop .xt-back") || $("#btnBackHome"); if (b) b.click(); } };
     const pub = $("#view-publish");
@@ -215,7 +226,7 @@ html.swb-drag,html.swb-drag body{overscroll-behavior:none;}`;
   }
   // overlays (sheets, 地区 panel, city list, photo viewer) also change whether back exists
   const omo = new MutationObserver(() => syncListeners());
-  ["guideSheet", "rulesSheet", "citySheet", "areaPanel", "cityDrop"].forEach((id) => {
+  ["guideSheet", "citySheet", "areaPanel", "cityDrop", "view-map", "app"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) omo.observe(el, { attributes: true, attributeFilter: ["class"] });
   });

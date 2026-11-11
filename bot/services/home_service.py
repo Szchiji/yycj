@@ -19,16 +19,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_CITIES = ["深圳", "广州", "东莞", "佛山", "珠海", "惠州"]
 SETTINGS_KEY = "default"
 
-SCORING_RULES = {
-    "title": "口碑分说明",
-    "items": [
-        "口碑分综合展示资料完整度、互动质量与过往评价。",
-        "基础分约 80；审核通过与优质互动可缓慢提升。",
-        "有效举报成立会下调；恶意举报会被扣分。",
-        "评价经管理员审核后才会展示，刷评将被拒绝。",
-        "分数仅供参考，请自行判断并理性沟通。",
-    ],
-}
+# 资料侧评价统计（条数/星级），与已停用的用户兰花信用无关。
+# 既有 authenticity_score / credit_boost 列仍可能存在于资料行，但不再作为对外评分展示。
 
 
 def _settings_to_dict(row: SiteSettings) -> Dict[str, Any]:
@@ -348,7 +340,7 @@ async def reputation_for_lamp(lamp_id: str) -> Dict[str, Any]:
     else:
         score = base
         avg = None
-    return {"score": max(0, min(100, score)), "base": base, "review_count": len(reviews), "avg_stars": round(avg, 2) if avg is not None else None, "rules": SCORING_RULES}
+    return {"score": max(0, min(100, score)), "base": base, "review_count": len(reviews), "avg_stars": round(avg, 2) if avg is not None else None}
 
 
 async def seed_demo_if_empty() -> Dict[str, Any]:

@@ -56,7 +56,7 @@ def test_notification_disabled_skips_before_identity_or_bot_send(monkeypatch):
 def test_welcome_overall_switch_does_not_send_or_remove_admin_entry(monkeypatch):
     from bot.handlers import start
     from bot.services import execution_log
-    monkeypatch.setattr(start.credit_service,'ensure_user',AsyncMock())
+    monkeypatch.setattr(start.users,'ensure_user',AsyncMock())
     monkeypatch.setattr(start,'_force_join',AsyncMock(return_value=False))
     monkeypatch.setattr(start.home_service,'get_or_create_settings',AsyncMock(return_value=merge_ops({'bot_welcome_enabled':False})))
     monkeypatch.setattr(start,'get_settings',lambda:SimpleNamespace(normalized_webapp_url='https://app.test/app',is_admin=lambda _:False))

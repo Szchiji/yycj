@@ -12,7 +12,6 @@ from sqlalchemy import delete, func, or_, select, update
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import Session, SessionMessage, SessionStatus
-from bot.services import credit_service
 
 logger = logging.getLogger(__name__)
 
@@ -267,56 +266,18 @@ async def end_session(session_id: str, settle: bool = True) -> Optional[Dict[str
         row = res.scalar_one_or_none()
         if not row or row.status == SessionStatus.ENDED.value:
             return None
-        was_active = row.status == SessionStatus.ACTIVE.value
         row.status = SessionStatus.ENDED.value
         row.ended_at = datetime.utcnow()
         hours = get_settings().message_retention_hours
         row.messages_purge_at = row.ended_at + timedelta(hours=hours)
         data = _to_dict(row)
 
-    if settle and was_active:
-        created = data.get("created_at") or datetime.utcnow()
-        ended = data.get("ended_at") or datetime.utcnow()
-        duration = max(0.0, (ended - created).total_seconds() / 60.0)
-        bal = await reply_balance_for_session(session_id)
-        q = credit_service.compute_heuristic_q(
-            message_count=int(data.get("message_count") or 0),
-            media_count=int(data.get("media_count") or 0),
-            duration_minutes=duration,
-            reply_balance=bal,
-        )
-        async with session_scope() as s:
-            res = await s.execute(select(Session).where(Session.session_id == session_id))
-            row = res.scalar_one_or_none()
-            if row:
-                row.quality_score = q
-        delta = credit_service.calc_session_delta(
-            message_count=int(data.get("message_count") or 0),
-            media_count=int(data.get("media_count") or 0),
-            duration_minutes=duration,
-            has_praise=bool(data.get("has_praise")),
-            reported=bool(data.get("reported")),
-            reply_balance=bal,
-            quality_score=q,
-        )
-        for uid in (data["user_a_id"], data["user_b_id"]):
-            await credit_service.settle_lanhua(
-                uid,
-                delta,
-                action="session_end",
-                reason=f"会话结算 ({data['session_id'][:8]})",
-                related_id=data["session_id"],
-            )
-        data["settle_delta"] = delta
-        data["quality_score"] = q
-        data["reply_balance"] = bal
-    else:
-        data["settle_delta"] = 0
+    data["settle_delta"] = 0
     return data
 
 
 async def expire_old_sessions() -> int:
-    """超时结束：先查出 id，再走 end_session 统一收尾与结算。"""
+    """超时结束：先查出 id，再走 end_session 统一收尾。"""
     now = datetime.utcnow()
     async with session_scope() as s:
         res = await s.execute(

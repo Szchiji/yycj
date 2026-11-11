@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from bot.config import get_settings
 from bot.db import session_scope
-from bot.services import credit_service
+from bot.services import users
 
 logger = logging.getLogger(__name__)
 LOCK_DAYS = 7
@@ -53,7 +53,7 @@ async def set_user_role(user_id: int, role: str) -> Dict[str, Any]:
     allowed = {UserRole.TEACHER.value, UserRole.GUEST.value, UserRole.MERCHANT.value}
     if role not in allowed:
         raise ValueError("请选择客人 / 老师 / 商家")
-    await credit_service.ensure_user(user_id)
+    await users.ensure_user(user_id)
     admin = get_settings().is_admin(user_id)
     now = datetime.utcnow()
     async with session_scope() as s:
@@ -76,7 +76,7 @@ async def set_user_role(user_id: int, role: str) -> Dict[str, Any]:
             ),
             {"r": role, "t": now, "u2": now + timedelta(days=LOCK_DAYS), "u": user_id},
         )
-    user = await credit_service.get_user(user_id) or await credit_service.ensure_user(user_id)
+    user = await users.get_user(user_id) or await users.ensure_user(user_id)
     user["role"] = role
     user["role_set_at"] = now
     user["role_locked_until"] = now + timedelta(days=LOCK_DAYS)
@@ -90,13 +90,13 @@ async def unlock_role(user_id: int) -> Dict[str, Any]:
             text("UPDATE users SET role_locked_until = NULL WHERE user_id = :u"),
             {"u": user_id},
         )
-    user = await credit_service.get_user(user_id) or await credit_service.ensure_user(user_id)
+    user = await users.get_user(user_id) or await users.ensure_user(user_id)
     user["role_locked_until"] = None
     return user
 
 
-_orig_ensure = credit_service.ensure_user
-_orig_get = credit_service.get_user
+_orig_ensure = users.ensure_user
+_orig_get = users.get_user
 
 
 async def ensure_user(user_id: int, username: str | None = None, full_name: str | None = None):
@@ -109,6 +109,6 @@ async def get_user(user_id: int):
     return await attach_lock(user)
 
 
-credit_service.set_user_role = set_user_role  # type: ignore[assignment]
-credit_service.ensure_user = ensure_user  # type: ignore[assignment]
-credit_service.get_user = get_user  # type: ignore[assignment]
+users.set_user_role = set_user_role  # type: ignore[assignment]
+users.ensure_user = ensure_user  # type: ignore[assignment]
+users.get_user = get_user  # type: ignore[assignment]

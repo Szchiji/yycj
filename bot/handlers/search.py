@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup, default_state
 from aiogram.types import CallbackQuery, Message
 
 from bot.keyboards import lamp_actions_kb, search_filters_kb
-from bot.services import anti_brush, credit_service, search_service, session_service
+from bot.services import anti_brush, search_service, session_service, users
 
 router = Router(name="search")
 
@@ -22,8 +22,6 @@ MENU_TEXTS = {
     "✨ 发布",
     "📝 月影报告",
     "📝 报告",
-    "🌸 兰花信用",
-    "🌸 口碑",
     "❓ 帮助",
     "📱 打开首页",
     "📱 打开月影 Mini App",
@@ -163,5 +161,5 @@ async def search_query(message: Message, state: FSMContext) -> None:
 async def quick_search(message: Message, state: FSMContext) -> None:
     user = message.from_user
     if user:
-        await credit_service.ensure_user(user.id, username=user.username, full_name=user.full_name)
+        await users.ensure_user(user.id, username=user.username, full_name=user.full_name)
     await _run_search(message, (message.text or "").strip())

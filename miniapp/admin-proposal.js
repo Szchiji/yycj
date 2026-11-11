@@ -102,15 +102,15 @@
       lbar(it, { sig: "pin", danger: b, main: null, more: [] });
       if (acts && !acts.children.length) acts.remove();
     });
-    // 用户: 正常 → 拉黑 | 更多(解除拉黑, 解锁角色) 填入遮蔽 ; 已拉黑 → 更多(填入遮蔽, 解锁角色, 拉黑) 解除拉黑
+    // 用户: 正常 → 拉黑 | 更多(解除拉黑, 解锁角色) ; 已拉黑 → 更多(解锁角色, 拉黑) 解除拉黑
     $$("#adminUsers > .pick-item").forEach((it) => {
-      const ban = it.querySelector('[data-ban="1"]'), unban = it.querySelector('[data-ban="0"]'), fill = it.querySelector("[data-fill-shadow]"), unlock = it.querySelector("[data-unlock-role]");
+      const ban = it.querySelector('[data-ban="1"]'), unban = it.querySelector('[data-ban="0"]'), unlock = it.querySelector("[data-unlock-role]");
       if (!ban && !unban) return;
       const banned = /已拉黑/.test(it.querySelector(".muted")?.textContent || "");
       const row = it.querySelector(":scope > .row");
       const spec = banned
-        ? { sig: "U1" + (unlock ? "r" : ""), danger: null, main: unban, more: [fill, unlock, ban] }
-        : { sig: "U0" + (unlock ? "r" : ""), danger: ban, main: fill, more: [unban, unlock] };
+        ? { sig: "U1" + (unlock ? "r" : ""), danger: null, main: unban, more: [unlock, ban] }
+        : { sig: "U0" + (unlock ? "r" : ""), danger: ban, main: null, more: [unlock] };
       spec.more = spec.more.filter(Boolean);
       lbar(it, spec);
       if (row && !row.children.length) row.remove();

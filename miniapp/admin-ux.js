@@ -99,12 +99,11 @@
   if (listBox) new MutationObserver(() => polishListings()).observe(listBox, { childList: true, subtree: true });
   setTimeout(polishListings, 1500);
   document.addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("[data-list='unlist'], [data-list='delete'], [data-admin='post-no'], #btnShadowOn");
+    const btn = ev.target.closest("[data-list='unlist'], [data-list='delete'], [data-admin='post-no']");
     if (!btn || btn.dataset.confirmed === "1") return;
     ev.preventDefault(); ev.stopPropagation();
     let msg = "确定下架这份资料？";
-    if (btn.id === "btnShadowOn") msg = "确定遮蔽该用户？";
-    else if (btn.getAttribute("data-admin") === "post-no") msg = "确定拒绝这份投稿？";
+    if (btn.getAttribute("data-admin") === "post-no") msg = "确定拒绝这份投稿？";
     else if (btn.getAttribute("data-list") === "delete") {
       const t = btn.getAttribute("data-title") || "这份资料";
       msg = "确定永久删除「" + t + "」？删掉后不能恢复，只是想藏起来请用「下架」。";

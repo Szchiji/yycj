@@ -76,11 +76,10 @@
   }
 
   async function refresh() {
-    const [posts, reviews, reports, shadow, home] = await Promise.all([
+    const [posts, reviews, reports, home] = await Promise.all([
       api("/api/admin/posts/pending"),
       api("/api/admin/reviews/pending"),
       api("/api/admin/reports/pending"),
-      api("/api/admin/shadow"),
       api("/api/admin/homepage"),
     ]);
 
@@ -144,12 +143,6 @@
         </div>
       </div>
     `).join("") || "<p class='muted'>无待审举报</p>";
-
-    $("#adminShadow").innerHTML = (shadow.items || []).map((u) => `
-      <div class="card"><strong>${u.user_id}</strong> · ${escapeHtml(u.tier || "")}
-        <div class="muted">${u.lanhua_score} · ${u.shadow_days || 0} 天 · ${escapeHtml(u.shadow_reason || "")}</div>
-      </div>
-    `).join("") || "<p class='muted'>无遮蔽用户</p>";
 
     const settings = home.settings || {};
     if ($("#annText")) $("#annText").value = settings.announcement_text || "";
@@ -246,21 +239,6 @@
       const data = await api("/api/admin/seed-demo", { method: "POST", body: "{}" });
       toast(data.seeded ? "演示数据已填充" : (data.reason || "未种子"));
       await refresh();
-    } catch (e) { toast(e.message || String(e), true); }
-  });
-
-  $("#adjForm")?.addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    try {
-      const data = await api("/api/admin/credit/adjust", {
-        method: "POST",
-        body: JSON.stringify({
-          user_id: parseInt($("#adjUser").value, 10),
-          delta: parseInt($("#adjDelta").value, 10),
-          note: ($("#adjNote").value || "").trim(),
-        }),
-      });
-      toast(`已调整 → ${data.user.lanhua_score}`);
     } catch (e) { toast(e.message || String(e), true); }
   });
 

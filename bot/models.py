@@ -91,6 +91,7 @@ class User(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    # Compatibility remnants of the retired orchid-credit system. Kept in schema; unused by app logic.
     lanhua_score: Mapped[int] = mapped_column(Integer, default=100)
     tier: Mapped[str] = mapped_column(String(16), default=CreditTier.NEW.value)
     shadow_days: Mapped[int] = mapped_column(Integer, default=0)
@@ -135,6 +136,7 @@ class Lamp(Base):
     feed_pin_order: Mapped[int] = mapped_column(Integer, default=0)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
     unlist_reason: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # Compatibility remnants: no longer displayed or used as user-credit / 口碑分.
     authenticity_score: Mapped[int] = mapped_column(Integer, default=80)
     credit_boost: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default=LampStatus.PENDING.value, index=True)
@@ -217,6 +219,7 @@ class Report(Base):
 
 
 class CreditHistory(Base):
+    # Compatibility remnant of the retired orchid-credit ledger. Table retained; app no longer writes new rows.
     __tablename__ = "credit_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

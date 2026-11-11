@@ -12,7 +12,7 @@ from bot.api.deps import get_current_user_id
 from bot.config import get_settings
 from bot.db import session_scope
 from bot.models import Post, PostStatus, Report, ReportStatus, UserRole
-from bot.services import anti_brush, credit_service, home_service, search_service
+from bot.services import anti_brush, home_service, search_service, users
 from bot.api.routes_core import (
     router,
     PostCreateBody as _PostCreateBody,
@@ -49,9 +49,7 @@ async def api_create_post(
     body: PostCreateBody,
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    u = await credit_service.ensure_user(user_id)
-    if u.get("is_shadowed"):
-        raise HTTPException(status_code=403, detail="月影遮蔽中，暂时无法发布")
+    u = await users.ensure_user(user_id)
     role = u.get("role")
     if role not in (UserRole.TEACHER.value, UserRole.MERCHANT.value):
         raise HTTPException(status_code=403, detail="仅老师或商家可发布，请先在「我的」切换身份")
@@ -173,7 +171,7 @@ async def api_create_review(
     body: ReviewCreateBody,
     user_id: int = Depends(get_current_user_id),
 ) -> Dict[str, Any]:
-    u = await credit_service.ensure_user(user_id)
+    u = await users.ensure_user(user_id)
     if u.get("role") and u.get("role") != UserRole.GUEST.value:
         raise HTTPException(status_code=403, detail="评价需以客人身份提交")
     lamp = await search_service.get_lamp(body.lamp_id)

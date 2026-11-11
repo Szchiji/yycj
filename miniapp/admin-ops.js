@@ -82,26 +82,6 @@
     } catch (e) { alert(e.message || String(e)); }
   });
 
-  async function setShadow(userId, shadowed) {
-    await api("/api/admin/users/shadow", {
-      method: "POST",
-      body: JSON.stringify({
-        user_id: parseInt(userId, 10),
-        shadowed,
-        days: parseInt($("#shadowDays")?.value, 10) || 7,
-        reason: $("#shadowReason")?.value || "",
-      }),
-    });
-  }
-  $("#btnShadowOn")?.addEventListener("click", async () => {
-    try { await setShadow($("#shadowUid")?.value, true); alert("已设置遮蔽"); document.getElementById("btnRefresh")?.click(); }
-    catch (e) { alert(e.message || String(e)); }
-  });
-  $("#btnShadowOff")?.addEventListener("click", async () => {
-    try { await setShadow($("#shadowUid")?.value, false); alert("已解除遮蔽"); document.getElementById("btnRefresh")?.click(); }
-    catch (e) { alert(e.message || String(e)); }
-  });
-
   function listingActions(x) {
     const id = esc(x.lamp_id);
     const on = x.status === "active";
@@ -221,23 +201,17 @@
         <div class="pick-item">
           <div class="meta">
             <div><strong>${u.user_id}</strong> @${esc(u.username || "-")} · ${esc(u.full_name || "")}</div>
-            <div class="muted">${zhRole(u.role)} · 口碑 ${u.lanhua_score} · ${u.is_banned ? "已拉黑" : "正常"}${u.is_shadowed ? " · 遮蔽" + (u.shadow_days || 0) + "天" : ""}</div>
+            <div class="muted">${zhRole(u.role)} · ${u.is_banned ? "已拉黑" : "正常"}</div>
           </div>
           <div class="row">
             <button class="btn danger" data-ban="1" data-id="${u.user_id}">拉黑</button>
             <button class="btn" data-ban="0" data-id="${u.user_id}">解除拉黑</button>
-            <button class="btn" data-fill-shadow="${u.user_id}">填入遮蔽</button>
           </div>
         </div>`).join("") || "<p class='muted'>无结果</p>";
     }
   }
   $("#btnUserSearch")?.addEventListener("click", () => renderUsers().catch((e) => alert(e.message || e)));
   $("#adminUsers")?.addEventListener("click", async (ev) => {
-    const fill = ev.target.closest("[data-fill-shadow]");
-    if (fill) {
-      if ($("#shadowUid")) $("#shadowUid").value = fill.getAttribute("data-fill-shadow");
-      return;
-    }
     const btn = ev.target.closest("[data-ban]");
     if (!btn) return;
     try {
