@@ -18,6 +18,7 @@ from bot.db import session_scope
 from bot.models import Lamp
 from bot.models_extra import Coupon
 
+from bot.services import execution_trace as delivery
 logger = logging.getLogger(__name__)
 
 _END_WORD = {"ended": "已结束", "stopped": "已结束", "expired": "已结束", "sold_out": "已领完 · 已结束"}
@@ -99,56 +100,69 @@ async def _bot_name() -> str:
         return ""
 
 
+@delivery.traced("coupon_push","publish",source="business")
 async def publish(coupon_id: str) -> Optional[int]:
     """Post a new coupon to its city's channel (if 优惠推送 is on). Returns the message id."""
     from bot.services import home_service
     from bot.services.home_feed import feature_chat, ops_for_city
     async with session_scope() as s:
         c, items = await _batch(s, coupon_id)
+        if c:
+            await delivery.current().identify(city=c.city,listing_id=c.lamp_id,target='coupon:'+str(c.coupon_id))
         if not c or c.post_mid:
+            delivery.current().mark("skipped","already_processed" if c else "no_data")
             return None
         lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
         site = ops_for_city(await home_service.get_or_create_settings(), c.city)
+        await delivery.current().revision(site.get("config_revision"))
         if not site.get("broadcast_coupons", True):
+            delivery.current().mark("skipped","disabled")
             return None
         chat = feature_chat(site, "broadcast_coupons")
         if not chat:
+            delivery.current().mark("not_configured","not_configured")
             return None
         raw = site.get("link_label_detail", "查看详情")
         detail = str(raw if raw is not None else "查看详情").strip()[:16]
         text = render(items, lamp, await _bot_name(), detail_label=detail)
         try:
             from bot.main import bot
-            msg = await bot.send_message(chat, text, disable_web_page_preview=True)
-        except Exception:
-            logger.exception("coupon post failed (%s)", chat)
+            msg = await delivery.current().call(lambda:bot.send_message(chat,text,disable_web_page_preview=True),"create",send=True)
+        except Exception as exc:
+            logger.warning("coupon post failed (city=%s, kind=%s)",c.city,type(exc).__name__)
             return None
         c.post_chat, c.post_mid, c.post_closed = chat, int(getattr(msg, "message_id", 0) or 0) or None, False
         return c.post_mid
 
 
+@delivery.traced("coupon_push","close",source="business")
 async def close(coupon_id: str, reason: str = "ended") -> bool:
     """Edit the batch's channel post to 「已结束」 and drop the links. Idempotent. Any item id works."""
     async with session_scope() as s:
         c, items = await _batch(s, coupon_id)
+        if c:
+            await delivery.current().identify(city=c.city,listing_id=c.lamp_id,target='coupon:'+str(c.coupon_id))
         if not c or not c.post_mid or c.post_closed:
             return False
         lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
         text = render(items, lamp, "", closed=_END_WORD.get(reason, "已结束"))
         try:
             from bot.main import bot
-            await bot.edit_message_text(text, chat_id=c.post_chat, message_id=int(c.post_mid), disable_web_page_preview=True)
+            await delivery.current().call(lambda:bot.edit_message_text(text,chat_id=c.post_chat,message_id=int(c.post_mid),disable_web_page_preview=True),"close_existing")
         except Exception as exc:
             if "not modified" not in str(exc).lower():
-                logger.warning("coupon post close failed: %s", str(exc)[:200])
+                logger.warning("coupon post close failed: %s", type(exc).__name__)
         c.post_closed = True
         return True
 
 
+@delivery.traced("coupon_push","refresh",source="business")
 async def refresh(coupon_id: str) -> bool:
     """One item ran out but the batch is still open: re-render the post so that item shows 「已领完」."""
     async with session_scope() as s:
         c, items = await _batch(s, coupon_id)
+        if c:
+            await delivery.current().identify(city=c.city,listing_id=c.lamp_id,target='coupon:'+str(c.coupon_id))
         if not c or not c.post_mid or c.post_closed:
             return False
         lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
@@ -156,19 +170,22 @@ async def refresh(coupon_id: str) -> bool:
         chat, mid = c.post_chat, int(c.post_mid)
     try:
         from bot.main import bot
-        await bot.edit_message_text(text, chat_id=chat, message_id=mid, disable_web_page_preview=True)
+        await delivery.current().call(lambda:bot.edit_message_text(text,chat_id=chat,message_id=mid,disable_web_page_preview=True),"edit_existing")
     except Exception as exc:
         if "not modified" not in str(exc).lower():
-            logger.warning("coupon post refresh failed: %s", str(exc)[:200])
+            logger.warning("coupon post refresh failed: %s", type(exc).__name__)
         return False
     return True
 
 
+@delivery.traced("coupon_push","label_sync",source="label_sync")
 async def sync_edit(coupon_id: str) -> str:
     """Re-render an open coupon post for link-label sync. Returns updated/missing/gone/retry/skip."""
     from bot.services.label_sync import classify_edit_error, retry_after_sec
     async with session_scope() as s:
         c, items = await _batch(s, coupon_id)
+        if c:
+            await delivery.current().identify(city=c.city,listing_id=c.lamp_id,target='coupon:'+str(c.coupon_id))
         if not c or not c.post_mid or c.post_closed:
             return "skip"
         lamp = (await s.execute(select(Lamp).where(Lamp.lamp_id == c.lamp_id))).scalar_one_or_none()
@@ -176,7 +193,7 @@ async def sync_edit(coupon_id: str) -> str:
         chat, mid = c.post_chat, int(c.post_mid)
     try:
         from bot.main import bot
-        await bot.edit_message_text(text, chat_id=chat, message_id=mid, disable_web_page_preview=True)
+        await delivery.current().call(lambda:bot.edit_message_text(text,chat_id=chat,message_id=mid,disable_web_page_preview=True),"edit_existing")
         return "updated"
     except Exception as exc:
         kind = classify_edit_error(exc)
@@ -187,13 +204,14 @@ async def sync_edit(coupon_id: str) -> str:
             await asyncio.sleep(min(35, retry_after_sec(exc)))
             try:
                 from bot.main import bot
-                await bot.edit_message_text(text, chat_id=chat, message_id=mid, disable_web_page_preview=True)
+                await delivery.current().call(lambda:bot.edit_message_text(text,chat_id=chat,message_id=mid,disable_web_page_preview=True),"edit_existing")
                 return "updated"
             except Exception as exc2:
                 return classify_edit_error(exc2)
         return kind
 
 
+@delivery.origin("scheduled")
 async def job_close_due() -> int:
     """Every 10 min: close posts whose coupon expired / ended / was stopped / sold out."""
     now = datetime.utcnow()

@@ -103,6 +103,7 @@
   });
 
   function renderListingCards(items) {
+    const status=window.yycjWorkspace?.listingStatus;if(status)items=(items||[]).filter(x=>x.status===status);
     const box = $("#adminListings");
     if (!box) return;
     box.innerHTML = (items || []).map((x) => `
@@ -113,7 +114,8 @@
         </div>
         ${window.__yycjEditUI?.html(x.edit_state,"admin")||""}
         <div class="row">
-          <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期30天</button>
+          <button class="btn" data-fill-proxy="${esc(x.lamp_id)}">修改资料</button>
+          <button class="btn" data-list="renew" data-id="${esc(x.lamp_id)}">续期…</button>
           <button class="btn" data-list="relist" data-id="${esc(x.lamp_id)}">重新上架</button>
           <button class="btn danger" data-list="unlist" data-id="${esc(x.lamp_id)}">下架</button>
           <button class="btn danger" data-list="delete" data-id="${esc(x.lamp_id)}" data-title="${esc(x.title || "")}">删除</button>
@@ -133,17 +135,22 @@
         <button class="btn primary" data-pick="${action}" data-id="${esc(x.lamp_id)}">${action === "pin" ? "置顶" : "上轮播"}</button>
       </div>`).join("") || "<p class='muted'>无匹配</p>";
   }
+  const workspaceScope=()=>window.yycjWorkspace?window.yycjWorkspace.mode+":"+window.yycjWorkspace.city:"legacy";
   async function loadListings() {
+    const scope=workspaceScope();
     try {
       const listed = await api("/api/admin/listings");
-      listingCache = listed.items || [];
+      if(scope!==workspaceScope())return;
+      listingCache = listed.items || [];window.__yycjListings=listingCache;
       renderListingCards(listingCache);
       renderPick("#feedPinResults", listingCache.filter((x) => x.status === "active"), "pin");
       renderPick("#pinResults", listingCache.filter((x) => x.status === "active"), "carousel");
     } catch (e) {
+      if(scope!==workspaceScope())return;
       if ($("#adminListings")) $("#adminListings").innerHTML = "<p class='muted'>列表加载失败</p>";
     }
   }
+  window.yycjAdminListings={reload:loadListings,clear(){listingCache=[];window.__yycjListings=[];for(const id of ["adminListings","feedPinResults","pinResults"]){const box=document.getElementById(id);if(box)box.innerHTML='<p class="muted">正在读取当前范围…</p>';}}};
   $("#btnListingSearch")?.addEventListener("click", () => {
     renderListingCards(listingCache.filter((x) => matchQ(x, ($("#listingQ")?.value || "").trim())));
   });

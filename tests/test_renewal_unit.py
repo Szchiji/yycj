@@ -149,5 +149,5 @@ def test_production_preview_is_unreachable_and_versions_menu_are_consistent():
         text=Path("miniapp",page).read_text()
         assert "preview-fixtures" not in text and "LOCAL_PREVIEW" not in text
     desk=Path("miniapp/desk.html").read_text()
-    for asset,version in (("admin.js","20261110g"),("admin-city.js","20261110h"),("admin-ops.js","20261110g"),("admin-list.js","20261110f")):
+    for asset,version in (("admin.js","20261111a"),("workspace.js","20261111a"),("workspace.css","20261111a"),("admin-ops.js","20261111a"),("admin-proxy.js","20261111a"),("admin-buttons.js","20261111a"),("admin-coupons.js","20261111a"),("admin-list.js","20261110f")):
         assert f"{asset}?v={version}" in desk

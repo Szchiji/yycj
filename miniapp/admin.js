@@ -264,6 +264,7 @@
     } catch (e) { toast(e.message || String(e), true); }
   });
 
+  window.yycjAdminRefresh=refresh;
   $("#btnRefresh")?.addEventListener("click", async () => {
     try { await refresh(); toast("已刷新"); }
     catch (e) { toast(e.message || String(e), true); }

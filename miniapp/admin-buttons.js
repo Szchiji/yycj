@@ -28,9 +28,9 @@
     try{
      const r=await fetch('/api/admin/buttons/preview',{method:'POST',headers:{Authorization:'Bearer '+(localStorage.getItem('yycj_token')||''),'Content-Type':'application/json'},body:JSON.stringify({context:opt.context,city:opt.city||null,items:welcome?items():[],config:welcome?null:(value||opt.inherited||{mode:'default',items:[]}),...(opt.getFlags?.()||{})})});
      const d=await r.json();if(current!==seq || !box.isConnected)return;
-     const target=box.querySelector('.message-button-preview');if(!target)return;
+     const target=opt.previewTarget||box.querySelector('.message-button-preview');if(!target)return;
      target.innerHTML=r.ok?`<b>示例预览（与实际发送同一渲染器）</b>${(d.rows||[]).map(row=>`<div>${row.map(b=>`<span>${esc(b.label)}${b.type==='webapp'?' ↗':''}</span>`).join('')}</div>`).join('')||'<p>不附按钮</p>'}`:'<p>预览不可用，请检查权限与按钮配置</p>';
-    }catch{const target=box.querySelector('.message-button-preview');if(target)target.textContent='预览暂不可用，不影响当前已保存配置';}
+    }catch{const target=opt.previewTarget||box.querySelector('.message-button-preview');if(target)target.textContent='预览暂不可用，不影响当前已保存配置';}
    },220);
   }
   box.oninput=e=>{const row=e.target.closest('[data-brow]');if(row && e.target.dataset.bkey){const item=items()[+row.dataset.brow],key=e.target.dataset.bkey;item[key]=e.target.type==='checkbox'?e.target.checked:e.target.value;changed();}};

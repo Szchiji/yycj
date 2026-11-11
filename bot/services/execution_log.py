@@ -10,6 +10,8 @@ from bot.db import session_scope
 from bot.models import ExecutionRecord
 log=logging.getLogger(__name__)
 REASONS={
+ 'already_processed':'已有引用 / 已处理，未新增发送',
+ 'no_data':'没有可处理内容，未发送',
  'config_unavailable':'配置暂不可读取，未发送；不会绕过关闭开关',
  'disabled':'功能开关已关闭，按设置跳过', 'telegram_forbidden':'机器人无权限或收件人已屏蔽',
  'telegram_bad_request':'Telegram明确拒绝请求，请检查目标/媒体/按钮配置',
@@ -36,17 +38,17 @@ def safe(value,n=64):
  return value
 
 
-async def begin(feature,step,*,city=None,listing_id=None,operation_id=None,actor_id=None,revision=None,target=None,retry_kind=None):
+async def begin(feature,step,*,city=None,listing_id=None,operation_id=None,actor_id=None,revision=None,target=None,retry_kind=None,source=None):
  key=str(uuid.uuid4())
  try:
   async with session_scope() as s:
    s.add(ExecutionRecord(record_id=key,feature=safe(feature,32) or 'operation',step=safe(step,24) or 'execute',
      city=str(city)[:32] if city else None,listing_id=safe(listing_id),operation_id=safe(operation_id),
-     actor_id=int(actor_id) if actor_id is not None else None,config_revision=int(revision) if revision is not None else None,
+     source=safe(source,32),actor_id=int(actor_id) if actor_id is not None else None,config_revision=int(revision) if revision is not None else None,
      target_ref=safe(target,80),retry_kind=safe(retry_kind,24),status='running',reason_code='running'))
   return key
- except Exception:
-  log.exception('execution metadata persistence failed')
+ except Exception as exc:
+  log.warning('execution metadata persistence failed (%s)',type(exc).__name__)
   return None
 
 
@@ -55,7 +57,7 @@ async def finish(key,status,code=None):
  try:
   async with session_scope() as s:
    await s.execute(update(ExecutionRecord).where(ExecutionRecord.record_id==key).values(status=safe(status,24) or 'unknown',reason_code=code if code in REASONS else None,finished_at=datetime.utcnow()))
- except Exception:log.exception('execution metadata finish failed')
+ except Exception as exc:log.warning('execution metadata finish failed (%s)',type(exc).__name__)
 
 
 async def event(feature,step,status,code=None,**kwargs):

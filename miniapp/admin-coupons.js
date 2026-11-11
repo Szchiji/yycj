@@ -48,5 +48,6 @@
     if (ev.target.id === "cpnAll") { all = ev.target.checked; load(); return; }
     if (ev.target.closest && ev.target.closest('#adminSide [data-pane="listings"], #cityBar [data-city]')) setTimeout(load, 500);
   });
+  document.addEventListener('workspace:scope',load);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => setTimeout(load, 1500)); else setTimeout(load, 1500);
 })();

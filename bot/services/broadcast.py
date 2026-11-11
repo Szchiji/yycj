@@ -386,15 +386,22 @@ async def mark_unlist(lamp_id: str, *, reason: str = "") -> None:
         logger.exception("mark unlist on channel failed lamp=%s", str(lamp_id)[:8])
 
 
+from bot.services import execution_trace as delivery
+
+@delivery.traced("featured_review","publish",source="review_approval")
 async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Optional[str]:
     """Optional 精选评价 post (ops setting broadcast_reviews, default off). Failures are logged only."""
+    from bot.services import execution_trace as delivery
     from bot.services.home_feed import ops_for_city
     site = ops_for_city(await home_service.get_or_create_settings(), lamp.get("city"))
+    await delivery.current().identify(city=lamp.get("city"),listing_id=lamp.get("lamp_id"),revision=site.get("config_revision"),target="channel")
     if not site.get("broadcast_reviews"):
+        delivery.current().mark("skipped","disabled")
         return None
     from bot.services.home_feed import feature_chat
     chat = feature_chat(site, "broadcast_reviews")
     if not chat:
+        delivery.current().mark("not_configured","not_configured")
         return None
     from bot.services import bot_info
     ident = await bot_info.get_bot_identity()
@@ -411,7 +418,7 @@ async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Opti
     from bot.main import bot
     try:
         # text only: the public photo upload is gone and 约课凭证 never leave the admins
-        msg = await bot.send_message(chat, body, disable_web_page_preview=True)
+        msg = await delivery.current().call(lambda:bot.send_message(chat,body,disable_web_page_preview=True),"create",send=True)
         mid = getattr(msg, "message_id", None)
         if mid and review.get("review_id"):
             try:
@@ -424,9 +431,10 @@ async def broadcast_review(review: Dict[str, Any], lamp: Dict[str, Any]) -> Opti
                         row.post_chat = str(chat)
                         row.post_mid = int(mid)
                         await s.flush()
-            except Exception:
-                logger.exception("remember review post failed")
+            except Exception as exc:
+                delivery.current().mark("unknown","delivery_unknown")
+                logger.warning("remember review post failed (%s)",type(exc).__name__)
         return album_link(chat, int(mid)) if mid else None
-    except Exception:
-        logger.exception("broadcast review failed")
+    except Exception as exc:
+        logger.warning("broadcast review failed (%s)",type(exc).__name__)
         return None

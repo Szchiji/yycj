@@ -95,6 +95,24 @@ async def update_city_overrides(city: str, changes: Dict[str, Any], *, actor_id=
         return _settings_to_dict(row)
 
 
+async def patch_city_announcement(city: str, changes: Dict[str, Any], *, actor_id=None) -> Dict[str, Any]:
+    """Workbench-only partial patch, under the existing settings lock. Preserve legacy fallback:
+    disabled/empty city announcements never hide the global announcement. No guest-rule change.
+    """
+    async with session_scope() as s:
+        row=(await s.execute(select(SiteSettings).where(SiteSettings.key==SETTINGS_KEY).with_for_update())).scalar_one_or_none()
+        if not row:
+            row=SiteSettings(key=SETTINGS_KEY);s.add(row);await s.flush()
+        ops=dict(row.ops_config or {});allc=dict(ops.get('city_announcements') or {});old=dict(allc.get(city) or {})
+        text=str(changes.get('announcement_text',old.get('text','')) or '')[:2000]
+        enabled=bool(changes.get('announcement_enabled',old.get('enabled',False)))
+        if text.strip():allc[city]={'text':text,'enabled':enabled}
+        else:allc.pop(city,None)
+        ops['city_announcements']=allc;row.ops_config=home_feed.merge_ops(ops)
+        row.config_revision=(row.config_revision or 0)+1;row.updated_by=actor_id;row.updated_at=datetime.utcnow()
+        await s.flush();return _settings_to_dict(row)
+
+
 async def update_settings(
     *,
     announcement_text: Optional[str] = None,
