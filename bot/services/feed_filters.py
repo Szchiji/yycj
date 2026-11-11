@@ -221,12 +221,14 @@ def round_center(lat: Optional[float], lng: Optional[float]) -> Optional[Tuple[f
 class Filter:
     def __init__(self, *, price: Optional[str] = None, tags: Optional[str] = None, open_only: bool = False,
                  lat: Optional[float] = None, lng: Optional[float] = None, radius: Optional[float] = None,
-                 sort: str = "new", exact_center: bool = True) -> None:
+                 sort: str = "new", exact_center: bool = True, service: Optional[str] = None, public_only: bool = False) -> None:
         self.band = parse_band(price)
         self.coupon_ids = None  # set of lamp_ids with a live coupon when 「有优惠」 is on
         self.exact_center = bool(exact_center)  # False when the centre is a picked 区
         self.tags = parse_tags(tags)
-        self.open_only = bool(open_only)
+        self.service = service if service in ("all", "open", "rest") else ("open" if open_only else "all")
+        self.open_only = self.service == "open"
+        self.public_only = bool(public_only)
         self.center = round_center(lat, lng)
         r = None
         try:
@@ -245,10 +247,10 @@ class Filter:
     @property
     def needs_python(self) -> bool:
         """营业中 / 距离 are computed per listing, not in SQL."""
-        return self.open_only or self.radius is not None or self.sort == "near" or self.coupon_ids is not None
+        return self.service != "all" or self.radius is not None or self.sort == "near" or self.coupon_ids is not None
 
     def active_count(self, district: Optional[str] = None) -> int:
-        return sum([bool(district), self.has_price, bool(self.tags), self.open_only, self.radius is not None,
+        return sum([bool(district), self.has_price, bool(self.tags), self.service != "all", self.radius is not None,
                     self.coupon_ids is not None])
 
     def match_sql_side(self, lamp: Dict[str, Any]) -> bool:
@@ -282,7 +284,7 @@ class Filter:
 
     def match_python_side(self, lamp: Dict[str, Any]) -> bool:
         """营业中 / 半径. `lamp` already went through _with_shop (open_code)."""
-        if self.open_only and lamp.get("open_code") != "open":
+        if self.service != "all" and lamp.get("open_code") != self.service:
             return False
         if self.coupon_ids is not None and lamp.get("lamp_id") not in self.coupon_ids:
             return False

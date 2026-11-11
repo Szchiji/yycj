@@ -95,7 +95,7 @@ try {
   const fresh = (e, ttl) => e && !e.dead && (e.ok === undefined || Date.now() - e.t < ttl);
   function homeKey(u) {
     const q = u.searchParams;
-    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
+    return ["city", "q", "district", "sort", "offset", "limit", "lat", "lng", "at", "radius", "price", "tags", "open", "service", "map_results", "coupon", "place"].map((k) => k + "=" + (q.get(k) || (k === "offset" ? "0" : ""))).join("&");
   }
   // home-ui.js exposes the URL of its current first page; a meta caller with nothing to reuse
   // asks for exactly that page so the feed load right after it is served from the same request.
@@ -131,6 +131,8 @@ try {
         if (u.pathname === "/api/home") {
           stats.home += 1;
           const q = u.searchParams;
+          // Explicit map searches need fresh, cancellable transport, never a list/meta cache hit.
+          if(q.get("map_results") === "1") return raw(input, init);
           const city = q.get("city") || "";
           const lim = q.get("limit") || "";
           const meta = (lim === "1" || lim === "30") && !q.get("q") && !q.get("offset");
@@ -139,6 +141,7 @@ try {
           let hit = null;
           for (let i = homes.length - 1; i >= 0 && !hit; i -= 1) {
             const e = homes[i];
+            if (e.auth !== auth) continue;
             if (e.key === key && fresh(e, FEED_TTL)) hit = e;
             else if (meta && fresh(e, META_TTL) && (!city || e.city === city || (lim === "1" && !city))) hit = e;
           }
@@ -151,7 +154,7 @@ try {
           }
           // The feed is the same for every user, so a 200 answered with an older token is fine
           // to share; a failed request is never reused.
-          const e = track({ key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
+          const e = track({ auth, key: tkey, city: new URL(target, location.origin).searchParams.get("city") || city, t: Date.now(), p: raw(target, { headers: { Authorization: auth } }) });
           homes.push(e);
           if (homes.length > 12) homes.shift();
           return serve(e, init);
@@ -238,6 +241,7 @@ try {
     if (b && dead.has(b)) { const cur = getTok(); if (cur && cur !== b) opts = withTok(opts, cur); }
     let res = null, err = null, timeouts = 0;
     for (let k = 0; k < (isLamp ? 3 : 1); k += 1) {
+      if(init?.signal?.aborted)throw new DOMException("Aborted", "AbortError");
       if (timeouts >= 2) break;
       if (k) await sleep(k === 1 ? 500 : 1500);
       let o = opts, timer = 0;
@@ -246,7 +250,7 @@ try {
         timer = setTimeout(() => { timeouts += 1; ctl.abort(); }, 6000);
         o = Object.assign({}, opts || {}, { signal: ctl.signal });
       }
-      try { res = await raw(input, o); err = null; } catch (e) { res = null; err = e; } finally { clearTimeout(timer); }
+      try { res = await raw(input, o); err = null; } catch (e) { if(init?.signal?.aborted)throw e;res = null; err = e; } finally { clearTimeout(timer); }
       if (res && res.status === 401) {
         const sentTok = bearerOf(o);
         if (sentTok) dead.add(sentTok);
@@ -327,7 +331,7 @@ try {
   }
   function setFilt(patch) {
     const o = Object.assign({}, getFilt(), patch || {});
-    ["price", "tags", "open", "radius", "at", "lat", "lng", "np", "cpn"].forEach((k) => { if (!o[k]) delete o[k]; });
+    ["price", "tags", "service", "open", "radius", "at", "lat", "lng", "np", "cpn"].forEach((k) => { if (!o[k]) delete o[k]; });
     try {
       if (Object.keys(o).length) sessionStorage.setItem(filtKey(), JSON.stringify(o));
       else sessionStorage.removeItem(filtKey());
@@ -339,7 +343,7 @@ try {
   let appliedSig = null;
   function activeFiltCount() {
     const f = getFilt();
-    return [getArea(), f.price, f.tags, f.open, f.radius, f.cpn].filter(Boolean).length;
+    return [getArea(), f.price, f.tags, f.service && f.service!=="all" ? f.service : f.open, f.radius, f.cpn].filter(Boolean).length;
   }
   let lastFacets = null, facetsCity = "", qTimer = 0, locBusy = false, hasPlace = false;
   // 常用位置 (我的) is the default centre: the server applies it when no lat/lng/区 is sent; np=1 turns it off for this session
@@ -348,7 +352,7 @@ try {
   function cacheKey(city, qq) {
     const f = getFilt();
     return "yycj_hc_" + (city || "") + "_" + (qq || "") + "_" + getArea() + "_" + getSort()
-      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "") + "_" + (f.np || "") + "_" + (f.cpn || "");
+      + "_" + (f.price || "") + "_" + (f.tags || "") + "_" + (f.service || f.open || "") + "_" + (f.radius || "") + "_" + (f.at || "") + "_" + (f.np || "") + "_" + (f.cpn || "");
   }
   function readCache(city, qq) {
     try {
@@ -386,8 +390,8 @@ try {
   }
   window.__yycjPauseUi = pauseMedia;
   window.__yycjResumeUi = resumeWork;
-  async function api(path) {
-    const ctl = new AbortController();
+  async function api(path, controller) {
+    const ctl = controller || new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
     try {
       const r = await fetch(path, { headers: { Authorization: "Bearer " + token() }, signal: ctl.signal });
@@ -482,6 +486,7 @@ try {
   }
   function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
+    mapOptions=data.map_filter_options||null;mapOptionsCity=data.city||curCity();
     if (data.city) localStorage.setItem("yycj_city", data.city);
     fillCities(data.enabled_cities || cities, data.city || localStorage.getItem("yycj_city") || "");
     carouselMs = Math.max(3000, Math.min(12000, Number(data.carousel_interval_sec || 4) * 1000));
@@ -501,9 +506,23 @@ try {
       ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
     }
   }
-  let loadSequence = 0;
+  let loadSequence = 0, loadCtl = null, mapBusy = false, mapDirty = false, mapOptions = null, mapOptionsCity = "";
+  function cancelLoad(){if(!loadCtl)return;loadCtl.abort();loadCtl=null;++loadSequence;mapBusy=false;window.dispatchEvent(new CustomEvent('yycj:map-cancel'));paintMapFilters();}
+  function markMapDirty(){if(!window.__yycjMapMode)return;if(!mapDirty){cancelLoad();mapDirty=true;window.dispatchEvent(new CustomEvent('yycj:map-pending'));}paintMapFilters();}
+  function paintMapFilters(){
+    const el=$('#hubMapFilters');if(!el)return;el.classList.toggle('hidden',!window.__yycjMapMode);const f=getFilt(),service=f.service||(f.open?'open':'all'),area=getArea();
+    const opts=mapOptionsCity===curCity()&&mapOptions?.districts?mapOptions.districts:(lastAreas?.items||[]).map(x=>({key:x.key,label:x.key}));
+    const list=[{key:'',label:'全部地区'},...opts];if(area&&!list.some(x=>x.key===area))list.push({key:area,label:area==='__missing__'?'未标注地区':area});
+    el.innerHTML='<label><span class="sr-only">行政地区</span><select aria-label="行政地区" data-map-region>'+list.map(x=>'<option value="'+esc(x.key)+'"'+(x.key===area?' selected':'')+'>'+esc(x.label)+'</option>').join('')+'</select></label><label><span class="sr-only">服务状态</span><select aria-label="服务状态" data-map-service>'+[['all','全部状态'],['open','营业中'],['rest','休息中']].map(([key,label])=>'<option value="'+key+'"'+(service===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label><button type="button" class="btn" data-map-filter-apply'+(mapBusy?' disabled':'')+'>'+(mapBusy?'搜索中…':'查看结果')+'</button>'+(mapDirty?'<p role="status">筛选已改 · 点击查看结果后更新</p>':'');
+  }
+  window.__yycjMapFilters={paint:paintMapFilters,signature:()=>JSON.stringify([q,filtSig()]),get:()=>({city:curCity(),district:getArea(),service:getFilt().service||(getFilt().open?'open':'all'),pending:mapDirty}),set:patch=>{if(patch.district!==undefined)setArea(patch.district);if(patch.service!==undefined)setFilt({service:patch.service,open:patch.service==='open'?'1':''});markMapDirty();paintArea();},apply:()=>{q=($('#homeQ')?.value||'').trim();appliedSig=null;toggleArea(false);return window.__yycjLoadHome();}};
+  window.__yycjCancelHome=cancelLoad;
+  window.addEventListener('yycj:home-data',ev=>{if(ev.detail.city&&ev.detail.city!==curCity())return;mapOptions=ev.detail.map_filter_options||null;mapOptionsCity=curCity();cities=ev.detail.enabled_cities||cities;fillCities(cities,curCity());if(ev.detail.districts)lastAreas=ev.detail.districts;mapDirty=false;mapBusy=false;paintMapFilters();});
+  window.addEventListener('yycj:map-loading',()=>{mapDirty=false;mapBusy=true;paintMapFilters();});
+  window.addEventListener('yycj:map-error',()=>{mapBusy=false;paintMapFilters();});
   async function loadFeed(reset, options = {}) {
-    if (!token() || document.hidden) return;
+    if (!token() || document.hidden || !homeVisible()) return;
+    cancelLoad();const ctl=new AbortController();loadCtl=ctl;mapDirty=false;mapBusy=true;paintMapFilters();
     const seq = ++loadSequence, mapMode = !!window.__yycjMapMode;
     paused = false;
     arm();
@@ -526,7 +545,7 @@ try {
       const f = getFilt();
       if (f.price) params.set("price", f.price);
       if (f.tags) params.set("tags", f.tags);
-      if (f.open) params.set("open", "1");
+      params.set("service", f.service || (f.open ? "open" : "all"));
       if (f.cpn) params.set("coupon", "1");
       if (f.radius) params.set("radius", String(f.radius));
       if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
@@ -534,17 +553,18 @@ try {
       if (f.np) params.set("place", "0");
       if(window.__yycjMapMode) params.set("map_results", "1");
       appliedSig = filtSig();
-      const data = await api("/api/home?" + params.toString());
+      const data = await api("/api/home?" + params.toString(), ctl);
       if(seq !== loadSequence || mapMode !== !!window.__yycjMapMode || city !== curCity() || requestSig !== filtSig()) return;
       applyData(data, reset, mapRequest);
       window.dispatchEvent(new CustomEvent("yycj:entry-announcement", {detail:data.popup_announcement}));
       if(!window.__yycjMapMode) writeCache(data.city || city, q, data);
     } catch (e) {
+      if(ctl.signal.aborted)return;
       if(seq!==loadSequence || mapMode!==!!window.__yycjMapMode || requestCity!==curCity() || requestSig!==filtSig())return;
       if(mapMode){window.dispatchEvent(new CustomEvent("yycj:map-error",{detail:{...mapRequest,message:e.message}}));return;}
       const feed = $("#feed");
       if (feed && !feed.querySelector("[data-id]")) feed.innerHTML = "<p class='muted'>加载失败，点底栏首页重试</p>";
-    }
+    } finally {if(seq===loadSequence){loadCtl=null;mapBusy=false;paintMapFilters();}}
   }
   function areaLabel(k) { return k.length <= 3 ? k : k.slice(0, 2) + "…"; }
   function paintArea() {
@@ -563,6 +583,8 @@ try {
       btn.classList.toggle("long", true);
       btn.setAttribute("aria-label", "筛选" + (nAct ? "，已选" + nAct + "项" : ""));
     }
+    if(window.__yycjMapMode&&appliedSig!==null&&appliedSig!==filtSig())markMapDirty();
+    paintMapFilters();
     const panel = $("#areaPanel");
     if (!panel || panel.classList.contains("hidden")) return;
     const d = lastAreas || { total: 0, items: [] };
@@ -580,9 +602,9 @@ try {
     const tagChips = (facets.tags || []).map((t) =>
       "<button type=\"button\" class=\"area-chip" + (pickedTags.has(t.tag) ? " on" : "") + "\" data-tag=\"" + esc(t.tag) + "\">" + esc(t.tag) + "<i>" + t.count + "</i></button>"
     ).join("") || "<span class=\"muted\">暂无标签</span>";
-    const openChip = "<button type=\"button\" class=\"area-chip" + (f.open ? " on" : "") + "\" data-open=\"1\">营业中</button>" +
-      // 优惠 (option B): 「有优惠」 next to 营业中
-      (window.__yycjCouponMode && window.__yycjCouponMode("filter") ? "<button type=\"button\" class=\"area-chip" + (f.cpn ? " on" : "") + "\" data-cpn=\"1\">有优惠</button>" : "");
+    const service=f.service||(f.open?'open':'all');
+    const openChip = [['all','全部状态'],['open','营业中'],['rest','休息中']].map(([key,label])=>'<button type="button" class="area-chip'+(service===key?' on':'')+'" data-service="'+key+'">'+label+'</button>').join('') +
+      (window.__yycjCouponMode && window.__yycjCouponMode("filter") ? '<button type="button" class="area-chip'+(f.cpn?' on':'')+'" data-cpn="1">有优惠</button>' : '');
     const usePlace = placeOn(f);
     const hasLoc = !!(f.lat && f.lng) || !!f.at || usePlace;
     const radii = (facets.radii && facets.radii.length) ? facets.radii : [3, 5, 10];
@@ -693,7 +715,7 @@ try {
     const f = getFilt();
     if (f.price) params.set("price", f.price);
     if (f.tags) params.set("tags", f.tags);
-    if (f.open) params.set("open", "1");
+    params.set("service", f.service || (f.open ? "open" : "all"));
     if (f.cpn) params.set("coupon", "1");
     if (f.radius) params.set("radius", String(f.radius));
     if (f.lat && f.lng) { params.set("lat", String(f.lat)); params.set("lng", String(f.lng)); }
@@ -706,7 +728,7 @@ try {
   window.__yycjLoadHome = function (options) { paused = false; return loadFeed(true, options); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; loadFeed(true); }
+    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; window.__yycjLoadHome(); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest && ev.target.closest("[data-nav='home']")) {
       if (lastItems.length) paint();
@@ -742,6 +764,7 @@ try {
     if (ev.target.closest && ev.target.closest("#areaPanel [data-cpn]")) {
       setFilt({ cpn: getFilt().cpn ? "" : "1" }); paintArea(); return;
     }
+    const serviceChip=ev.target.closest?.('#areaPanel [data-service]');if(serviceChip){setFilt({service:serviceChip.dataset.service,open:serviceChip.dataset.service==='open'?'1':''});paintArea();return;}
     if (ev.target.closest && ev.target.closest("#areaPanel [data-open]")) {
       setFilt({ open: getFilt().open ? "" : "1" }); paintArea(); return;
     }
@@ -794,10 +817,13 @@ try {
       toggleArea(false);
       q = "";
       if ($("#homeQ")) $("#homeQ").value = "";
-      loadFeed(true);
+      window.__yycjLoadHome();
     }
   }, true);
   mountGuide();
+  const toolbar=document.createElement('div');toolbar.id='hubMapFilters';toolbar.className='hub-map-filters hidden';$('#feed')?.insertAdjacentElement('beforebegin',toolbar);paintMapFilters();
+  toolbar.addEventListener('change',ev=>{if(ev.target.matches('[data-map-region]'))window.__yycjMapFilters.set({district:ev.target.value});if(ev.target.matches('[data-map-service]'))window.__yycjMapFilters.set({service:ev.target.value});});
+  toolbar.addEventListener('click',ev=>{if(ev.target.closest('[data-map-filter-apply]'))window.__yycjMapFilters.apply();});
   const qInput = $("#homeQ");
   if (qInput && !qInput.dataset.debounced) {
     qInput.dataset.debounced = "1";
@@ -822,9 +848,9 @@ try {
     arm();
   }
   (function watchCarousel() {
-    document.addEventListener("visibilitychange", arm);
+    document.addEventListener("visibilitychange", ()=>{if(document.hidden)cancelLoad();arm();});
     const view = $("#view-home");
-    if (view && window.MutationObserver) new MutationObserver(arm).observe(view, { attributes: true, attributeFilter: ["class"] });
+    if (view && window.MutationObserver) new MutationObserver(()=>{if(!homeVisible())cancelLoad();arm();}).observe(view, { attributes: true, attributeFilter: ["class"] });
     const pins = $("#pins");
     if (pins && window.IntersectionObserver) {
       new IntersectionObserver((es) => { pinsSeen = es.some((e) => e.isIntersecting); arm(); }).observe(pins);
@@ -1558,6 +1584,8 @@ try {
     window.__yycjLampFetch = true;
     const rawFetch = window.fetch.bind(window);
     const memo = new Map();
+    window.__yycjDropLampCache=id=>{for(const key of memo.keys())if(key.startsWith(String(id)+'|'))memo.delete(key);};
+    const serve=(p,init)=>{const out=p.then(r=>r.clone()),sig=init?.signal;if(!sig)return out;if(sig.aborted)return Promise.reject(new DOMException('Aborted','AbortError'));return new Promise((res,rej)=>{const abort=()=>rej(new DOMException('Aborted','AbortError'));sig.addEventListener('abort',abort,{once:true});out.then(r=>{sig.removeEventListener('abort',abort);res(r)},e=>{sig.removeEventListener('abort',abort);rej(e)});});};
     const RE = /^(?:https?:\/\/[^/]+)?\/api\/lamps\/([^/?#]+)(\?[^#]*)?$/;
     window.fetch = function (input, init) {
       try {
@@ -1572,11 +1600,11 @@ try {
           const key = id + "|" + q + "|" + auth;
           let e = memo.get(key);
           if (!e && !q) memo.forEach((x, k) => { if (!e && k.startsWith(id + "|") && k.endsWith("|" + auth)) e = x; });
-          if (e) return e.p.then((r) => r.clone());
+          if (e) return serve(e.p,init);
           const ent = { p: rawFetch(input, init), t: now, done: false };
           memo.set(key, ent);
           ent.p.then((r) => { ent.done = true; ent.t = Date.now(); if (!r.ok) memo.delete(key); }, () => memo.delete(key));
-          return ent.p.then((r) => r.clone());
+          return serve(ent.p,init);
         }
       } catch (e) {}
       return rawFetch(input, init);
@@ -1947,8 +1975,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
     if (tg && tg.onEvent) tg.onEvent("backButtonClicked", closeViewer);
   } catch (e) {}
   window.addEventListener("popstate", closeViewer);
+  let gallerySequence=0;
   async function paint(id) {
-    if (!id) return;
+    if (!id) return;const my=++gallerySequence;
     const box = document.getElementById("detail");
     if (box) box.setAttribute("data-lamp", id);
     try {
@@ -1956,7 +1985,9 @@ html.yv-lock,html.yv-lock body{overscroll-behavior:none;}`;
         headers: { Authorization: "Bearer " + token() },
         cache: "no-store",
       });
+      if (!r.ok) return;
       const data = await r.json();
+      if (my!==gallerySequence || !box || box.getAttribute("data-lamp") !== String(id) || document.getElementById("view-detail")?.classList.contains("hidden")) return;
       const cache = window.__yycjLampCache;
       delete cache[id];
       cache[id] = data;
@@ -3372,20 +3403,21 @@ try {
     try { if (!document.querySelector("#yycjGallery .yc-slide") && window.__yycjPaintGallery) window.__yycjPaintGallery(id); } catch (e) {}
     try { if (window.__yycjLoadDetailExtras) window.__yycjLoadDetailExtras(id); } catch (e) {}
   }
-  let seq = 0;
+  let seq = 0, controller=null;
   async function ensure(id, attempt) {
+    controller?.abort();controller=new AbortController();const ctl=controller;const timeout=setTimeout(()=>ctl.abort(),8000);
     const my = ++seq;
     const t0 = Date.now();
-    const live = () => my === seq && currentId() === id;
+    const live = () => my === seq && currentId() === id && shown();
     if (attempt > 1) state("loading");
     const slow = setTimeout(() => { if (live() && shown()) state("loading"); }, 700);
     let data = null, status = "";
     try {
-      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() } });
+      const r = await fetch("/api/lamps/" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + token() }, signal:ctl.signal });
       status = String(r.status);
       if (r.ok) data = await r.json();
     } catch (e) { status = e && e.name === "AbortError" ? "timeout" : "net"; }
-    clearTimeout(slow);
+    clearTimeout(timeout);clearTimeout(slow);
     if (!live()) return;
     const ms = Date.now() - t0;
     if (data && (data.lamp || data.item)) {
@@ -3405,7 +3437,7 @@ try {
   }
   let last = "";
   function check() {
-    if (!shown()) { last = ""; return; }
+    if (!shown()) { last = "";++seq;controller?.abort();controller=null;return; }
     const id = currentId();
     if (!id || id === last) return;
     last = id;
@@ -4644,12 +4676,12 @@ try {
    this.host=host;this.city=city;this.onSearch=onSearch;this.onDetail=onDetail;this.loadLeaflet=loadLeaflet;this.seq=0;this.epoch=0;this.rows=[];this.selected='';this.visible=true;this.busy=false;
    host.innerHTML='<div class="hub-map-heading"><b>地图找资料</b><span id="hubMapCount"></span></div><p class="hub-map-privacy">仅按公开区中心展示，不代表资料具体位置</p><div class="hub-map-stage"><div id="hubResultMap" aria-label="本城资料区域地图"></div><button type="button" class="btn hub-search-area hidden" id="hubSearchArea">搜索此区域</button></div><div id="hubMapStatus" class="hub-map-status" role="status" aria-live="polite"></div><div id="hubMapTileStatus" class="hub-map-tile-status hidden" role="status"><span>底图暂不可用</span><button type="button" class="btn" data-map-tiles-retry>重试底图</button><button type="button" class="btn" data-map-list>查看列表</button></div><section id="hubMapSelection" class="hub-map-selection hidden" aria-label="已选资料"></section><section id="hubMapChooser" class="hub-map-chooser hidden" aria-label="同区域资料"></section><details id="hubMapUnlocated" class="hidden"><summary></summary><div></div></details>';
    this.$=s=>host.querySelector(s);
-   this.click=e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-map-tiles-retry'))this.retryTiles();else if(b.hasAttribute('data-map-list')){if(!this.busy&&this.rows.length)this.choose(this.rows,true);}else if(b.id==='hubSearchArea')this.search();else if(b.hasAttribute('data-map-retry'))this.retry();else if(b.hasAttribute('data-map-select'))this.select(b.dataset.mapSelect);else if(b.hasAttribute('data-map-detail'))this.onDetail(b.dataset.mapDetail);else if(b.hasAttribute('data-map-close'))this.deselect();else if(b.hasAttribute('data-map-choose'))this.choose(this.chosen||[],this.chosenAsList);};
+   this.click=e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-map-tiles-retry'))this.retryTiles();else if(b.hasAttribute('data-map-list')){if(!this.busy&&this.rows.length)this.choose(this.rows,true);}else if(b.id==='hubSearchArea')this.search();else if(b.hasAttribute('data-map-retry'))this.retry();else if(b.hasAttribute('data-map-select'))this.select(b.dataset.mapSelect);else if(b.hasAttribute('data-map-detail')){if(this.visible&&!this.busy&&this.detailIds?.has(String(b.dataset.mapDetail)))this.onDetail(b.dataset.mapDetail);}else if(b.hasAttribute('data-map-close'))this.deselect();else if(b.hasAttribute('data-map-choose'))this.choose(this.chosen||[],this.chosenAsList);};
    host.addEventListener('click',this.click);
   }
   bounds(){if(!this.map||this.map.getZoom()==null)return null;const b=this.map.getBounds();return {south:b.getSouth(),west:b.getWest(),north:b.getNorth(),east:b.getEast()};}
   status(text,retry=false){this.$('#hubMapStatus').innerHTML='<span>'+esc(text)+'</span>'+(retry?'<button type="button" class="btn" data-map-retry>'+ (this.meta?.area?'重试此区域':'重试加载')+'</button>':'');}
-  begin(meta){if(!this.visible)return;this.seq=meta.seq;this.meta=meta;this.busy=true;++this.epoch;this.rows=[];this.$('#hubMapUnlocated').classList.add('hidden');this.$('#hubMapCount').textContent='读取中';this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.layer?.clearLayers();this.status('正在读取本城资料…');this.updateSearch();}
+  begin(meta){if(!this.visible)return;this.seq=meta.seq;this.meta=meta;this.busy=true;++this.epoch;this.rows=[];this.detailIds=new Set();this.$('#hubMapUnlocated').classList.add('hidden');this.$('#hubMapCount').textContent='读取中';this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.layer?.clearLayers();this.status('正在读取本城资料…');this.updateSearch();}
   error(meta){if(!this.visible||meta.seq!==this.seq||meta.city!==this.city())return;this.busy=false;this.$('#hubMapCount').textContent='搜索失败';this.status('加载失败，请重试。未展示旧搜索结果。',true);this.updateSearch();}
   updateSearch(){const b=this.$('#hubSearchArea');const moved=this.map&&!same(this.bounds(),this.searched);b.classList.toggle('hidden',!moved||!this.visible);b.disabled=this.busy;b.textContent=this.busy?'搜索中…':'搜索此区域';this.tileNotice();}
   // Keep the entire active panel above the existing HTML navigation, including
@@ -4662,10 +4694,12 @@ try {
   async receive(data,meta={}){
    if(!this.visible||(meta.seq&&meta.seq!==this.seq)||(meta.city&&meta.city!==this.city())||(data.city&&data.city!==this.city()))return;
    const epoch=++this.epoch;this.meta=meta;this.busy=false;this.selected='';this.chosen=[];this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');
+   this.detailIds=new Set((data.items||[]).slice(0,600).filter(x=>!data.city||!x.city||x.city===data.city).map(x=>String(x.lamp_id)));
    this.all=points(data);this.rows=this.all.filter(p=>inside(p,meta.area));this.data=data;
    const mapped=new Set(this.all.map(p=>String(p.item.lamp_id))),missing=(data.items||[]).slice(0,600).filter(x=>!mapped.has(String(x.lamp_id))&&(!data.city||!x.city||x.city===data.city));
    const unknown=this.$('#hubMapUnlocated');unknown.classList.toggle('hidden',!missing.length);unknown.open=false;unknown.querySelector('summary').textContent=missing.length+' 份无公开区中心 · 不参与区域筛选';unknown.querySelector('div').innerHTML=missing.map(x=>this.rowButton(x,'data-map-detail')).join('');
-   this.$('#hubMapCount').textContent=this.rows.length+' 份'+(meta.area?' · 此区域':' · 本城');
+   this.$('#hubMapCount').textContent=this.rows.length+' 份'+(meta.area?' · 此区域':missing.length?'可定位 / '+(this.rows.length+missing.length)+' 份结果':' · 本城');
+   this.$('.hub-map-stage').classList.toggle('hidden',!this.all.length&&!meta.area);
    const suffix=data.map_truncated?' · 已达600份上限，请缩小现有筛选（区域搜索仅筛选这批结果）':'';
    this.status((this.rows.length?'点圆点选资料，数字表示聚合数量':meta.area?'此区域暂无匹配资料，可移动地图后再搜索':missing.length?'暂无可定位资料，可展开下方列表':'暂无匹配资料，请调整城市或现有筛选')+suffix);
    if(!this.all.length&&!this.map){this.$('#hubResultMap').classList.add('hidden');this.updateSearch();return;}
@@ -4678,7 +4712,7 @@ try {
      tiles.on('loading',()=>{this.tileLoadFailed=false;});
      tiles.on('tileerror',()=>{this.tileLoadFailed=true;this.tileFailed=true;this.tileNotice();});
      tiles.on('load',()=>{clearTimeout(this.tileRetryTimer);this.tileRetrying=false;this.tileFailed=!!this.tileLoadFailed;this.tileNotice();});
-     this.onMove=()=>{this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());this.mapReady=true;
+     this.onMove=()=>{if(this.restoring){this.paint();this.updateSearch();return;}this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());this.mapReady=true;
     }
     this.map.invalidateSize();
     if(!meta.area&&this.all.length)this.map.fitBounds(this.all.map(p=>[p.lat,p.lng]),{padding:[42,42],maxZoom:12,animate:false});
@@ -4708,6 +4742,9 @@ try {
    el.innerHTML=media+'<div class="hub-map-card-text"><b>'+esc(x.title||'未命名资料')+'</b><p>'+esc([x.city,x.district].filter(Boolean).join(' · '))+'</p>'+(x.open_text?'<span>'+esc(x.open_text)+'</span>':'')+'</div><button type="button" class="btn" data-map-detail="'+esc(id)+'">查看详情</button><button type="button" class="hub-map-close" data-map-close aria-label="关闭已选资料">×</button>'+(this.chosen?.length>1?'<button type="button" class="hub-map-siblings" data-map-choose>'+(this.chosenAsList?'当前结果 ':'同区域 ')+this.chosen.length+' 份 ›</button>':'');this.paint();this.reveal(el);
   }
   deselect(){this.selected='';this.$('#hubMapSelection').classList.add('hidden');this.$('#hubMapChooser').classList.add('hidden');this.paint();}
+  cancel(){if(!this.busy)return;this.busy=false;this.$('#hubMapCount').textContent='未完成';this.status('搜索已取消，可重试。',true);this.updateSearch();}
+  pendingChanges(){++this.epoch;this.busy=false;this.rows=[];this.detailIds=new Set();this.$('#hubMapUnlocated').classList.add('hidden');this.deselect();this.$('#hubMapCount').textContent='待应用';this.status('筛选已改，点击查看结果后更新');this.updateSearch();}
+  resume(){this.restoring=true;try{this.map?.invalidateSize({pan:false});}finally{this.restoring=false;}this.paint();this.updateSearch();}
   activate(on){this.visible=on;if(!on){++this.epoch;this.busy=false;this.deselect();}else this.map?.invalidateSize();}
   destroy(){++this.epoch;clearTimeout(this.tileRetryTimer);this.host.removeEventListener('click',this.click);this.map?.remove();}
  }
@@ -4755,11 +4792,15 @@ try {
     if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();controller()?.activate(!!window.__yycjMapMode);window.__yycjLoadHome?.();}; }
     if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
-  function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
-  let resultMap=null;
-  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:id=>{window.__yycjBack='home';show('detail');window.__yycjOpenLamp=id;fetchDetail(id);},loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
+  function syncMapMode() { window.__yycjMapFilters?.paint();const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
+  let resultMap=null,mapReturn=null;
+  function openMapDetail(id){const box=$('#detail');if(!box)return;mapReturn={city:city(),scope:window.__yycjMapFilters?.signature(),scroll:window.scrollY};window.__yycjBack='home';window.__yycjOpenLamp=id;box.innerHTML='';const gal=$('#yycjGallery');if(gal){gal.innerHTML='';gal.dataset.lamp='';}$('#view-detail .xhs-bar')?.remove();const name=$('#xhsTop .xt-name');if(name)name.textContent='';if(window.openLamp){window.__yycjDropLampCache?.(id);window.openLamp(id);return;}box.setAttribute('data-lamp',id);show('detail');if(!window.__yycjEnsureDetail)fetchDetail(id);}
+  const homeView=$('#view-home');if(homeView)new MutationObserver(()=>{if(homeView.classList.contains('hidden'))return;syncMapMode();if(window.__yycjMapMode&&mapReturn&&mapReturn.city===city()&&mapReturn.scope===window.__yycjMapFilters?.signature()){resultMap?.resume();window.scrollTo({top:mapReturn.scroll,behavior:'auto'});}mapReturn=null;}).observe(homeView,{attributes:true,attributeFilter:['class']});
+  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:openMapDetail,loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
   window.addEventListener('yycj:home-data',ev=>{syncMapMode();if(window.__yycjMapMode)controller()?.receive(ev.detail,ev.mapRequest||{});});
   window.addEventListener('yycj:map-loading',ev=>controller()?.begin(ev.detail));
+  window.addEventListener('yycj:map-cancel',()=>resultMap?.cancel());
+  window.addEventListener('yycj:map-pending',()=>resultMap?.pendingChanges());
   window.addEventListener('yycj:map-error',ev=>controller()?.error(ev.detail));
   window.addEventListener('pagehide',ev=>{if(!ev.persisted){resultMap?.destroy();resultMap=null;}});
   mount();

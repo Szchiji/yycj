@@ -37,11 +37,15 @@
     if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.onclick=()=>{window.__yycjMapMode=!window.__yycjMapMode;b.textContent=window.__yycjMapMode?'列表':'地图';b.setAttribute('aria-pressed',String(window.__yycjMapMode)); syncMapMode();controller()?.activate(!!window.__yycjMapMode);window.__yycjLoadHome?.();}; }
     if(!$('#hubMapWrap')) { const w=document.createElement('div');w.id='hubMapWrap';w.className='hidden';w.innerHTML='';$('#feed')?.insertAdjacentElement('beforebegin',w); }
   }
-  function syncMapMode() { const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
-  let resultMap=null;
-  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:id=>{window.__yycjBack='home';show('detail');window.__yycjOpenLamp=id;fetchDetail(id);},loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
+  function syncMapMode() { window.__yycjMapFilters?.paint();const on=!!window.__yycjMapMode;$('#feed')?.classList.toggle('hidden',on);$('#pins')?.classList.toggle('hidden',on);$('#hubMapWrap')?.classList.toggle('hidden',!on);if(on) $('#btnLoadMore')?.classList.add('hidden'); }
+  let resultMap=null,mapReturn=null;
+  function openMapDetail(id){const box=$('#detail');if(!box)return;mapReturn={city:city(),scope:window.__yycjMapFilters?.signature(),scroll:window.scrollY};window.__yycjBack='home';window.__yycjOpenLamp=id;box.innerHTML='';const gal=$('#yycjGallery');if(gal){gal.innerHTML='';gal.dataset.lamp='';}$('#view-detail .xhs-bar')?.remove();const name=$('#xhsTop .xt-name');if(name)name.textContent='';if(window.openLamp){window.__yycjDropLampCache?.(id);window.openLamp(id);return;}box.setAttribute('data-lamp',id);show('detail');if(!window.__yycjEnsureDetail)fetchDetail(id);}
+  const homeView=$('#view-home');if(homeView)new MutationObserver(()=>{if(homeView.classList.contains('hidden'))return;syncMapMode();if(window.__yycjMapMode&&mapReturn&&mapReturn.city===city()&&mapReturn.scope===window.__yycjMapFilters?.signature()){resultMap?.resume();window.scrollTo({top:mapReturn.scroll,behavior:'auto'});}mapReturn=null;}).observe(homeView,{attributes:true,attributeFilter:['class']});
+  function controller(){mount();if(!resultMap&&window.yycjResultMap)resultMap=new window.yycjResultMap.ResultMap($('#hubMapWrap'),{city,onSearch:area=>window.__yycjLoadHome?.({mapArea:area}),onDetail:openMapDetail,loadLeaflet:()=>window.__yycjLoadLeaflet()});return resultMap;}
   window.addEventListener('yycj:home-data',ev=>{syncMapMode();if(window.__yycjMapMode)controller()?.receive(ev.detail,ev.mapRequest||{});});
   window.addEventListener('yycj:map-loading',ev=>controller()?.begin(ev.detail));
+  window.addEventListener('yycj:map-cancel',()=>resultMap?.cancel());
+  window.addEventListener('yycj:map-pending',()=>resultMap?.pendingChanges());
   window.addEventListener('yycj:map-error',ev=>controller()?.error(ev.detail));
   window.addEventListener('pagehide',ev=>{if(!ev.persisted){resultMap?.destroy();resultMap=null;}});
   mount();

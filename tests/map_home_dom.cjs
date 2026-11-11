@@ -6,7 +6,7 @@ const wait=()=>new Promise(r=>setTimeout(r,0));
  try{
   w.scrollTo=()=>{};w.__yycjHomeBooted=true;w.localStorage.setItem('yycj_city','深圳');w.localStorage.setItem('yycj_token','OFFLINE_UNIT_TRANSPORT_ONLY');
   w.__yycjLoadLeaflet=async()=>L;
-  w.fetch=(url,opt)=>{calls.push({url,opt});return new Promise(resolve=>queue.push({url,resolve}));};
+  w.fetch=(url,opt)=>{calls.push({url,opt});return new Promise(resolve=>queue.push({url,opt,resolve}));};
   for(const n of ['home-ui.js','map-results.js','community-ui.js'])w.eval(fs.readFileSync('miniapp/'+n,'utf8'));
   const $=s=>w.document.querySelector(s),data={city:'深圳',enabled_cities:['深圳','广州'],items:[{lamp_id:'a',title:'测试',city:'深圳',district:'南山'}],map_groups:[{lat:22.53,lng:113.93,lamp_ids:['a']}],pins:[],has_more:false};
   $('#hubMapToggle').click();assert.equal(calls.length,1);assert(new URL(calls[0].url,'https://offline.invalid').searchParams.get('map_results')==='1');assert(!calls[0].url.includes('bounds'));
@@ -16,6 +16,11 @@ const wait=()=>new Promise(r=>setTimeout(r,0));
   const fail=w.__yycjLoadHome();queue.shift().resolve({ok:false,status:503,json:async()=>({detail:'地图资料暂时无法加载，请重试'})});await fail;assert($('#hubMapStatus').textContent.includes('加载失败'));assert($('#hubMapStatus [data-map-retry]'));assert(!$('#hubMapStatus').textContent.includes('暂无'),'503 must not become an empty result');
   $('#hubMapStatus [data-map-retry]').click();queue.shift().resolve({ok:true,json:async()=>data});await wait();await wait();
   const cross=w.__yycjLoadHome();w.localStorage.setItem('yycj_city','广州');queue.shift().resolve({ok:true,json:async()=>data});await cross;assert(!$('#hubMapSelection').textContent.includes('测试')); // stale city's response not committed
+
+  w.localStorage.setItem('yycj_city','深圳');const pending=w.__yycjLoadHome(),oldMap=queue.shift();$('#hubMapToggle').click();assert(oldMap.opt.signal.aborted);queue.shift().resolve({ok:true,json:async()=>data});oldMap.resolve({ok:true,json:async()=>data});await pending;await wait();assert($('#hubMapWrap').classList.contains('hidden'));
+  $('#hubMapToggle').click();const loadingMap=queue.shift();w.__yycjMapFilters.set({district:'南山',service:'rest'});assert(loadingMap.opt.signal.aborted);const nCalls=calls.length;assert.equal($('#hubMapCount').textContent,'待应用');loadingMap.resolve({ok:true,json:async()=>data});await wait();assert.equal($('#hubMapCount').textContent,'待应用');assert.equal(calls.length,nCalls,'pending combined filters must not fetch');
+  const applied=w.__yycjMapFilters.apply(),req=queue.shift();assert(req.url.includes('service=rest')&&new URL(req.url,'https://offline.invalid').searchParams.get('district')==='南山');req.resolve({ok:true,json:async()=>data});await applied;assert.equal(w.__yycjMapFilters.get().pending,false);
+  const stale=w.__yycjLoadHome(),beforeCity=queue.shift();w.localStorage.setItem('yycj_city','广州');const current=w.__yycjLoadHome(),afterCity=queue.shift();assert(beforeCity.opt.signal.aborted);afterCity.resolve({ok:true,json:async()=>({...data,city:'广州',items:[],map_groups:[]})});await current;beforeCity.resolve({ok:false,status:503,json:async()=>({detail:'old city failure'})});await stale;assert(!$('#hubMapStatus').textContent.includes('加载失败'));
   assert(!fs.readFileSync('miniapp/map-results.js','utf8').includes('geolocation'));
   console.log('Map home DOM: scoped request lifecycle, explicit-only area search, stale success/error/city suppression PASS');
  }finally{dom.window.close()}

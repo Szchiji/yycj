@@ -40,3 +40,5 @@
 .hub-map-tile-status>span{flex:1}.hub-map-tile-status>.btn{min-height:44px;white-space:nowrap;font-size:12px;padding:6px 9px}
 @media(max-width:760px){#hubMapWrap #hubResultMap{height:clamp(180px,calc(100vh - 490px),350px)}}
 @supports(height:100svh){@media(max-width:760px){#hubMapWrap #hubResultMap{height:clamp(180px,calc(100svh - 490px),350px)}}.hub-map-options{max-height:clamp(96px,25svh,180px)}}
+
+.hub-map-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;margin:8px 0;color:#d8c38c}.hub-map-filters label{min-width:0}.hub-map-filters select{width:100%;min-height:44px;min-width:0;border:1px solid #355247;border-radius:10px;background:#16302a;color:#f1eee4;font-size:12px;padding:6px}.hub-map-filters>.btn{min-height:44px;white-space:nowrap;padding:6px 10px;font-size:12px}.hub-map-filters>p{grid-column:1/-1;margin:0;font-size:11px;color:#d4b26a}.hub-map-filters .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
