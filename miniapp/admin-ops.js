@@ -111,7 +111,8 @@
     const unlist = on ? `<button class="btn danger" type="button" data-list="unlist" data-id="${id}">下架</button>` : "";
     const del = `<button class="btn danger" type="button" data-list="delete" data-id="${id}" data-title="${esc(x.title || "")}">删除</button>`;
     // Active cards keep 重新上架 in 更多 so it is not beside 下架 / 续期 (easy mis-tap). Hidden cards show it as a primary action. Handlers stay on data-list / data-fill-proxy.
-    const extra = on ? relist + del : del;
+    const history = `<button class="btn" type="button" data-history="${id}" data-history-scope="admin">修改记录</button>`;
+    const extra = (on ? relist : "") + history + del;
     return `<div class="listing-actions">${proxy}${renew}${on ? unlist : relist}<details class="listing-more"><summary>更多</summary><div class="listing-more-menu">${extra}</div></details></div>`;
   }
   function renderListingCards(items) {
