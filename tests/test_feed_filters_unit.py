@@ -34,8 +34,10 @@ def test_tags_and_distance():
     f = ff.Filter(lat=22.533, lng=113.930, radius=5, sort="near")
     assert f.distance({"city": "深圳", "district": "南山"}) < 1
     assert ff.distance_label(0.4) == "<2km" and ff.distance_label(4.4) == "约4km" and ff.distance_label(23) == "约25km"
-    # near without a centre falls back to newest
+    # near without a centre falls back to newest; 人气 is a first-class sort
     assert ff.Filter(sort="near").sort == "new"
+    assert ff.Filter(sort="hot").sort == "hot"
+    assert ff.Filter(sort="unknown").sort == "new"
     # listing coords are snapped to a ~500 m grid before any distance is computed
     assert ff.point_of({"approx_lat": 22.53337, "approx_lng": 113.93049}) == (22.535, 113.93)
 

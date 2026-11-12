@@ -236,7 +236,7 @@ class Filter:
         except (TypeError, ValueError):
             r = None
         self.radius = r if (r and self.center and 0 < r <= 50) else None
-        self.sort = sort if sort in ("new", "reviews", "near") else "new"
+        self.sort = sort if sort in ("new", "reviews", "near", "hot") else "new"
         if self.sort == "near" and not self.center:
             self.sort = "new"
 
