@@ -1,0 +1,641 @@
+/* 月影 theme: 玫红玻璃 Rose Glass — tokens + skin only (no business/layout change).
+   Loaded last in the Mini App bundle so it can replace 翡翠金 tokens and leftover hardcoded visitor colors.
+   管理后台 (admin / workspace / desk) is not included in this bundle and stays 墨绿金. */
+
+@font-face {
+  font-family: "Noto Serif SC";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("./fonts/NotoSerifSC-Regular.woff") format("woff");
+}
+@font-face {
+  font-family: "Noto Serif SC";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("./fonts/NotoSerifSC-Bold.woff") format("woff");
+}
+@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("./fonts/NotoSansSC-Regular.woff") format("woff");
+}
+@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("./fonts/NotoSansSC-Bold.woff") format("woff");
+}
+
+:root {
+  --bg: #08050C;
+  --bg-2: #120814;
+  --rose: #FF2E6B;
+  --gold: #FFC857;
+  --purple: #9D5BFF;
+  --mint: #64F2C4;
+  --rest: #C4B8A8;
+  --rest-gold-60: rgba(255, 200, 87, 0.60);
+  --text: #F3EDEF;
+  --text-dim: #A396A3;
+  --text-ink: #14060A;
+  --line: rgba(255, 46, 107, 0.22);
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --glass: rgba(22, 12, 28, 0.55);
+  --glass-strong: rgba(8, 5, 12, 0.92);
+  --glass-bar: rgba(8, 5, 12, 0.55);
+  --glass-bar-fallback: rgba(8, 5, 12, 0.94);
+  --chip: rgba(255, 255, 255, 0.04);
+  --grad-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
+  --font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
+  --font-sans: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --blur-bar: 20px;
+  --blur-card: 16px;
+
+  /* Map the shared --t-* contract onto the rose palette so earlier rules restyle without structural edits. */
+  --t-overlay: rgba(8, 5, 12, .58);
+  --t-thumb: #160C1C;
+  --t-bg: #08050C;
+  --t-bg2: #120814;
+  --t-card: rgba(22, 12, 28, 0.92);
+  --t-line: rgba(255, 46, 107, 0.22);
+  --t-text: #F3EDEF;
+  --t-muted: #A396A3;
+  --t-accent: #FF2E6B;
+  --t-btn: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
+  --t-btnink: #fff;
+  --t-input: #120814;
+  --t-bar: rgba(8, 5, 12, 0.94);
+  --t-chipon: rgba(255, 46, 107, 0.16);
+  --t-annbg: rgba(157, 91, 255, 0.10);
+  --t-anntext: #FFC857;
+  --t-ph: #1A0C18;
+  --t-split: rgba(255, 46, 107, 0.35);
+  --t-badgeloc: rgba(8, 5, 12, 0.78);
+  --t-badgetag: rgba(157, 91, 255, 0.82);
+  --t-goldbg: #FFC857;
+  --t-goldtext: #14060A;
+  --t-toast: #1A0E18;
+  --t-toasttext: #F3EDEF;
+  --t-price: #FFC857;
+  --t-tag: #E6D6FF;
+  --t-pill: rgba(157, 91, 255, 0.12);
+  --t-pilltext: #E6D6FF;
+  --t-soft: rgba(255, 255, 255, 0.05);
+  --t-dot: #FF2E6B;
+  --t-media: #12080F;
+  --t-open: #64F2C4;
+  --t-link: #FFC857;
+  --t-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
+  --t-ctatext: #fff;
+  --t-fav: #FF7A9C;
+  --t-shadow: 0 0 0 1px rgba(255, 46, 107, 0.10), 0 4px 14px rgba(255, 46, 107, 0.22);
+  --t-scheme: dark;
+  --t-dangerbg: #3A1524;
+  --t-dangertext: #FFB4C8;
+  --t-dangerline: #6B2740;
+  --t-grad-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
+  --t-grad-cta-text: #fff;
+  --t-open-fg: #08241C;
+  --t-open-bg: #64F2C4;
+  --t-open-glow: 0 0 8px rgba(100, 242, 196, 0.45);
+  --t-rest-fg: #C4B8A8;
+  --t-rest-bg: rgba(8, 5, 12, 0.72);
+  --t-wait-fg: #FFC857;
+  --t-wait-bg: rgba(8, 5, 12, 0.72);
+  --t-wait-line: rgba(255, 200, 87, 0.60);
+  --t-gold-soft: rgba(255, 200, 87, 0.16);
+  --t-font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
+  --t-font-sans: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+/* ---- typography & page ground ---- */
+html body {
+  font-family: var(--t-font-sans) !important;
+  background: var(--t-bg) !important;
+  background-image: none !important;
+  color: var(--t-text) !important;
+}
+html body,
+html body button,
+html body input,
+html body textarea,
+html body select {
+  font-family: var(--t-font-sans);
+}
+
+/* Top atmosphere: soft rose / purple / gold, does not intercept clicks. */
+html body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 340px;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 80% at 16% -8%, rgba(255, 46, 107, 0.30), transparent 62%),
+    radial-gradient(ellipse 80% 70% at 96% 4%, rgba(157, 91, 255, 0.24), transparent 58%),
+    radial-gradient(ellipse 50% 40% at 58% 22%, rgba(255, 200, 87, 0.07), transparent 70%);
+}
+
+/* ---- top bar: frosted glass, serif brand title ---- */
+html body .topbar {
+  background: var(--glass-bar-fallback) !important;
+  border-bottom-color: var(--t-line) !important;
+}
+@supports ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
+  html body .topbar {
+    background: var(--glass-bar) !important;
+    -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+    backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+  }
+}
+html body .brand {
+  font-family: var(--t-font-serif) !important;
+  font-weight: 700 !important;
+  font-size: 20px !important;
+  letter-spacing: 0.08em !important;
+  color: var(--t-text) !important;
+  line-height: 1;
+}
+html body .top-admin,
+html body #hubHomeEntry.top-admin,
+html body a {
+  color: var(--t-link) !important;
+}
+html body .chip,
+html body #btnCity {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 200, 87, 0.45) !important;
+  color: var(--t-text) !important;
+  border-radius: 999px !important;
+}
+
+/* ---- buttons: all capsules; primary = rose→purple glow ---- */
+html body .btn,
+html body button.btn {
+  border-radius: 999px !important;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+html body .search-row .btn,
+html body #btnArea,
+html body #btnSearch,
+html body #hubMapToggle,
+html body .btn.primary,
+html body .btn.block,
+html body .xhs-bar .btn,
+html body .filt-actions .btn,
+html body .hub-search-area,
+html body .hub-map-selection > .btn {
+  min-height: 39px;
+}
+html body .btn.sm { min-height: 32px; }
+html body .btn:not(.primary):not(.danger):not(.ghost),
+html body button.btn:not(.primary):not(.danger):not(.ghost) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 200, 87, 0.45) !important;
+  color: var(--t-text) !important;
+}
+html body .btn.primary,
+html body button.btn.primary,
+html body #view-detail.xhs .xhs-bar #detailChat {
+  border: 0 !important;
+  background: var(--t-grad-cta) !important;
+  color: #fff !important;
+  text-shadow: 0 1px 1px rgba(8, 5, 12, 0.45);
+  box-shadow:
+    0 4px 16px rgba(255, 46, 107, 0.42),
+    0 0 24px rgba(157, 91, 255, 0.28) !important;
+}
+html body .btn.ghost {
+  background: transparent !important;
+  border-color: rgba(255, 46, 107, 0.40) !important;
+  color: var(--t-text) !important;
+}
+html body #btnArea {
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: var(--t-line) !important;
+  color: var(--t-text) !important;
+}
+html body #btnArea.on,
+html body #btnArea[aria-expanded="true"] {
+  border-color: var(--rose) !important;
+  color: #fff !important;
+  background: rgba(255, 46, 107, 0.16) !important;
+  box-shadow: 0 0 12px rgba(255, 46, 107, 0.25);
+}
+html body .search-row input,
+html body .search-row #homeQ,
+html body #mapFullQ {
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: var(--t-line) !important;
+  color: var(--t-text) !important;
+}
+
+/* ---- glass cards: keep 117×224 / 3-col / 8px gap / 12px inset ---- */
+html body #feed.has-cover .feed-card.cover-card,
+html body #favList .feed-card.cover-card {
+  position: relative;
+  height: 224px;
+  overflow: visible !important;
+  background: var(--glass) !important;
+  border: 1px solid rgba(255, 46, 107, 0.46) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 46, 107, 0.10),
+    0 4px 14px rgba(255, 46, 107, 0.22) !important;
+  border-radius: 12px !important;
+}
+@supports ((-webkit-backdrop-filter: blur(16px)) or (backdrop-filter: blur(16px))) {
+  html body #feed.has-cover .feed-card.cover-card,
+  html body #favList .feed-card.cover-card {
+    background: rgba(22, 12, 28, 0.48) !important;
+    -webkit-backdrop-filter: blur(var(--blur-card)) saturate(1.2);
+    backdrop-filter: blur(var(--blur-card)) saturate(1.2);
+  }
+}
+html body #feed.has-cover .feed-card.cover-card::after,
+html body #favList .feed-card.cover-card::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 4;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+html body #feed .cover-wrap,
+html body #favList .cover-wrap {
+  overflow: hidden;
+  border-radius: 11px 11px 0 0;
+  height: 168px;
+}
+html body #feed .feed-card .body,
+html body #favList .feed-card .body {
+  height: 56px;
+}
+html body #feed .feed-card h3,
+html body #favList .feed-card h3 {
+  font-family: var(--t-font-serif) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--t-text) !important;
+}
+html body .card,
+html body .sheet-panel,
+html body .boot-card,
+html body .gate-card,
+html body .city-drop {
+  background: var(--t-card) !important;
+  border-color: var(--t-line) !important;
+  box-shadow: var(--t-shadow);
+}
+html body .pin-card,
+html body #pins .pin-card {
+  border: 1px solid rgba(255, 46, 107, 0.28) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 6px 18px rgba(255, 46, 107, 0.16);
+  background-color: var(--t-ph) !important;
+}
+html body .pin-copy,
+html body #pins .pin-copy,
+html body .pin-card h3 {
+  font-family: var(--t-font-serif);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+html body .pin-copy b {
+  font-family: var(--t-font-serif);
+  font-weight: 700;
+  font-size: 15px;
+}
+html body .announce {
+  background: var(--t-annbg) !important;
+  border-color: rgba(255, 200, 87, 0.28) !important;
+  color: var(--t-anntext) !important;
+}
+html body #feedSplit {
+  background: linear-gradient(90deg, transparent, var(--t-split), transparent) !important;
+}
+
+/* ---- status bookmarks ---- */
+html body .badge-open,
+html body #view-detail.xhs .xhs-open {
+  color: var(--t-open-fg) !important;
+  background: var(--t-open-bg) !important;
+  box-shadow: var(--t-open-glow) !important;
+  border: 0 !important;
+}
+html body .badge-open.st-rest,
+html body .badge-open.st-closed,
+html body #view-detail.xhs .xhs-open[data-code=rest],
+html body #view-detail.xhs .xhs-open[data-code=closed],
+html body #view-detail.xhs .xhs-open.off {
+  color: var(--t-rest-fg) !important;
+  background: var(--t-rest-bg) !important;
+  box-shadow: inset 0 0 0 1px rgba(196, 184, 168, 0.45) !important;
+  font-weight: 600;
+}
+html body .badge-open.st-wait,
+html body #view-detail.xhs .xhs-open[data-code=wait] {
+  color: var(--t-wait-fg) !important;
+  background: var(--t-wait-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--t-wait-line) !important;
+  font-weight: 600;
+}
+
+/* ---- filter / sort chips ---- */
+html body .area-chip,
+html body .sort-opt {
+  border-radius: 999px !important;
+}
+html body .area-chip.on {
+  background: var(--t-grad-cta) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(255, 46, 107, 0.35);
+}
+html body .area-chip.on i { color: #fff !important; opacity: .8; }
+html body .sort-opt.on {
+  border-color: var(--rose) !important;
+  color: #fff !important;
+  font-weight: 600;
+  background: rgba(255, 46, 107, 0.16) !important;
+  box-shadow: 0 0 10px rgba(255, 46, 107, 0.25);
+}
+html body .area-panel,
+html body .area-panel .filt-actions {
+  background: rgba(16, 8, 20, 0.94) !important;
+  border-color: var(--t-line) !important;
+}
+
+/* ---- bottom nav: rose label + glow dash ---- */
+html body .bottom-nav {
+  background: var(--glass-bar-fallback) !important;
+  border-top-color: var(--t-line) !important;
+}
+@supports ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
+  html body .bottom-nav {
+    background: var(--glass-bar) !important;
+    -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+    backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+  }
+}
+html body .nav-item {
+  position: relative;
+  color: var(--t-muted) !important;
+  font-size: 13px;
+  font-weight: 500;
+}
+html body .nav-item.active {
+  color: var(--rose) !important;
+  font-weight: 700 !important;
+}
+html body .nav-item.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--t-grad-cta);
+  box-shadow: 0 0 8px rgba(255, 46, 107, 0.90), 0 0 16px rgba(157, 91, 255, 0.55);
+}
+
+/* ---- detail ---- */
+html body #xhsTop,
+html body #view-detail.xhs .xhs-bar {
+  background: var(--glass-bar-fallback) !important;
+  border-color: var(--t-line) !important;
+}
+@supports ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
+  html body #xhsTop,
+  html body #view-detail.xhs .xhs-bar {
+    background: var(--glass-bar) !important;
+    -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+    backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
+  }
+}
+html body #xhsTop .xt-name,
+html body #view-detail.xhs .xt-name,
+html body #view-detail.xhs #detail > .card > h3,
+html body #detail > .card > h3 {
+  font-family: var(--t-font-serif) !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  letter-spacing: 0.04em;
+  color: var(--t-text) !important;
+}
+html body #view-detail.xhs .xhs-price { color: var(--t-price) !important; }
+html body #yycjTags .tag,
+html body #view-detail.xhs #yycjTags .tag {
+  background: var(--t-pill) !important;
+  color: var(--t-tag) !important;
+  border: 1px solid rgba(157, 91, 255, 0.45);
+  border-radius: 999px;
+}
+html body #yycjGallery .yc-dot.on,
+html body #view-detail.xhs #yycjGallery .yc-dot.on {
+  background: var(--rose) !important;
+  box-shadow: 0 0 8px rgba(255, 46, 107, 0.8);
+}
+
+/* ---- hours / shift (teacher 上架) ---- */
+html body .shift-pill {
+  color: var(--t-open-fg) !important;
+  background: var(--t-open-bg) !important;
+}
+html body .shift-pill[data-code=unset],
+html body .hours-picker .hp-next {
+  color: var(--t-muted) !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18) !important;
+}
+html body .hours-picker .hp-next {
+  color: var(--t-link) !important;
+  box-shadow: inset 0 0 0 1px var(--t-wait-line) !important;
+}
+html body .shift-pill[data-code=rest],
+html body .shift-pill[data-code=closed] {
+  color: var(--t-rest-fg) !important;
+  background: var(--t-rest-bg) !important;
+}
+html body .shift-pill[data-code=wait] {
+  color: var(--t-wait-fg) !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1px var(--t-wait-line) !important;
+}
+html body .shift-btns .btn.on {
+  box-shadow: inset 0 0 0 1.5px var(--rose) !important;
+  color: var(--rose) !important;
+}
+html body .shift-sw input:checked { background: var(--rose) !important; }
+html body .hours-picker .hp-foot button { color: var(--t-link) !important; }
+html body .shift-box { box-shadow: inset 0 0 0 1px rgba(255, 46, 107, 0.22); }
+
+/* ---- me / publish ---- */
+html body #view-me .me-head {
+  background: linear-gradient(135deg, rgba(255, 46, 107, 0.22), rgba(157, 91, 255, 0.18), #160C1C) !important;
+  border-color: rgba(255, 46, 107, 0.35) !important;
+}
+html body #view-me .me-av,
+html body .tut-n {
+  color: #fff !important;
+  background: var(--t-grad-cta) !important;
+}
+html body #view-me .me-ic { background: rgba(255, 46, 107, 0.12) !important; color: var(--rose) !important; }
+html body #view-me .me-todo { background: rgba(22, 12, 28, 0.72) !important; }
+html body #view-me .me-pill { border-color: rgba(157, 91, 255, 0.35) !important; }
+html body .yycj-dlg { background: rgba(8, 5, 12, .6) !important; }
+html body .yycj-dlg-card { border-color: rgba(255, 46, 107, 0.45) !important; }
+html body #view-me .me-hn b,
+html body #view-publish #publishTitle,
+html body #view-me .me-sec > h5 {
+  font-family: var(--t-font-serif);
+}
+
+/* ---- entry announcement / edit result (visitor, not admin-body) ---- */
+html body .entry-announcement-panel {
+  background: var(--t-card) !important;
+  color: var(--t-text) !important;
+  border-color: var(--rose) !important;
+}
+html body .entry-announcement-panel h2 { color: var(--t-link) !important; font-family: var(--t-font-serif); }
+html body .entry-announcement-panel footer { border-top-color: var(--t-line) !important; }
+html body:not(.admin-body) .edit-result {
+  background: var(--t-card) !important;
+  color: var(--t-text) !important;
+  border-color: var(--t-line) !important;
+}
+html body:not(.admin-body) .edit-result strong,
+html body:not(.admin-body) .edit-result a,
+html body:not(.admin-body) .hist-diff b { color: var(--t-link) !important; }
+html body:not(.admin-body) .edit-review-note { border-left-color: var(--gold) !important; }
+
+/* ---- coupons leftover gold washes ---- */
+html body .cpn-block {
+  background: linear-gradient(90deg, var(--t-gold-soft), rgba(255, 200, 87, 0.04)) !important;
+}
+html body .cpn-items li { background: var(--t-gold-soft) !important; }
+
+/* ---- map / community (hardcoded 墨绿金 leftovers) ---- */
+html body .hub-home-entry,
+html body .hub-row,
+html body #hubResultMap,
+html body .hub-map-stage,
+html body .hub-cluster,
+html body .hub-map-chooser,
+html body #view-map.map-fullview,
+html body .map-full-top,
+html body #mapFullFilterPanel {
+  background: var(--t-card) !important;
+  color: var(--t-text) !important;
+  border-color: var(--t-line) !important;
+}
+html body #view-map.map-fullview { background: var(--t-bg) !important; }
+html body .hub-home-entry,
+html body .hub-row span,
+html body .hub-cluster b,
+html body .detail-trust,
+html body .hub-map-heading span,
+html body .hub-map-card-text span,
+html body .hub-map-siblings,
+html body .hub-map-row span,
+html body .hub-map-filters,
+html body .hub-map-filters > p,
+html body .hub-map-tile-status,
+html body #hubResultMap .leaflet-control-attribution a,
+html body #hubResultMap .leaflet-control-zoom a,
+html body #app.map-full-open #hubMapWrap .hub-map-privacy-fold summary {
+  color: var(--t-link) !important;
+}
+html body .hub-map-privacy,
+html body .hub-map-status,
+html body .hub-map-card-text p,
+html body #hubMapUnlocated { color: var(--t-muted) !important; }
+html body .hub-search-area {
+  background: var(--t-grad-cta) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  border-radius: 999px !important;
+  box-shadow: 0 4px 16px rgba(255, 46, 107, 0.42) !important;
+  text-shadow: 0 1px 1px rgba(8, 5, 12, 0.45);
+}
+html body #hubResultMap .leaflet-control-zoom a,
+html body #hubResultMap .leaflet-control-attribution {
+  background: var(--t-card) !important;
+  border-color: var(--t-line) !important;
+  color: var(--t-text) !important;
+}
+html body #hubResultMap .leaflet-control-zoom { border-color: rgba(255, 46, 107, 0.45) !important; }
+html body #hubResultMap .leaflet-tile-pane {
+  filter: grayscale(.45) invert(.9) hue-rotate(230deg) brightness(.68) saturate(.7);
+}
+html body #hubResultMap .hub-map-marker {
+  background: #2A1230 !important;
+  color: var(--gold) !important;
+  border-color: var(--rose) !important;
+  box-shadow: 0 0 0 3px rgba(255, 46, 107, 0.28), 0 0 14px rgba(255, 46, 107, 0.55) !important;
+}
+html body #hubResultMap .hub-map-marker.is-single {
+  background: var(--t-grad-cta) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+html body #hubResultMap .hub-map-marker.is-selected {
+  outline-color: var(--gold) !important;
+  box-shadow: 0 0 0 9px rgba(255, 46, 107, 0.28) !important;
+}
+html body .hub-map-selection,
+html body .hub-map-chooser {
+  background: rgba(16, 8, 20, 0.82) !important;
+  border-color: rgba(255, 46, 107, 0.46) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 8px 28px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(255, 46, 107, 0.22);
+  color: var(--t-text) !important;
+}
+html body .hub-map-selection > .btn {
+  background: var(--t-grad-cta) !important;
+  color: #fff !important;
+  border: 0 !important;
+}
+html body .hub-map-close { color: var(--t-muted) !important; }
+html body .hub-map-card-text > b { font-family: var(--t-font-serif); font-weight: 700; }
+html body .hub-map-row,
+html body .hub-map-filters select,
+html body #mapFullQ {
+  background: var(--t-input) !important;
+  color: var(--t-text) !important;
+  border-color: var(--t-line) !important;
+}
+html body .hub-map-row { background: transparent !important; border-bottom-color: var(--t-line) !important; }
+html body #app.map-full-open #hubMapWrap .hub-map-heading,
+html body #app.map-full-open #hubMapWrap .hub-map-privacy-fold,
+html body #app.map-full-open #hubMapWrap .hub-map-status,
+html body #app.map-full-open #hubMapWrap .hub-map-tile-status,
+html body #app.map-full-open #hubMapUnlocated:not(.hidden) {
+  background: rgba(16, 8, 20, 0.90) !important;
+  color: var(--t-text) !important;
+}
+html body #app.map-full-open #hubMapWrap .hub-map-stage { background: var(--t-media) !important; }
+
+/* place-pick pin ink follows theme tokens already; tighten leftover dark-green border */
+html body .pp-pin i { border-color: var(--t-goldtext) !important; }
+html body .pp-pin i::after { background: var(--t-goldtext) !important; }
