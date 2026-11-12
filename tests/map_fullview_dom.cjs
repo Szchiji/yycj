@@ -123,5 +123,25 @@ function fixture(){
    assert(css.includes('--map-dock-h'));
    cases++;
  }finally{f.close()}}
+ {const f=fixture();try{
+   await f.start();
+   const single=f.L.markers.find(x=>x.opts.icon.className.includes('is-single'));
+   assert(single,'fixture must include a single-point marker');
+   single.fire('click');
+   const sel=f.$('#hubMapSelection');
+   assert(!sel.classList.contains('hidden'),'single-dot card must survive full-view dock invalidateSize/moveend');
+   assert(sel.querySelector('[data-map-detail]'));
+   f.L.maps[0].fire('moveend');
+   assert(sel.classList.contains('hidden'),'a later user pan must still close the card');
+   const cluster=f.L.markers.find(x=>x.opts.icon.html.includes('2'));
+   cluster.fire('click');
+   const chooser=f.$('#hubMapChooser');
+   assert(!chooser.classList.contains('hidden'),'cluster chooser must survive full-view dock invalidateSize/moveend');
+   assert.equal(chooser.querySelectorAll('[data-map-select]').length,2);
+   f.$('[data-map-select="b"]').click();
+   assert(!f.$('#hubMapSelection').classList.contains('hidden'));
+   assert(f.$('#hubMapSelection').textContent.includes('示例红'));
+   cases++;
+ }finally{f.close()}}
  console.log(`Map fullview DOM: ${cases} enter/exit/release/reentry/resize/dock/explicit-search/history/privacy cases passed`);
 })().catch(e=>{console.error(e);process.exitCode=1});
