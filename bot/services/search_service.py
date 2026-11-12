@@ -250,7 +250,6 @@ async def search_lamps(*, keyword: str | None = None, city: str | None = None, p
         else:
             by_hot = sort == "hot"
             if by_hot:
-                from datetime import datetime
                 now = datetime.utcnow()
                 stmt = (select(Lamp).where(and_(*conditions))
                         .order_by(
