@@ -9,7 +9,7 @@ html body .ls-cell em{font-style:normal;font-size:10px;color:var(--t-muted);}
 html body #revStars.rk-hide{display:none!important;}
 html body .rk-stars{display:flex;align-items:center;gap:4px;margin:4px 0 10px;}
 html body .rk-stars [data-star]{width:40px;height:40px;padding:0;border:0;background:transparent;font-size:30px;line-height:40px;color:rgba(255,255,255,.18);cursor:pointer;}
-html body .rk-stars [data-star].on{color:#E3C88A;text-shadow:0 0 8px rgba(227,200,138,.35);}
+html body .rk-stars [data-star].on{color:var(--t-link,#E3C88A);text-shadow:0 0 8px rgba(227,200,138,.35);}
 html body .rk-lbl{margin-left:8px;font-size:13px;color:var(--t-accent);}
 html body .rk-photos{display:flex;gap:8px;margin:8px 0 12px;}
 html body .rk-ph,html body .rk-add{position:relative;width:76px;height:76px;border-radius:10px;overflow:hidden;flex:0 0 auto;}

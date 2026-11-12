@@ -15,7 +15,7 @@
 .hist-check input{width:20px;height:20px;margin-top:2px;flex:0 0 20px;}
 .hist-diff{margin:0;padding:0;list-style:none;}
 .hist-diff li{border-bottom:1px solid rgba(212,178,106,.15);padding:8px 0;font-size:13px;}
-.hist-diff b{display:block;color:#D4B26A;font-size:12px;margin-bottom:2px;}
+.hist-diff b{display:block;color:var(--t-accent,#D4B26A);font-size:12px;margin-bottom:2px;}
 .hist-warn{color:#E7C27A;font-size:12px;margin:8px 0;}
 .hist-empty{margin:16px 0;font-size:13px;}
 html body #view-me .ls-more{position:relative;flex:0 0 auto;}

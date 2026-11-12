@@ -10,8 +10,8 @@ html body .area-panel{position:absolute;top:calc(100% + 6px);left:0;right:0;z-in
 html body .area-chips{display:flex;flex-wrap:wrap;gap:8px;}
 html body .area-chip{display:inline-flex;align-items:center;min-height:32px;padding:5px 12px;border-radius:999px;border:1px solid var(--t-line);background:transparent;color:var(--t-text);font-size:13px;}
 html body .area-chip i{font-style:normal;margin-left:5px;font-size:11px;color:var(--t-muted);}
-html body .area-chip.on{background:linear-gradient(90deg,#C9A45C,#E3C88A);color:#13241F;border-color:transparent;font-weight:600;}
-html body .area-chip.on i{color:#13241F;opacity:.75;}
+html body .area-chip.on{background:var(--t-grad-cta,linear-gradient(90deg,#C9A45C,#E3C88A));color:var(--t-grad-cta-text,#13241F);border-color:transparent;font-weight:600;}
+html body .area-chip.on i{color:var(--t-grad-cta-text,#13241F);opacity:.75;}
 html body .area-empty{margin:8px 2px 0;font-size:12px;}
 html body #guideSheet{z-index:90;}
 /* 排序（评价多 / 最新上架）：在地区面板顶部，浮层内，不推动首页 */

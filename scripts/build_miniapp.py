@@ -19,6 +19,7 @@ MINI = Path(__file__).resolve().parent.parent / "miniapp"
 CSS = [
     "styles.css", "home-fix.css", "home-inline.css", "theme-emerald.css",
     "status-badge.css", "hours.css", "area-filter.css", "upgrades.css", "place-pick.css", "coupons.css", "me-layout.css", "community.css", "entry-announcement.css", "edit-state-ui.css", "edit-history-ui.css",
+    "theme-rose.css",
 ]
 JS = [
     "cover.js", "net-cache.js", "resilience.js", "app.js", "home-ui.js", "hours-picker.js",
