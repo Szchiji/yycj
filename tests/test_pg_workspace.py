@@ -123,7 +123,7 @@ def test_city_announcement_partial_save_preserves_independent_switch(monkeypatch
             assert '深圳' not in (await home.get_or_create_settings())['city_announcements']
             f={x['key']:x for x in r.json()['config']['fields']}
             assert f['announcement_text']['effective']=='全站公告' and f['announcement_enabled']['effective'] is False
-            assert r.json()['config']['announcement_effective']=={'text':'全站公告','enabled':True,'source':'global'}
+            assert r.json()['config']['announcement_effective']=={'text':'全站公告','items':['全站公告'],'enabled':True,'source':'global'}
     run(check())
 
 
@@ -161,7 +161,7 @@ def test_parallel_city_and_announcement_patches_do_not_erase_other_fields(monkey
             assert site['city_overrides']['深圳']['community_backup_url'].endswith('/sz')
             assert site['city_overrides']['广州']['community_backup_url'].endswith('/gz')
             assert site['city_overrides']['深圳']['link_label_reviews']==''
-            assert site['city_announcements']['深圳']=={'text':'并发新正文','enabled':True}
+            assert site['city_announcements']['深圳']=={'text':'并发新正文','items':['并发新正文'],'enabled':True}
             assert site['bot_welcome_text']=='保留欢迎正文'
     run(check())
 
@@ -171,7 +171,7 @@ def test_all_true_admin_entrypoints_use_new_shell_without_fixture_routes(monkeyp
         async with environment(monkeypatch) as(c,h,home):
             for url in ['/app/admin.html','/app/console.html','/app/desk.html']:
                 r=await c.get(url);assert r.status_code==200
-                assert 'workspaceNav' in r.text and 'workspace.js?v=20261112a' in r.text
+                assert 'workspaceNav' in r.text and 'workspace.js?v=20261112b' in r.text
                 assert 'workspace_fixture' not in r.text and 'OFFLINE_FIXTURE' not in r.text
                 assert 'no-store' in r.headers['cache-control']
             r=await c.get('/app/desk-legacy.html');assert r.status_code==200
@@ -191,4 +191,27 @@ def test_global_channel_save_reuses_feature_validation(monkeypatch):
             assert r.status_code==200,r.text
             validate.assert_awaited_once_with({'broadcast_channel':'@normalized_test'},city=None)
             assert (await home.get_or_create_settings())['broadcast_channel']=='@normalized_test'
+    run(check())
+
+
+def test_multi_announcement_items_round_trip_and_legacy_text(monkeypatch):
+    async def check():
+        async with environment(monkeypatch) as(c,h,home):
+            r=await c.post('/api/admin/workspace/config',headers=h(1),json={'section':'announcement','changes':{'announcement_enabled':True,'announcement_items':['全站第一条','全站第二条']}})
+            assert r.status_code==200,r.text
+            site=await home.get_or_create_settings()
+            assert site['announcement_text']=='全站第一条'
+            assert site['announcement_items']==['全站第一条','全站第二条']
+            from bot.services.home_feed import resolve_home_announcement
+            assert resolve_home_announcement(site,'广州')=={'text':'全站第一条','items':['全站第一条','全站第二条'],'enabled':True}
+            r=await c.post('/api/admin/workspace/config',headers=h(1),json={'city':'深圳','section':'announcement','changes':{'announcement_enabled':True,'announcement_items':['深圳一','深圳二']}})
+            assert r.status_code==200,r.text
+            site=await home.get_or_create_settings()
+            assert site['city_announcements']['深圳']=={'text':'深圳一','items':['深圳一','深圳二'],'enabled':True}
+            assert resolve_home_announcement(site,'深圳')['items']==['深圳一','深圳二']
+            assert resolve_home_announcement(site,'广州')['items']==['全站第一条','全站第二条']
+            # Legacy single-text save replaces the list; old column still readable.
+            r=await c.post('/api/admin/cities/announcement',headers=h(1),json={'city':'深圳','text':'只留一条','enabled':True})
+            assert r.status_code==200,r.text
+            assert (await home.get_or_create_settings())['city_announcements']['深圳']['items']==['只留一条']
     run(check())

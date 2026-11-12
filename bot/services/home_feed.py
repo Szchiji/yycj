@@ -41,8 +41,10 @@ DEFAULT_OPS = {
     "extra_admin_ids": [],
     # {"<operator user_id>": ["深圳", ...]}: operators listed here only see / act on those cities.
     "operator_cities": {},
-    # {"深圳": {"text": "...", "enabled": true}}: overrides the global announcement on that city's home.
+    # {"深圳": {"text": "...", "items": ["..."], "enabled": true}}: overrides the global announcement on that city's home.
     "city_announcements": {},
+    # Global multi-item home ticker; announcement_text column remains the first/compat item.
+    "announcement_items": [],
     # {"深圳": {"broadcast_channel": "@sz_ch", ...}}: per-city overrides; missing/empty = site-wide value.
     "city_overrides": {},
     "approve_promo_text": "你的资料已上架。\n欢迎把月影车姬介绍给朋友：在 Telegram 搜索同名机器人，点左下角「首页」开始。",
@@ -129,6 +131,52 @@ CITY_KEYS = [
     {"key": "listing_days", "label": "上架天数", "type": "int", "min": 1, "max": 365, "super": True},
 ]
 CITY_KEY_MAP = {x["key"]: x for x in CITY_KEYS}
+
+
+
+ANN_ITEM_MAX = 2000
+ANN_ITEMS_MAX = 8
+
+
+def normalize_announcement_items(text=None, items=None) -> List[str]:
+    """Compat-read: prefer items when present, otherwise a single legacy text. No backfill writes."""
+    out: List[str] = []
+    if isinstance(items, list):
+        for x in items:
+            s = str(x or "").strip()[:ANN_ITEM_MAX]
+            if s:
+                out.append(s)
+            if len(out) >= ANN_ITEMS_MAX:
+                break
+    if out:
+        return out
+    s = str(text or "").strip()[:ANN_ITEM_MAX]
+    return [s] if s else []
+
+
+def pack_announcement(text=None, items=None, enabled: bool = False) -> Dict[str, Any]:
+    cleaned = normalize_announcement_items(text, items)
+    return {
+        "text": cleaned[0] if cleaned else "",
+        "items": cleaned,
+        "enabled": bool(enabled) and bool(cleaned),
+    }
+
+
+def resolve_home_announcement(settings: Dict[str, Any], city: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """City override wins when it has enabled non-empty items; empty/disabled city falls back to global.
+    Returning None matches the existing 'no content / switch off → do not display' rule.
+    """
+    city_ann = (settings.get("city_announcements") or {}).get(city or "")
+    if isinstance(city_ann, dict) and city_ann.get("enabled"):
+        packed = pack_announcement(city_ann.get("text"), city_ann.get("items"), True)
+        if packed["items"]:
+            return {"text": packed["text"], "items": packed["items"], "enabled": True}
+    if settings.get("announcement_enabled"):
+        packed = pack_announcement(settings.get("announcement_text"), settings.get("announcement_items"), True)
+        if packed["items"]:
+            return {"text": packed["text"], "items": packed["items"], "enabled": True}
+    return None
 
 
 def audit_on(value: Any) -> bool:
@@ -322,10 +370,11 @@ def merge_ops(raw) -> Dict[str, Any]:
             c = str(city or "").strip()[:32]
             if not c or not isinstance(v, dict):
                 continue
-            text = str(v.get("text") or "")[:2000]
-            if text.strip() or v.get("enabled"):
-                anns[c] = {"text": text, "enabled": bool(v.get("enabled")) and bool(text.strip())}
+            packed = pack_announcement(v.get("text"), v.get("items"), v.get("enabled"))
+            if packed["items"] or v.get("enabled"):
+                anns[c] = packed
     out["city_announcements"] = anns
+    out["announcement_items"] = normalize_announcement_items(None, out.get("announcement_items"))
     out["city_overrides"] = clean_city_overrides(out.get("city_overrides"))
     return out
 

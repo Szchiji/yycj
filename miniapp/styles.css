@@ -105,14 +105,16 @@ input, textarea, select {
 }
 label { font-size: .85rem; color: var(--muted); }
 .announce {
-  overflow: hidden; white-space: nowrap; background: #1c2748;
+  overflow: hidden; white-space: normal; background: #1c2748;
   border: 1px solid var(--line); border-radius: 10px;
-  padding: 6px 10px; margin-bottom: 8px; color: var(--warn); font-size: .8rem;
+  padding: 6px 10px; margin: 0 0 6px; color: var(--warn); font-size: .8rem;
 }
-.announce span { display: inline-block; padding-left: 100%; animation: marquee 18s linear infinite; }
-@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+.announce .announce-viewport { overflow: hidden; position: relative; }
+.announce .announce-track { will-change: transform; }
+.announce .announce-item { line-height: 1.45; }
+.announce.is-static .announce-item { white-space: normal; }
 .pins {
-  display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px;
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
 }
 .pin-card, .pin-card.short {

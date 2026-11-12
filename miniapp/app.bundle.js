@@ -274,7 +274,7 @@ try {
 ;} catch (e) { try { console.error("resilience.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "resilience.js" }); } catch (x) {} }
 /* ---- app.js ---- */
 try {
-(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor((getComputedStyle(document.documentElement).getPropertyValue("--t-bg")||"#08050C").trim()||"#08050C")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"}`:"";const c=n.announcement,o=a("#announce");c&&c.text?(o.classList.remove("hidden"),o.innerHTML=`<span>${s(c.text)}</span>`):o.classList.add("hidden");try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();if(window.__yycjSubmitReview)return void window.__yycjSubmitReview({go:g,refresh:S});try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:window.__yycjRevPhotos?window.__yycjRevPhotos():[]})}),window.__yycjRevReset&&window.__yycjRevReset(),c(window.__yycjRevDoneMsg||"评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
+(()=>{const t=window.Telegram&&window.Telegram.WebApp;if(t){t.ready(),t.expand();try{t.setHeaderColor((getComputedStyle(document.documentElement).getPropertyValue("--t-bg")||"#08050C").trim()||"#08050C")}catch(t){}}const e={guest:"客人",teacher:"老师",merchant:"商家"},i={token:localStorage.getItem("yycj_token")||"",user:null,isAdmin:!1,city:localStorage.getItem("yycj_city")||"",cities:[],lat:null,lng:null,home:null,scoringRules:null},a=t=>document.querySelector(t),n=t=>Array.from(document.querySelectorAll(t));function s(t){return String(t??"").replace(/[&<>"']/g,(t=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[t])))}function c(t,e){const i=a("#toast");i.textContent=t||"",i.classList.toggle("hidden",!t),i.classList.toggle("err",!!e),t&&setTimeout((()=>i.classList.add("hidden")),2800)}function o(t){const e=a("#boot");if(e&&(e.classList.remove("hidden"),a("#gate")?.classList.add("hidden"),a("#app")?.classList.add("hidden"),null!=t)){const e=a("#bootMsg");e&&(e.textContent=t)}}function r(){a("#boot")?.classList.add("hidden");const t=a("#bootRetry");t&&t.classList.add("hidden")}function l(t){o(t||"连接失败，请重试");const e=a("#bootRetry");e&&e.classList.remove("hidden")}function d(t){return new Promise((e=>setTimeout(e,t)))}async function u(t,e={}){const a=Object.assign({"Content-Type":"application/json"},e.headers||{});i.token&&(a.Authorization=`Bearer ${i.token}`);const n=await fetch(t,{...e,headers:a});let s=null;try{s=await n.json()}catch(t){}if(!n.ok){const t=s&&(s.detail||s.message)||n.statusText;throw new Error("string"==typeof t?t:JSON.stringify(t))}return s}function p(t){function u(x){x=String(x||"").trim();if(!x)return"";if(x.toLowerCase().startsWith("file_id:"))return u(x.slice(8));if(x.startsWith("http")||x.startsWith("/"))return x;return "/api/media/file/"+encodeURIComponent(x)}for(const m of t.media||[]){if(m&&m.type==="video")continue;const v=u((m&&(m.preview_url||m.file_id||m.url))||"");if(v)return v}for(const e of t.photos||[]){const v=u(e);if(v&&!String(e).startsWith("BAAC"))return v}return ""}async function m(){o("正在连接…");const t=await async function(t=3500){const e=Date.now()+t;for(;Date.now()<e;){const t=window.Telegram&&window.Telegram.WebApp,e=t&&t.initData||"";if(e)return e;await d(100)}const i=window.Telegram&&window.Telegram.WebApp,a="undefined"!=typeof location&&location.pathname||"",n=/\/app$/.test(a),s=!!(i&&i.initDataUnsafe&&i.initDataUnsafe.user);return i&&i.initData||""}(3500);if(!t){const t=window.Telegram&&window.Telegram.WebApp,e="undefined"!=typeof location&&location.pathname||"",i=!!(t&&t.initDataUnsafe&&t.initDataUnsafe.user);l(i?"页面被重定向导致登录丢失，请更新后重试":"未检测到 Telegram 登录信息。请在 Telegram 内打开。");return!1}try{o("正在登录…");const e=await u("/api/auth",{method:"POST",body:JSON.stringify({initData:t})});return i.token=e.token,i.user=e.user,i.isAdmin=!!e.is_admin,localStorage.setItem("yycj_token",i.token),!0}catch(t){return l(`登录失败：${t.message||String(t)}`),!1}}async function y(t){const e=await u("/api/me/role",{method:"POST",body:JSON.stringify({role:t})});return i.user=e.user,localStorage.setItem("yycj_role",t),e}function h(t){r(),a("#gate").classList.toggle("hidden",!t),a("#app").classList.toggle("hidden",t)}function g(t){n(".view").forEach((t=>t.classList.add("hidden")));const e=a(`#view-${t}`);e&&e.classList.remove("hidden"),n(".nav-item").forEach((e=>e.classList.toggle("active",e.dataset.nav===t)))}function v(t){return"teacher"===t||"merchant"===t?"publish":"home"}async function f(){const t=new URLSearchParams;i.city&&t.set("city",i.city),null!=i.lat&&t.set("lat",String(i.lat)),null!=i.lng&&t.set("lng",String(i.lng)),t.set("limit","30");const n=await u(`/api/home?${t}`);i.home=n,i.cities=n.enabled_cities||[],n.city&&!i.city&&(i.city=n.city,localStorage.setItem("yycj_city",i.city)),a("#btnCity").textContent=`${i.city||"城市"} ▾`,a("#topMeta").textContent=i.user?`${e[i.user.role]||"未设身份"}`:"";if(window.__yycjPaintAnnounce)window.__yycjPaintAnnounce(n);else{const c=n.announcement,o=a("#announce");if(o){const items=(c&&Array.isArray(c.items)?c.items:[]).map(x=>String(x||"").trim()).filter(Boolean),text=String(c&&c.text||"").trim(),show=items.length?items:[text].filter(Boolean);show.length?(o.classList.remove("hidden"),o.innerHTML=`<div class="announce-viewport"><div class="announce-item">${s(show[0])}</div></div>`):o.classList.add("hidden")}}try{window.__yycjReloadHome&&window.__yycjReloadHome()}catch(t){}w()}function w(){a("#cityList").innerHTML=(i.cities||[]).map((t=>`<button class="role-btn" data-city="${s(t)}" type="button">${s(t)}</button>`)).join("")||'<p class="muted">暂无开放城市</p>';const t=a("#pubCity");t&&(t.innerHTML=(i.cities||[]).map((t=>`<option value="${s(t)}" ${t===i.city?"selected":""}>${s(t)}</option>`)).join(""))}async function b(e){const n=new URLSearchParams;null!=i.lat&&n.set("lat",String(i.lat)),null!=i.lng&&n.set("lng",String(i.lng));const o=n.toString()?`?${n}`:"",r=await u(`/api/lamps/${encodeURIComponent(e)}${o}`),l=r.lamp,d=r.reputation||{};if(window.__yycjOpenLamp&&window.__yycjOpenLamp!==e)return;if(window.__yycjRenderDetail&&window.__yycjRenderDetail(r,e)){a("#view-detail").classList.contains("hidden")||g("detail");return}a("#detail").innerHTML=`<div class="card"><h3>${s(l.title||"")}</h3><div class="muted">📍 ${s(l.city||"")}${l.district?" · "+s(l.district):""}</div><div class="muted">💰 ${s(l.price_text||"面议")}</div><p>${s(l.description||"")}</p><div class="row"><button class="btn primary" id="detailChat" type="button">想聊聊</button><button class="btn" id="detailReport" type="button">举报</button><button class="btn" id="detailReview" type="button">写评价</button></div></div>`,a("#view-detail").classList.contains("hidden")||g("detail"),a("#detailChat").onclick=()=>$(l.lamp_id),a("#detailReport").onclick=async()=>{const i=prompt("举报原因")||"";if(!i)return;await u("/api/reports",{method:"POST",body:JSON.stringify({lamp_id:l.lamp_id,reason:i,description:""})});c("举报已提交")},a("#detailReview").onclick=()=>{a("#revLampId").value=l.lamp_id,g("review")}}async function $(e){const nick=((a("#guestNick")&&a("#guestNick").value)||localStorage.getItem("yycj_guest_nick")||"").trim().slice(0,16);const body={lamp_id:e};nick&&(body.guest_alias=nick);const i=await u("/api/sessions/request",{method:"POST",body:JSON.stringify(body)});c(i.message||"已发送")}async function L(t){t.preventDefault();const e=i.user&&i.user.role;if("teacher"!==e&&"merchant"!==e)return void c("请先切换身份",!0);c("ok")}async function S(){const t=await u("/api/me");i.user=t.user,i.isAdmin=!!t.is_admin;const n=t.user||{};a("#meCard").innerHTML=`<div class="muted">${s(e[n.role]||"")}</div>`;a("#adminEntry").classList.toggle("hidden",!i.isAdmin)}async function _(){const t=v(i.user&&i.user.role);g("home"),await f().catch((()=>{})),w(),await S().catch((()=>{}))}async function T(){try{if(!await m())return;if(r(),!i.user||!i.user.role){try{await y("guest")}catch(t){return void l(`设置客人身份失败：${t.message||String(t)}`)}}h(!1),await _()}catch(t){l(`启动失败：${t.message||String(t)}`)}}n(".role-btn[data-role]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.role),h(!1),await _()}catch(t){c(t.message||String(t),!0)}}))));n("[data-switch]").forEach((t=>t.addEventListener("click",(async()=>{try{await y(t.dataset.switch),await S();g("home");await f()}catch(t){c(t.message||String(t),!0)}}))));n(".nav-item").forEach((t=>t.addEventListener("click",(async()=>{const e=t.dataset.nav;if(e==="fav")return;g(e);try{"home"===e&&await f(),"me"===e&&await S()}catch(t){c(t.message||String(t),!0)}}))));a("#btnCity")&&a("#btnCity").addEventListener("click",(()=>{w();a("#citySheet")&&a("#citySheet").classList.remove("hidden")}));a("#cityClose")&&a("#cityClose").addEventListener("click",(()=>a("#citySheet").classList.add("hidden")));a("#cityList")&&a("#cityList").addEventListener("click",(async t=>{const e=t.target.closest("[data-city]");if(e){i.city=e.dataset.city,localStorage.setItem("yycj_city",i.city);a("#citySheet")&&a("#citySheet").classList.add("hidden");try{await f()}catch(t){c(t.message||String(t),!0)}}}));a("#pins")&&a("#pins").addEventListener("click",(async t=>{const e=t.target.closest("[data-id]");if(e)try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#feed")&&a("#feed").addEventListener("click",(async t=>{if(t.target.closest("[data-fav]"))return;const e=t.target.closest("[data-id]");if(!e)return;try{await b(e.dataset.id)}catch(t){c(t.message||String(t),!0)}}));a("#btnBackHome")&&a("#btnBackHome").addEventListener("click",(()=>{if(window.__yycjBack==="fav")return;g("home")}));a("#rulesClose")&&a("#rulesClose").addEventListener("click",(()=>a("#rulesSheet").classList.add("hidden")));a("#publishForm")&&a("#publishForm").addEventListener("submit",(async t=>{try{await L(t)}catch(t){c(t.message||String(t),!0)}}));a("#reviewForm")&&a("#reviewForm").addEventListener("submit",(async t=>{t.preventDefault();if(window.__yycjSubmitReview)return void window.__yycjSubmitReview({go:g,refresh:S});try{await u("/api/reviews",{method:"POST",body:JSON.stringify({lamp_id:a("#revLampId").value,stars:parseInt(a("#revStars").value,10)||5,text:a("#revText").value.trim(),photos:window.__yycjRevPhotos?window.__yycjRevPhotos():[]})}),window.__yycjRevReset&&window.__yycjRevReset(),c(window.__yycjRevDoneMsg||"评价已提交"),g("me"),await S()}catch(t){c(t.message||String(t),!0)}}));const gn=a("#guestNick");gn&&(gn.value=localStorage.getItem("yycj_guest_nick")||"");const bn=a("#btnSaveNick");bn&&bn.addEventListener("click",(()=>{const v=((a("#guestNick")&&a("#guestNick").value)||"").trim().slice(0,16);localStorage.setItem("yycj_guest_nick",v);c(v?"代称已保存":"已清除代称")}));const x=a("#bootRetry");x&&x.addEventListener("click",(()=>{x.classList.add("hidden"),T()}));T()})();
 ;} catch (e) { try { console.error("app.js", e); if (window.__yycjReport) window.__yycjReport({ ev: "js_error", msg: String((e && e.message) || e), src: "app.js" }); } catch (x) {} }
 /* ---- home-ui.js ---- */
 try {
@@ -439,16 +439,10 @@ try {
     const load = eager ? "eager" : "lazy";
     return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\"" + (eager ? " fetchpriority=\"high\"" : "") + " />";
   }
-  // Card hours, compact (full label with 次日 stays on the detail page):
-  // "10-22" -> "10–22点", "20:00–次日04:00" -> "20–04点", "9:30~21:00" -> "9:30–21点"; unparsable text is shown as-is.
+  // Show the backend hours_label as-is (e.g. "10:00–22:00", "20:00–次日04:00").
+  // Do not compact to "10–00点" / "10–22点" — the card reserves a dedicated hours row.
   function fmtHours(raw) {
-    const s = String(raw || "").trim().replace(/：/g, ":");
-    if (!s) return "";
-    const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*[-–—~～至到]\s*(?:次日)?\s*(\d{1,2})(?::(\d{2}))?$/);
-    if (!m) return s;
-    const a = m[2] && m[2] !== "00" ? m[1] + ":" + m[2] : m[1];
-    const b = m[4] && m[4] !== "00" ? m[3] + ":" + m[4] : m[3];
-    return a.padStart(2, "0") + "–" + b.padStart(2, "0") + "点";
+    return String(raw || "").trim().replace(/：/g, ":");
   }
   function cardHtml(t, idx) {
     const img = cover(t);
@@ -460,6 +454,7 @@ try {
     // 优惠 (option A): a small 「惠」 pill in the title row, like 置顶 — card size unchanged
     const cpn = t.coupon && window.__yycjCouponMode && window.__yycjCouponMode("badge") ? "<span class=\"badge-cpn\" title=\"" + esc(t.coupon.text || "") + "\">惠</span>" : "";
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
+    const hours = fmtHours(t.hours_text);
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
       imgTag(img, "thumb", idx < 3) +
       // 收藏只在详情页；卡片左上角放营业状态书签
@@ -467,7 +462,7 @@ try {
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
       (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
-      "</div><div class=\"body\"><h3>" + pin + cpn + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + (fmtHours(t.hours_text) ? "<span class=\"st-hours\"> · " + esc(fmtHours(t.hours_text)) + "</span>" : "") + "</div></div></div>";
+      "</div><div class=\"body\"><h3>" + pin + cpn + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + "</div><div class=\"st-hours" + (hours ? "" : " is-empty") + "\">" + (hours ? esc(hours) : "&nbsp;") + "</div></div></div>";
   }
   function pinHtml(p, idx) {
     const t = (p && p.lamp) || p || {};
@@ -489,6 +484,72 @@ try {
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
+
+  let announceTimer = 0, announceIdx = 0;
+  const ANNOUNCE_FLIP_MS = 4200;
+  function announceItemsOf(data) {
+    const a = data && data.announcement;
+    if (!a || a.enabled === false) return [];
+    const raw = Array.isArray(a.items) ? a.items : [];
+    const items = raw.map((x) => String(x || "").trim()).filter(Boolean);
+    if (items.length) return items;
+    const text = String(a.text || "").trim();
+    return text ? [text] : [];
+  }
+  function stopAnnounce() {
+    if (announceTimer) { clearInterval(announceTimer); announceTimer = 0; }
+  }
+  function paintAnnounce(data) {
+    const ann = $("#announce");
+    if (!ann) return;
+    stopAnnounce();
+    announceIdx = 0;
+    const items = announceItemsOf(data);
+    if (!items.length) {
+      ann.classList.add("hidden");
+      ann.classList.remove("is-flip", "is-static");
+      ann.innerHTML = "";
+      return;
+    }
+    ann.classList.remove("hidden");
+    if (items.length === 1) {
+      ann.classList.add("is-static");
+      ann.classList.remove("is-flip");
+      ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-item\">" + esc(items[0]) + "</div></div>";
+      return;
+    }
+    ann.classList.add("is-flip");
+    ann.classList.remove("is-static");
+    const slides = items.concat([items[0]]);
+    ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-track\">" +
+      slides.map((x) => "<div class=\"announce-item\">" + esc(x) + "</div>").join("") +
+      "</div></div>";
+    const track = ann.querySelector(".announce-track");
+    const viewport = ann.querySelector(".announce-viewport");
+    const vis = ann.querySelectorAll(".announce-track > .announce-item");
+    let max = 0;
+    for (let i = 0; i < items.length; i += 1) max = Math.max(max, vis[i].offsetHeight || 0);
+    if (!max) max = vis[0] ? vis[0].scrollHeight || 22 : 22;
+    for (let i = 0; i < vis.length; i += 1) vis[i].style.minHeight = max + "px";
+    if (viewport) viewport.style.height = max + "px";
+    function go(next) {
+      announceIdx = next;
+      const h = viewport ? viewport.offsetHeight : max;
+      track.style.transition = "transform .45s ease";
+      track.style.transform = "translateY(" + (-announceIdx * h) + "px)";
+      if (announceIdx === items.length) {
+        setTimeout(() => {
+          if (!track.isConnected) return;
+          track.style.transition = "none";
+          track.style.transform = "translateY(0)";
+          announceIdx = 0;
+        }, 480);
+      }
+    }
+    announceTimer = setInterval(() => go(announceIdx + 1), ANNOUNCE_FLIP_MS);
+  }
+  window.__yycjPaintAnnounce = paintAnnounce;
+
   function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
     mapOptions=data.map_filter_options||null;mapOptionsCity=data.city||curCity();
@@ -505,11 +566,7 @@ try {
     paint();
     $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
     const homeEvent=new CustomEvent("yycj:home-data", {detail:data});homeEvent.mapRequest=mapRequest;window.dispatchEvent(homeEvent);
-    const ann = $("#announce");
-    if (ann && data.announcement && data.announcement.text) {
-      ann.classList.remove("hidden");
-      ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
-    }
+    paintAnnounce(data);
   }
   let loadSequence = 0, loadCtl = null, mapBusy = false, mapDirty = false, mapOptions = null, mapOptionsCity = "";
   function cancelLoad(){if(!loadCtl)return;loadCtl.abort();loadCtl=null;++loadSequence;mapBusy=false;window.dispatchEvent(new CustomEvent('yycj:map-cancel'));paintMapFilters();}
@@ -857,7 +914,8 @@ try {
     const pins = $("#pins");
     if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card")) {
       const card = pins.querySelector(".pin-card");
-      const step = card ? card.offsetWidth + 10 : 160;
+      const gap = pins ? (parseFloat(window.getComputedStyle(pins).columnGap || pins.style.gap) || 6) : 6;
+      const step = card ? card.offsetWidth + gap : 160;
       if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollLeft = 0;
       else pins.scrollLeft += step;
     }

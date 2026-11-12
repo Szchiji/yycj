@@ -4,7 +4,7 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 MINI = ROOT / "miniapp"
-V = "20261112d"
+V = "20261112e"
 BRASS = ("#0F2420", "#D4B26A", "#16302A", "#C9A45C", "#E3C88A", "#1C3D35")
 VISITOR_CSS = [
     "styles.css", "home-fix.css", "home-inline.css", "status-badge.css", "hours.css",
@@ -81,7 +81,7 @@ def test_palette_tokens():
 
 def test_layout_rules_kept():
     rose = _read("theme-rose.css")
-    assert "height: 224px" in rose
+    assert "height: 240px" in rose
     assert "height: 168px" in rose
     inline = _read("home-inline.css")
     assert "grid-template-columns:1fr 1fr 1fr" in inline or "grid-template-columns: 1fr 1fr 1fr" in inline

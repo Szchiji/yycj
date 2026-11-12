@@ -107,14 +107,16 @@ input, textarea, select {
 }
 label { font-size: .85rem; color: var(--muted); }
 .announce {
-  overflow: hidden; white-space: nowrap; background: #1c2748;
+  overflow: hidden; white-space: normal; background: #1c2748;
   border: 1px solid var(--line); border-radius: 10px;
-  padding: 6px 10px; margin-bottom: 8px; color: var(--warn); font-size: .8rem;
+  padding: 6px 10px; margin: 0 0 6px; color: var(--warn); font-size: .8rem;
 }
-.announce span { display: inline-block; padding-left: 100%; animation: marquee 18s linear infinite; }
-@keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+.announce .announce-viewport { overflow: hidden; position: relative; }
+.announce .announce-track { will-change: transform; }
+.announce .announce-item { line-height: 1.45; }
+.announce.is-static .announce-item { white-space: normal; }
 .pins {
-  display: flex; gap: 10px; overflow-x: auto; padding: 2px 0 8px;
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
 }
 .pin-card, .pin-card.short {
@@ -212,7 +214,7 @@ a { color: var(--accent); }
 .media-preview { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
 /* ---- home-fix.css ---- */
 #pins {
-  display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory;
+  display:flex; gap:6px; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; padding: 2px 0 0; margin: 0;
 }
 #pins .pin-card {
@@ -256,7 +258,7 @@ a { color: var(--accent); }
 /* moved verbatim from the inline <style> in go.html / index.html (same cascade position) */
     #feed,#pins{visibility:visible!important;}
     #topMeta{display:none!important;}
-    #pins { margin-bottom:4px!important;padding-bottom:0!important;display:flex !important; gap:10px; overflow-x:auto !important; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+    #pins { margin-bottom:2px!important;padding-bottom:0!important;display:flex !important; gap:6px; overflow-x:auto !important; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
     #pins .pin-card { flex:0 0 46%!important; width:46%!important; min-width:46%!important; aspect-ratio:3/4!important; height:auto!important; position:relative!important; overflow:hidden!important; border-radius:14px!important; scroll-snap-align:start; display:block!important; }
     #pins .pin-card img.pin-cover, #pins .pin-card img.thumb { display:block!important; position:absolute!important; inset:0!important; width:100%!important; height:100%!important; object-fit:cover!important; }
     #pins .pin-copy { position:absolute; left:0; right:0; bottom:0; padding:28px 10px 10px; background:linear-gradient(transparent,rgba(0,0,0,.72)); color:#fff; z-index:2; }
@@ -348,7 +350,7 @@ html body #yycjViewer .g-thumb{background:var(--t-thumb)!important;}
 html body #yycjViewer .g-thumb.on{border-color:var(--t-goldbg)!important;}
 /* ---- status-badge.css ---- */
 /* 首页 / 详情 营业状态：黄铜书签角标（墨绿金）。只改角标本身，不动卡片尺寸。 */
-html body #feed .feed-card .muted.price{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html body #feed .feed-card .muted.price{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;}
 html body .st-hours{color:var(--t-muted);}
 html body .badge-open{position:absolute!important;top:7px;left:0;z-index:3;display:inline-flex;align-items:center;padding:1px 8px 1px 6px;border-radius:0 8px 8px 0;font-size:9px;line-height:14px;font-weight:700;letter-spacing:.3px;color:var(--t-open-fg,#13241F);background:var(--t-open-bg,linear-gradient(90deg,#C9A45C,#E3C88A));box-shadow:var(--t-open-glow,0 1px 4px rgba(0,0,0,.35));pointer-events:none;}
 html body .badge-open.st-rest{color:var(--t-rest-fg,#D4D8D0);background:var(--t-rest-bg,rgba(20,32,29,.78));box-shadow:none;font-weight:600;}
@@ -1096,11 +1098,14 @@ html body #mapFullQ {
   color: var(--t-text) !important;
 }
 
-/* ---- glass cards: keep 117×224 / 3-col / 8px gap / 12px inset ---- */
+/* ---- glass cards: 3-col same size; 168 cover + 72 body (title/price + reserved hours) ---- */
 html body #feed.has-cover .feed-card.cover-card,
 html body #favList .feed-card.cover-card {
   position: relative;
-  height: 224px;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  gap: 0 !important;
   overflow: visible !important;
   background: var(--glass) !important;
   border: 1px solid rgba(255, 46, 107, 0.46) !important;
@@ -1137,7 +1142,27 @@ html body #favList .cover-wrap {
 }
 html body #feed .feed-card .body,
 html body #favList .feed-card .body {
-  height: 56px;
+  height: 72px;
+  min-height: 72px;
+  max-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+html body #feed .feed-card .st-hours,
+html body #favList .feed-card .st-hours {
+  display: block;
+  flex: none;
+  min-height: 1.25em;
+  max-height: 2.5em;
+  line-height: 1.25;
+  font-size: 11px;
+  overflow: hidden;
+}
+html body #feed .feed-card .st-hours.is-empty,
+html body #favList .feed-card .st-hours.is-empty {
+  visibility: hidden;
 }
 html body #feed .feed-card h3,
 html body #favList .feed-card h3 {

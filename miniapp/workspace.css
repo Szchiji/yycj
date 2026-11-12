@@ -296,3 +296,8 @@
  .workspace-body .ws-editor-details>summary{min-height:44px;padding:10px 12px}
  .workspace-body #sideMask.open{inset:56px 0 0}
 }
+
+.workspace-body .ws-ann-list{display:flex;flex-direction:column;gap:8px}
+.workspace-body .ws-ann-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
+.workspace-body .ws-ann-row textarea{min-height:64px;width:100%;resize:vertical}
+.workspace-body .ws-ann-row [data-ann-del]{margin-top:4px}

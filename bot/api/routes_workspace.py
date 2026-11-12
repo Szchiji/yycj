@@ -9,7 +9,7 @@ from bot.services.admin_acl import is_super
 from bot.services.home_feed import CITY_KEYS,DEFAULT_OPS
 
 SITE={
- 'announcement_text':('首页公告','textarea','announcement'),'announcement_enabled':('显示首页公告','bool','announcement'),
+ 'announcement_text':('首页公告','textarea','announcement'),'announcement_enabled':('显示首页公告','bool','announcement'),'announcement_items':('首页公告（可设多条）','announcement_items','announcement'),
  'enabled_cities':('已开通城市','lines','system'),'bot_welcome_enabled':('发送欢迎消息','bool','welcome'),
  'bot_welcome_text':('欢迎正文','textarea','welcome'),'bot_welcome_buttons':('欢迎按钮','welcome_buttons','welcome'),
  'media_channel_id':('媒体存储频道','text','system'),'required_chats':('必加入群配置','json','system'),
@@ -31,7 +31,7 @@ def section(key):
 
 def schema():
  out={m['key']:{**m,'section':section(m['key'])} for m in CITY_KEYS}
- for k,(label,kind,group) in SITE.items():out[k]={**out.get(k,{}),'key':k,'label':label,'type':kind,'section':group,'site_only':True,'super':True}
+ for k,(label,kind,group) in SITE.items():out[k]={**out.get(k,{}),'key':k,'label':label,'type':kind,'section':group,'site_only':True,'super':True,'hidden':k=='announcement_text'}
  return out
 
 @router.get('/admin/workspace/config')
@@ -50,14 +50,33 @@ async def workspace_config(city:Optional[str]=None,admin_id:int=Depends(get_admi
    'effective':None if protected else (site.get(key,DEFAULT_OPS.get(key)) if city and value is None else value),
    'editable':rights['can_edit'] and not protected,'protected':protected})
  effective_announcement=None
+ from bot.services.home_feed import normalize_announcement_items
+ if not city:
+  # Compat-read: if ops list is empty, the legacy announcement_text column still counts.
+  for f in fields:
+   if f['key']=='announcement_items':
+    items=normalize_announcement_items(site.get('announcement_text'), site.get('announcement_items'))
+    f['value']=items; f['effective']=items if site.get('announcement_enabled') else []; f['global']=items
  if city:
   ann=(site.get('city_announcements') or {}).get(city,{})
-  local=bool(ann.get('enabled') and str(ann.get('text') or '').strip())
-  displayed=ann.get('text') if local else site.get('announcement_text') if site.get('announcement_enabled') else ''
-  effective_announcement={'text':displayed or '', 'enabled':bool(displayed),'source':'city' if local else 'global'}
-  for key,label,kind in [('announcement_text','本城公告正文','textarea'),('announcement_enabled','启用本城公告覆盖','bool')]:
-   value=ann.get('text','') if kind=='textarea' else ann.get('enabled',False)
-   fields.append({'key':key,'label':label,'type':kind,'section':'announcement','value':value,'global':site.get(key),'effective':displayed if kind=='textarea' else value,'editable':rights['can_edit'],'allow_blank':True,'inherit_supported':False,'hint':'关闭本城覆盖或清空正文＝回落全站公告；不能藉此隐藏全站公告。'})
+  local_items=normalize_announcement_items(ann.get('text'), ann.get('items'))
+  local=bool(ann.get('enabled') and local_items)
+  global_items=normalize_announcement_items(site.get('announcement_text'), site.get('announcement_items'))
+  displayed_items=local_items if local else (global_items if site.get('announcement_enabled') else [])
+  displayed=displayed_items[0] if displayed_items else ''
+  effective_announcement={'text':displayed or '', 'items':displayed_items, 'enabled':bool(displayed_items),'source':'city' if local else 'global'}
+  for key,label,kind,hidden in [
+    ('announcement_enabled','启用本城公告覆盖','bool',False),
+    ('announcement_items','首页公告（可设多条）','announcement_items',False),
+    ('announcement_text','本城公告正文','textarea',True),
+  ]:
+   if key=='announcement_items':
+    value=local_items; effective=displayed_items
+   elif kind=='textarea':
+    value=ann.get('text','') if local_items else ''; effective=displayed
+   else:
+    value=ann.get('enabled',False); effective=value
+   fields.append({'key':key,'label':label,'type':kind,'section':'announcement','value':value,'global':site.get(key) if key!='announcement_items' else global_items,'effective':effective,'editable':rights['can_edit'],'allow_blank':True,'inherit_supported':False,'hidden':hidden,'hint':'关闭本城覆盖或清空正文＝回落全站公告；不能藉此隐藏全站公告。'})
  return {'fields':fields,'announcement_effective':effective_announcement,'city':city,'is_super':is_super(admin_id),'config_revision':site.get('config_revision'),**rights}
 
 class Patch(BaseModel):
@@ -85,6 +104,7 @@ async def workspace_save(body:Patch,admin_id:int=Depends(get_admin_user_id)):
   if kind=='bool' and not isinstance(value,bool):raise HTTPException(400,'开关必须为布尔值')
   if kind=='int' and (not isinstance(value,int) or isinstance(value,bool)):raise HTTPException(400,'数值字段格式不正确')
   if kind in ('text','textarea','url') and not isinstance(value,str):raise HTTPException(400,'文案字段格式不正确')
+  if kind=='announcement_items' and (not isinstance(value,list) or any(not isinstance(x,str) for x in value)):raise HTTPException(400,'公告列表格式不正确')
   if kind=='lines' and (not isinstance(value,list) or any(not isinstance(x,str) for x in value)):raise HTTPException(400,'城市应为字符串列表')
  if not body.changes:return {'ok':True,'message':'没有字段变化'}
  if body.city:
@@ -115,7 +135,7 @@ async def workspace_save(body:Patch,admin_id:int=Depends(get_admin_user_id)):
   try:features=await channel_features.validate({k:v for k,v in changes.items() if k in feature_keys},city=None) if feature_keys.intersection(changes) else {}
   except ValueError as exc:raise HTTPException(400,str(exc)) from exc
   before=await home_service.get_or_create_settings()
-  await home_service.update_settings(announcement_text=changes.get('announcement_text'),announcement_enabled=changes.get('announcement_enabled'),enabled_cities=changes.get('enabled_cities'),ops_config={**extras,**features} or None,actor_id=admin_id)
+  await home_service.update_settings(announcement_text=changes.get('announcement_text'),announcement_enabled=changes.get('announcement_enabled'),announcement_items=changes.get('announcement_items'),enabled_cities=changes.get('enabled_cities'),ops_config={**extras,**features} or None,actor_id=admin_id)
   after=await home_service.get_or_create_settings()
   try:await label_sync.schedule_after_save(before,after,city=None)
   except Exception:

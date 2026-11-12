@@ -240,11 +240,14 @@ html body #mapFullQ {
   color: var(--t-text) !important;
 }
 
-/* ---- glass cards: keep 117×224 / 3-col / 8px gap / 12px inset ---- */
+/* ---- glass cards: 3-col same size; 168 cover + 72 body (title/price + reserved hours) ---- */
 html body #feed.has-cover .feed-card.cover-card,
 html body #favList .feed-card.cover-card {
   position: relative;
-  height: 224px;
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  gap: 0 !important;
   overflow: visible !important;
   background: var(--glass) !important;
   border: 1px solid rgba(255, 46, 107, 0.46) !important;
@@ -281,7 +284,27 @@ html body #favList .cover-wrap {
 }
 html body #feed .feed-card .body,
 html body #favList .feed-card .body {
-  height: 56px;
+  height: 72px;
+  min-height: 72px;
+  max-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+html body #feed .feed-card .st-hours,
+html body #favList .feed-card .st-hours {
+  display: block;
+  flex: none;
+  min-height: 1.25em;
+  max-height: 2.5em;
+  line-height: 1.25;
+  font-size: 11px;
+  overflow: hidden;
+}
+html body #feed .feed-card .st-hours.is-empty,
+html body #favList .feed-card .st-hours.is-empty {
+  visibility: hidden;
 }
 html body #feed .feed-card h3,
 html body #favList .feed-card h3 {

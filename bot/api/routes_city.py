@@ -19,6 +19,7 @@ class CityAnnounceBody(BaseModel):
     city: str
     text: str = ""
     enabled: bool = True
+    items: Optional[List[str]] = None
 
 
 class CitySettingsBody(BaseModel):
@@ -64,9 +65,13 @@ async def api_city_announcement(
         if scope is None or city not in scope:
             raise HTTPException(status_code=403, detail="只有超管或负责这个城市的运营能改城市公告")
     current = dict((await home_service.get_or_create_settings()).get("city_announcements") or {})
-    text = (body.text or "")[:2000]
-    if text.strip():
-        current[city] = {"text": text, "enabled": bool(body.enabled)}
+    from bot.services import home_feed
+    if body.items is not None:
+        packed = home_feed.pack_announcement(body.text, body.items, body.enabled)
+    else:
+        packed = home_feed.pack_announcement(body.text, None, body.enabled)
+    if packed["items"]:
+        current[city] = packed
     else:
         current.pop(city, None)
     settings = await home_service.update_settings(ops_config={"city_announcements": current})
