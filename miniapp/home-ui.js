@@ -235,13 +235,13 @@
     if (items.length === 1) {
       ann.classList.add("is-static");
       ann.classList.remove("is-flip");
-      ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-item\">" + esc(items[0]) + "</div></div>";
+      ann.innerHTML = "<span class=\"ann-kicker\">公告</span><div class=\"announce-viewport\"><div class=\"announce-item\">" + esc(items[0]) + "</div></div>";
       return;
     }
     ann.classList.add("is-flip");
     ann.classList.remove("is-static");
     const slides = items.concat([items[0]]);
-    ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-track\">" +
+    ann.innerHTML = "<span class=\"ann-kicker\">公告</span><div class=\"announce-viewport\"><div class=\"announce-track\">" +
       slides.map((x) => "<div class=\"announce-item\">" + esc(x) + "</div>").join("") +
       "</div></div>";
     const track = ann.querySelector(".announce-track");
@@ -473,7 +473,7 @@
       btn.type = "button";
       btn.setAttribute("aria-expanded", "false");
       // invisible "教程" keeps the old button's exact size; the visible label sits on top
-      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\">筛选</span>";
+      btn.innerHTML = "<span class=\"area-sz\" aria-hidden=\"true\">教程</span><span class=\"area-lbl\"><i class=\"area-ic\" aria-hidden=\"true\"></i>筛选</span>";
       row.insertBefore(btn, row.firstChild);
       const panel = document.createElement("div");
       panel.id = "areaPanel";
@@ -521,7 +521,7 @@
   window.__yycjLoadHome = function (options) { paused = false; return loadFeed(true, options); };
   window.__yycjReloadHome = window.__yycjLoadHome;
   document.addEventListener("click", (ev) => {
-    if (ev.target.id === "btnSearch") { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; window.__yycjLoadHome(); }
+    if (ev.target.closest && ev.target.closest("#btnSearch")) { q = ($("#homeQ") && $("#homeQ").value.trim()) || ""; window.__yycjLoadHome(); }
     if (ev.target.id === "btnLoadMore") loadFeed(false);
     if (ev.target.closest && ev.target.closest("[data-nav='home']")) {
       if (lastItems.length) paint();

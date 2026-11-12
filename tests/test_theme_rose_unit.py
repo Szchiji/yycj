@@ -4,7 +4,7 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 MINI = ROOT / "miniapp"
-V = "20261112e"
+V = "20261112g"
 BRASS = ("#0F2420", "#D4B26A", "#16302A", "#C9A45C", "#E3C88A", "#1C3D35")
 VISITOR_CSS = [
     "styles.css", "home-fix.css", "home-inline.css", "status-badge.css", "hours.css",
@@ -40,25 +40,31 @@ def test_theme_rose_is_last_in_bundle_sources():
     assert css.rfind("/* ---- theme-rose.css ---- */") > css.find("/* ---- theme-emerald.css ---- */")
     assert css.rfind("/* ---- theme-rose.css ---- */") > css.find("/* ---- community.css ---- */")
     assert "--rose: #FF2E6B" in css or "--rose:#FF2E6B" in css
-    assert "#08050C" in css and "#FFC857" in css and "#9D5BFF" in css and "#64F2C4" in css
+    assert "#08050C" in css and "#FFC857" in css and "#9D5BFF" in css and "#35E0A1" in css
 
 
 def test_font_files_and_faces_are_local():
     fonts = MINI / "fonts"
-    for name in (
-        "NotoSerifSC-Regular.woff",
-        "NotoSerifSC-Bold.woff",
-        "NotoSansSC-Regular.woff",
-        "NotoSansSC-Bold.woff",
+    for name, min_size in (
+        ("NotoSerifSC-Regular.woff", 10_000),
+        ("NotoSerifSC-Bold.woff", 10_000),
+        ("NotoSansSC-Regular.woff", 10_000),
+        ("NotoSansSC-Bold.woff", 10_000),
+        ("BebasNeue-Regular.woff", 8_000),
     ):
         path = fonts / name
-        assert path.is_file() and path.stat().st_size > 10_000, name
+        assert path.is_file() and path.stat().st_size > min_size, name
+    ofl = fonts / "BebasNeue-OFL.txt"
+    assert ofl.is_file() and "SIL OPEN FONT LICENSE" in ofl.read_text("utf-8")
     rose = _read("theme-rose.css")
     assert '@font-face' in rose
     assert 'url("./fonts/NotoSerifSC-Bold.woff")' in rose
     assert 'url("./fonts/NotoSansSC-Regular.woff")' in rose
+    assert 'url("./fonts/BebasNeue-Regular.woff")' in rose
+    assert "font-display: swap" in rose
     assert "fonts.googleapis.com" not in rose
-    assert "Noto Serif SC" in rose and "Noto Sans SC" in rose
+    assert "Noto Serif SC" in rose and "Noto Sans SC" in rose and "Bebas Neue" in rose
+    assert "#64F2C4" not in rose
 
 
 def test_palette_tokens():
@@ -68,10 +74,10 @@ def test_palette_tokens():
         "--rose": "#FF2E6B",
         "--gold": "#FFC857",
         "--purple": "#9D5BFF",
-        "--mint": "#64F2C4",
+        "--mint": "#35E0A1",
         "--rest": "#C4B8A8",
-        "--t-open-fg": "#08241C",
-        "--glass-bar-fallback": "rgba(8, 5, 12, 0.94)",
+        "--t-open-fg": "#06281C",
+        "--glass-bar-fallback": "rgba(10, 6, 16, 0.92)",
         "--t-grad-cta": "linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%)",
     }.items():
         assert value in rose, token
@@ -81,13 +87,16 @@ def test_palette_tokens():
 
 def test_layout_rules_kept():
     rose = _read("theme-rose.css")
-    assert "height: 240px" in rose
+    assert "height: 244px" in rose
     assert "height: 168px" in rose
+    assert "height: 76px" in rose
+    assert "margin-top: 3px" in rose
+    assert "margin-top: auto" not in rose
     inline = _read("home-inline.css")
     assert "grid-template-columns:1fr 1fr 1fr" in inline or "grid-template-columns: 1fr 1fr 1fr" in inline
-    assert "gap:8px" in inline.replace(" ", "")
+    assert "gap:10px" in inline.replace(" ", "")
     styles = _read("styles.css")
-    assert "padding: 8px 12px" in styles  # main inset
+    assert "padding: 12px 16px" in styles  # main inset
 
 
 def test_visitor_css_has_no_bare_brass_hex():

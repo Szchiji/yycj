@@ -85,7 +85,7 @@ def test_frontend_and_admin_ui_have_no_credit_surfaces():
     app = (MINI / "app.js").read_text(encoding="utf-8")
     admin_js = (MINI / "admin.js").read_text(encoding="utf-8")
     ops = (MINI / "admin-ops.js").read_text(encoding="utf-8")
-    assert "app.bundle.js?v=20261112e" in go and "app.bundle.css?v=20261112e" in go
+    assert "app.bundle.js?v=20261112g" in go and "app.bundle.css?v=20261112g" in go
     assert "兰花令" not in app
     assert "rulesSheet" not in go and "口碑分说明" not in go
     assert "调整口碑分" not in desk and "月影遮蔽" not in desk and "遮蔽名单" not in desk

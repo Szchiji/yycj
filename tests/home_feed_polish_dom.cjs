@@ -6,8 +6,10 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 (async()=>{
   const rose=src('theme-rose.css'), styles=src('styles.css'), inline=src('home-inline.css'), fix=src('home-fix.css'), homeUi=src('home-ui.js'), ws=src('workspace.js'), wsCss=src('workspace.css');
-  assert.match(rose,/height:\s*240px/);
-  assert.match(rose,/height:\s*72px/);
+  assert.match(rose,/height:\s*244px/);
+  assert.match(rose,/height:\s*76px/);
+  assert.match(rose,/margin-top:\s*3px/);
+  assert.doesNotMatch(rose,/\.st-hours[^{]*\{[^}]*margin-top:\s*auto/);
   assert.doesNotMatch(rose,/height:\s*224px/);
   assert.match(rose,/\.st-hours/);
   assert.match(inline,/gap:\s*6px/);
@@ -51,6 +53,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   }
   const ann=d.querySelector('#announce');
   assert(ann && !ann.classList.contains('hidden'));
+  assert.equal(ann.querySelector('.ann-kicker') && ann.querySelector('.ann-kicker').textContent,'公告');
   assert(ann.classList.contains('is-flip'));
   assert.equal(ann.querySelectorAll('.announce-item').length,3); // 2 + clone
   assert.equal(ann.querySelector('.announce-item').textContent,'欢迎使用月影车姬');

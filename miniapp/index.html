@@ -8,7 +8,7 @@
   <!-- defer: the boot card paints without waiting for telegram.org; script order is unchanged -->
   <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
   <!-- all page CSS, same order as before, with theme-rose last (scripts/build_miniapp.py) -->
-  <link rel="stylesheet" href="./app.bundle.css?v=20261112e" />
+  <link rel="stylesheet" href="./app.bundle.css?v=20261112g" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -34,9 +34,13 @@
       <section id="view-home" class="view">
         <div id="pins" class="pins"></div>
         <div id="announce" class="announce hidden"></div>
-        <div class="search-row">
-          <input id="homeQ" maxlength="64" placeholder="搜花名、标签、城区、价位" />
-          <button class="btn" id="btnSearch" type="button">搜索</button>
+        <div class="search-stack">
+          <div class="search-bar">
+            <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+            <input id="homeQ" maxlength="64" placeholder="搜花名、标签、城区、价位" />
+            <button class="btn" id="btnSearch" type="button">搜索</button>
+          </div>
+          <div class="search-row search-actions"></div>
         </div>
         <div id="feedSplit" aria-hidden="true"></div>
         <div id="feed" class="feed feed-3"></div>
@@ -106,14 +110,14 @@
       </section>
     </main>
     <nav class="bottom-nav nav-3">
-      <button data-nav="home" class="nav-item active" type="button"><span>首页</span></button>
-      <button data-nav="fav" class="nav-item hidden" type="button"><span>收藏</span></button>
-      <button data-nav="publish" class="nav-item" type="button"><span>上架</span></button>
-      <button data-nav="me" class="nav-item" type="button"><span>我的</span></button>
+      <button data-nav="home" class="nav-item active" type="button"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg><span>首页</span></button>
+      <button data-nav="fav" class="nav-item hidden" type="button"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.4-7-10a4.5 4.5 0 0 1 7-3.7A4.5 4.5 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg><span>收藏</span></button>
+      <button data-nav="publish" class="nav-item" type="button"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M8 7V5h8v2M8 11h8M8 15h8M7 21h10a1 1 0 0 0 1-1V7H6v13a1 1 0 0 0 1 1z"/></svg><span>上架</span></button>
+      <button data-nav="me" class="nav-item" type="button"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 19.2c1.2-3 4-4.7 7-4.7s5.8 1.7 7 4.7"/></svg><span>我的</span></button>
     </nav>
   </div>
   <div id="citySheet" class="sheet hidden"><div class="sheet-panel"><h3>选择城市</h3><div id="cityList"></div><button class="btn block" id="cityClose" type="button">关闭</button></div></div>
   <!-- all page scripts, same order as before (scripts/build_miniapp.py); each one still isolated by try/catch -->
-  <script src="./app.bundle.js?v=20261112e" defer></script>
+  <script src="./app.bundle.js?v=20261112g" defer></script>
 </body>
 </html>

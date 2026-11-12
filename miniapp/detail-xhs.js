@@ -35,7 +35,7 @@ body.xhs-detail #xhsTop{display:grid;}
 #view-detail.xhs .xhs-pub{order:0!important;display:flex;align-items:center;gap:10px;margin:0 0 10px;}
 #view-detail.xhs .xhs-av{flex:0 0 36px;width:36px;height:36px;border-radius:18px;overflow:hidden;background:#2a3352;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;}
 #view-detail.xhs .xhs-av img{width:100%;height:100%;object-fit:cover;display:block;}
-#view-detail.xhs .xhs-pub h3{flex:1;min-width:0;margin:0;font-size:17px;font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#view-detail.xhs .xhs-pub h3{flex:1;min-width:0;margin:0;font-family:var(--t-font-serif),serif;font-size:24px;font-weight:700;line-height:1.25;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #view-detail.xhs .xhs-open{flex:0 0 auto;padding:3px 10px;border-radius:999px;font-size:12px;border:1px solid rgba(61,214,140,.5);color:#3dd68c;}
 #view-detail.xhs .xhs-open.off{border-color:#2a3352;color:#9aa3c7;}
 #view-detail.xhs #detail>.card>p{order:2;font-size:15px;line-height:1.65;margin:2px 0 8px;white-space:pre-wrap;word-break:break-word;color:#e8ecff;}
@@ -112,7 +112,7 @@ body.xhs-detail #xhsTop{display:grid;}
     if (!meta) { meta = document.createElement("div"); meta.className = "xhs-meta"; card.appendChild(meta); }
     if (loc && loc.parentNode !== meta) meta.insertBefore(loc, meta.firstChild);
     let tm = meta.querySelector(".xhs-time");
-    const when = [lamp.hours_text ? "营业 " + lamp.hours_text : "", mmdd(lamp.updated_at || lamp.created_at)].filter(Boolean).join(" · ");
+    const when = String(lamp.hours_text || "").trim();
     if (when && !tm) { tm = document.createElement("span"); tm.className = "xhs-time"; meta.appendChild(tm); }
     if (tm && tm.textContent !== when) tm.textContent = when;
     const rep = document.getElementById("detailReport");

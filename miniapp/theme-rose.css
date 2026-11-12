@@ -12,7 +12,7 @@
 @font-face {
   font-family: "Noto Serif SC";
   font-style: normal;
-  font-weight: 600 800;
+  font-weight: 600 900;
   font-display: swap;
   src: url("./fonts/NotoSerifSC-Bold.woff") format("woff");
 }
@@ -31,29 +31,37 @@
   src: url("./fonts/NotoSansSC-Bold.woff") format("woff");
 }
 
+@font-face {
+  font-family: "Bebas Neue";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/BebasNeue-Regular.woff") format("woff");
+}
+
 :root {
   --bg: #08050C;
   --bg-2: #120814;
   --rose: #FF2E6B;
   --gold: #FFC857;
   --purple: #9D5BFF;
-  --mint: #64F2C4;
+  --mint: #35E0A1;
   --rest: #C4B8A8;
   --rest-gold-60: rgba(255, 200, 87, 0.60);
-  --text: #F3EDEF;
-  --text-dim: #A396A3;
+  --text: #F7EFF5;
+  --text-dim: #B6A2B8;
   --text-ink: #14060A;
-  --line: rgba(255, 46, 107, 0.22);
+  --line: #FFFFFF14;
   --line-soft: rgba(255, 255, 255, 0.08);
   --glass: rgba(22, 12, 28, 0.55);
   --glass-strong: rgba(8, 5, 12, 0.92);
-  --glass-bar: rgba(8, 5, 12, 0.55);
-  --glass-bar-fallback: rgba(8, 5, 12, 0.94);
+  --glass-bar: rgba(10, 6, 16, 0.72);
+  --glass-bar-fallback: rgba(10, 6, 16, 0.92);
   --chip: rgba(255, 255, 255, 0.04);
   --grad-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
   --font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
   --font-sans: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --blur-bar: 20px;
+  --blur-bar: 24px;
   --blur-card: 16px;
 
   /* Map the shared --t-* contract onto the rose palette so earlier rules restyle without structural edits. */
@@ -61,15 +69,15 @@
   --t-thumb: #160C1C;
   --t-bg: #08050C;
   --t-bg2: #120814;
-  --t-card: rgba(22, 12, 28, 0.92);
-  --t-line: rgba(255, 46, 107, 0.22);
-  --t-text: #F3EDEF;
-  --t-muted: #A396A3;
+  --t-card: #0E0814;
+  --t-line: #FFFFFF1A;
+  --t-text: #F7EFF5;
+  --t-muted: #B6A2B8;
   --t-accent: #FF2E6B;
   --t-btn: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
   --t-btnink: #fff;
   --t-input: #120814;
-  --t-bar: rgba(8, 5, 12, 0.94);
+  --t-bar: rgba(10, 6, 16, 0.92);
   --t-chipon: rgba(255, 46, 107, 0.16);
   --t-annbg: rgba(157, 91, 255, 0.10);
   --t-anntext: #FFC857;
@@ -80,7 +88,7 @@
   --t-goldbg: #FFC857;
   --t-goldtext: #14060A;
   --t-toast: #1A0E18;
-  --t-toasttext: #F3EDEF;
+  --t-toasttext: #F7EFF5;
   --t-price: #FFC857;
   --t-tag: #E6D6FF;
   --t-pill: rgba(157, 91, 255, 0.12);
@@ -88,7 +96,7 @@
   --t-soft: rgba(255, 255, 255, 0.05);
   --t-dot: #FF2E6B;
   --t-media: #12080F;
-  --t-open: #64F2C4;
+  --t-open: #35E0A1;
   --t-link: #FFC857;
   --t-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
   --t-ctatext: #fff;
@@ -100,9 +108,9 @@
   --t-dangerline: #6B2740;
   --t-grad-cta: linear-gradient(135deg, #FF2E6B 0%, #9D5BFF 100%);
   --t-grad-cta-text: #fff;
-  --t-open-fg: #08241C;
-  --t-open-bg: #64F2C4;
-  --t-open-glow: 0 0 8px rgba(100, 242, 196, 0.45);
+  --t-open-fg: #06281C;
+  --t-open-bg: #35E0A1;
+  --t-open-glow: 0 0 8px rgba(53, 224, 161, 0.40);
   --t-rest-fg: #C4B8A8;
   --t-rest-bg: rgba(8, 5, 12, 0.72);
   --t-wait-fg: #FFC857;
@@ -111,6 +119,10 @@
   --t-gold-soft: rgba(255, 200, 87, 0.16);
   --t-font-serif: "Noto Serif SC", "Songti SC", "Source Han Serif SC", serif;
   --t-font-sans: "Noto Sans SC", "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --t-font-num: "Bebas Neue", "Oswald", sans-serif;
+  --text-3: #7E6B84;
+  --surface: #0E0814;
+  --glass-elev: #FFFFFF0B;
   color-scheme: dark;
 }
 
@@ -120,6 +132,11 @@ html body {
   background: var(--t-bg) !important;
   background-image: none !important;
   color: var(--t-text) !important;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html body main {
+  padding: 12px 16px calc(var(--nav-h) + 20px);
 }
 html body,
 html body button,
@@ -146,7 +163,8 @@ html body::before {
 /* ---- top bar: frosted glass, serif brand title ---- */
 html body .topbar {
   background: var(--glass-bar-fallback) !important;
-  border-bottom-color: var(--t-line) !important;
+  border-bottom-color: #FFFFFF14 !important;
+  padding: 12px 16px;
 }
 @supports ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
   html body .topbar {
@@ -157,11 +175,11 @@ html body .topbar {
 }
 html body .brand {
   font-family: var(--t-font-serif) !important;
-  font-weight: 700 !important;
-  font-size: 20px !important;
-  letter-spacing: 0.08em !important;
-  color: var(--t-text) !important;
-  line-height: 1;
+  font-weight: 900 !important;
+  font-size: 16.8px !important;
+  letter-spacing: 0.06em !important;
+  color: #fff !important;
+  line-height: 1.2;
 }
 html body .top-admin,
 html body #hubHomeEntry.top-admin,
@@ -170,10 +188,12 @@ html body a {
 }
 html body .chip,
 html body #btnCity {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border-color: rgba(255, 200, 87, 0.45) !important;
+  background: #FFFFFF0B !important;
+  border-color: #FFFFFF1A !important;
   color: var(--t-text) !important;
   border-radius: 999px !important;
+  height: 32px;
+  font-size: 12px;
 }
 
 /* ---- buttons: all capsules; primary = rose→purple glow ---- */
@@ -240,17 +260,17 @@ html body #mapFullQ {
   color: var(--t-text) !important;
 }
 
-/* ---- glass cards: 3-col same size; 168 cover + 72 body (title/price + reserved hours) ---- */
+/* ---- glass cards: 3-col same size; 168 cover + 76 body (title/price + 3px + reserved hours) ---- */
 html body #feed.has-cover .feed-card.cover-card,
 html body #favList .feed-card.cover-card {
   position: relative;
-  height: 240px;
-  min-height: 240px;
-  max-height: 240px;
+  height: 244px;
+  min-height: 244px;
+  max-height: 244px;
   gap: 0 !important;
   overflow: visible !important;
   background: var(--glass) !important;
-  border: 1px solid rgba(255, 46, 107, 0.46) !important;
+  border: 1px solid #FFFFFF1A !important;
   box-shadow:
     0 0 0 1px rgba(255, 46, 107, 0.10),
     0 4px 14px rgba(255, 46, 107, 0.22) !important;
@@ -284,36 +304,63 @@ html body #favList .cover-wrap {
 }
 html body #feed .feed-card .body,
 html body #favList .feed-card .body {
-  height: 72px;
-  min-height: 72px;
-  max-height: 72px;
+  height: 76px;
+  min-height: 76px;
+  max-height: 76px;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   overflow: hidden;
-}
-html body #feed .feed-card .st-hours,
-html body #favList .feed-card .st-hours {
-  display: block;
-  flex: none;
-  min-height: 1.25em;
-  max-height: 2.5em;
-  line-height: 1.25;
-  font-size: 11px;
-  overflow: hidden;
-}
-html body #feed .feed-card .st-hours.is-empty,
-html body #favList .feed-card .st-hours.is-empty {
-  visibility: hidden;
+  padding: 8px !important;
+  box-sizing: border-box;
 }
 html body #feed .feed-card h3,
 html body #favList .feed-card h3 {
   font-family: var(--t-font-serif) !important;
   font-weight: 700 !important;
-  font-size: 13px !important;
-  line-height: 1.2;
+  font-size: 15px !important;
+  line-height: 1.25;
   letter-spacing: 0.02em;
-  color: var(--t-text) !important;
+  color: #fff !important;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html body #feed .feed-card .price,
+html body #favList .feed-card .price,
+html body #feed .feed-card .muted,
+html body #favList .feed-card .muted {
+  font-family: var(--t-font-num), var(--t-font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: var(--t-price) !important;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html body #feed .feed-card .st-hours,
+html body #favList .feed-card .st-hours {
+  display: block;
+  flex: none;
+  min-height: 14px;
+  max-height: 14px;
+  line-height: 14px;
+  font-size: 11px;
+  font-weight: 400;
+  font-family: var(--t-font-sans);
+  color: #7E6B84 !important;
+  margin-top: 3px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+html body #feed .feed-card .st-hours.is-empty,
+html body #favList .feed-card .st-hours.is-empty {
+  visibility: hidden;
 }
 html body .card,
 html body .sheet-panel,
@@ -345,10 +392,32 @@ html body .pin-copy b {
   font-size: 15px;
 }
 html body .announce {
-  background: var(--t-annbg) !important;
-  border-color: rgba(255, 200, 87, 0.28) !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-color: #FFFFFF14 !important;
   color: var(--t-anntext) !important;
+  padding: 7px 10px;
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  border-radius: 12px;
 }
+html body .announce .ann-kicker {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  border: 1px solid rgba(255, 200, 87, 0.45);
+  background: rgba(255, 200, 87, 0.10);
+  border-radius: 6px;
+  padding: 2px 6px;
+  line-height: 1.2;
+}
+html body .announce .announce-viewport { flex: 1; min-width: 0; overflow: hidden; }
+html body .announce .announce-item { font-size: 11px; color: var(--t-muted); }
 html body #feedSplit {
   background: linear-gradient(90deg, transparent, var(--t-split), transparent) !important;
 }
@@ -384,12 +453,22 @@ html body .area-chip,
 html body .sort-opt {
   border-radius: 999px !important;
 }
-html body .area-chip.on {
-  background: var(--t-grad-cta) !important;
+html body .area-chip,
+html body .sort-opt {
+  border-radius: 999px !important;
+  border: 1px solid #FFFFFF1A !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--t-muted) !important;
+  font-size: 13px;
+  min-height: 32px;
+}
+html body .area-chip.on,
+html body .sort-opt.on {
+  background: rgba(255, 46, 107, 0.18) !important;
   color: #fff !important;
-  border-color: transparent !important;
+  border-color: rgba(255, 46, 107, 0.70) !important;
   font-weight: 600;
-  box-shadow: 0 2px 10px rgba(255, 46, 107, 0.35);
+  box-shadow: 0 0 16px rgba(255, 46, 107, 0.25);
 }
 html body .area-chip.on i { color: #fff !important; opacity: .8; }
 html body .sort-opt.on {
@@ -407,8 +486,8 @@ html body .area-panel .filt-actions {
 
 /* ---- bottom nav: rose label + glow dash ---- */
 html body .bottom-nav {
-  background: var(--glass-bar-fallback) !important;
-  border-top-color: var(--t-line) !important;
+  background: rgba(10, 6, 16, 0.92) !important;
+  border-top-color: #FFFFFF14 !important;
 }
 @supports ((-webkit-backdrop-filter: blur(20px)) or (backdrop-filter: blur(20px))) {
   html body .bottom-nav {
@@ -419,26 +498,48 @@ html body .bottom-nav {
 }
 html body .nav-item {
   position: relative;
-  color: var(--t-muted) !important;
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #7E6B84 !important;
+  font-size: 10px;
   font-weight: 500;
+  padding: 8px 4px 10px;
+}
+html body .nav-item .nav-ico,
+html body .nav-item svg {
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 html body .nav-item.active {
-  color: var(--rose) !important;
+  color: #fff !important;
   font-weight: 700 !important;
 }
-html body .nav-item.active::after {
+html body .nav-item.active .nav-ico,
+html body .nav-item.active svg {
+  color: var(--rose) !important;
+  stroke-width: 2.4;
+}
+html body .nav-item.active::before {
   content: "";
   position: absolute;
+  top: 4px;
   left: 50%;
-  bottom: 10px;
   transform: translateX(-50%);
-  width: 18px;
+  width: 24px;
   height: 2px;
   border-radius: 999px;
-  background: var(--t-grad-cta);
-  box-shadow: 0 0 8px rgba(255, 46, 107, 0.90), 0 0 16px rgba(157, 91, 255, 0.55);
+  background: var(--rose);
+  box-shadow: 0 0 8px #FF2E6B;
 }
+html body .nav-item.active::after { content: none; }
 
 /* ---- detail ---- */
 html body #xhsTop,
@@ -454,17 +555,33 @@ html body #view-detail.xhs .xhs-bar {
     backdrop-filter: blur(var(--blur-bar)) saturate(1.35);
   }
 }
+html body #view-detail.xhs .xhs-pub h3,
 html body #xhsTop .xt-name,
 html body #view-detail.xhs .xt-name,
 html body #view-detail.xhs #detail > .card > h3,
 html body #detail > .card > h3 {
   font-family: var(--t-font-serif) !important;
   font-weight: 700 !important;
-  font-size: 18px !important;
+  font-size: 24px !important;
   letter-spacing: 0.04em;
-  color: var(--t-text) !important;
+  line-height: 1.25;
+  color: #fff !important;
 }
-html body #view-detail.xhs .xhs-price { color: var(--t-price) !important; }
+html body #view-detail.xhs .xhs-price,
+html body #view-detail .xhs-price {
+  font-family: var(--t-font-num), var(--t-font-sans);
+  font-size: 28px !important;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--t-price) !important;
+}
+html body #view-detail.xhs .xhs-meta,
+html body #view-detail .xhs-meta,
+html body #view-detail.xhs .xhs-time {
+  font-size: 12px;
+  color: rgba(247, 239, 245, 0.70);
+}
 html body #yycjTags .tag,
 html body #view-detail.xhs #yycjTags .tag {
   background: var(--t-pill) !important;
@@ -531,6 +648,21 @@ html body #view-publish #publishTitle,
 html body #view-me .me-sec > h5 {
   font-family: var(--t-font-serif);
 }
+html body #view-me .me-head { gap: 16px; padding: 16px; }
+html body #view-me .me-hn b { font-size: 19px; font-weight: 700; line-height: 1.3; }
+html body #view-publish #publishTitle,
+html body #view-fav > .card > h3 { font-family: var(--t-font-serif); font-size: 19px; font-weight: 700; }
+html body #view-me .me-sec { margin: 16px 0 0; }
+html body #view-me .me-sec > h5 {
+  margin: 0 4px 8px;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  font-weight: 600;
+  color: var(--rose);
+}
+html body #view-me .me-grp > .card,
+html body #view-me .me-todos { padding: 12px 16px !important; }
+html body #view-me .me-row { min-height: 48px; font-size: 15px; }
 
 /* ---- entry announcement / edit result (visitor, not admin-body) ---- */
 html body .entry-announcement-panel {
@@ -662,3 +794,106 @@ html body #app.map-full-open #hubMapWrap .hub-map-stage { background: var(--t-me
 /* place-pick pin ink follows theme tokens already; tighten leftover dark-green border */
 html body .pp-pin i { border-color: var(--t-goldtext) !important; }
 html body .pp-pin i::after { background: var(--t-goldtext) !important; }
+
+
+/* ---- NightBay adapt: search stack, actions, spacing ---- */
+html body .search-stack { margin: 0 0 12px; }
+html body .search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin: 0 0 8px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #FFFFFF1A !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+}
+html body .search-bar .search-ico {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: #7E6B84;
+}
+html body .search-bar #homeQ,
+html body .search-bar input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--t-text) !important;
+  font-size: 13px;
+  line-height: 1.3;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+html body .search-bar #homeQ::placeholder { color: #7E6B84; letter-spacing: 0; }
+html body .search-bar #btnSearch {
+  flex: none;
+  min-height: 28px !important;
+  height: 28px;
+  padding: 0 10px !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html body .search-row,
+html body .search-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  position: relative;
+}
+html body .search-row #btnArea,
+html body .search-row #hubMapToggle,
+html body .search-actions #btnArea,
+html body .search-actions #hubMapToggle {
+  flex: none;
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 2px !important;
+  margin: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--t-muted) !important;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 0 !important;
+}
+html body .search-row #hubMapToggle,
+html body .search-actions #hubMapToggle { margin-left: auto; }
+html body .search-row #btnArea .area-lbl,
+html body .search-row #btnArea.long .area-lbl {
+  position: static;
+  font-size: 13px;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+html body #pins { margin-bottom: 10px !important; }
+html body #feed.has-cover,
+html body .feed.feed-3 { gap: 10px; }
+html body .top-admin,
+html body #hubHomeEntry.top-admin {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+html body #hubMapToggle .act-ico,
+html body .search-row .act-ico,
+html body .search-actions .act-ico {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
