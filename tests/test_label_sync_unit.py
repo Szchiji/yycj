@@ -64,3 +64,27 @@ def test_blank_label_is_a_real_change():
     after = _site(link_label_reviews="")
     assert effective_labels(after, "上海")[1] == ""
     assert cities_whose_labels_changed(before, after) == ["上海", "深圳"]
+
+
+def test_review_count_keys_match_between_producer_and_run_city():
+    """_review_counts returns reviews_stored/reviews_legacy; run_city used to read 'stored'/'legacy'
+    and KeyError after the Telegram edits, leaving Shenzhen label sync marked failed."""
+    import ast
+    import inspect
+    from bot.services import label_sync
+
+    counts_src = inspect.getsource(label_sync._review_counts)
+    assert '"reviews_stored"' in counts_src and '"reviews_legacy"' in counts_src
+    run_src = inspect.getsource(label_sync._run_city_locked)
+    tree = ast.parse(run_src)
+    keys = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "reviews"
+            and isinstance(node.slice, ast.Constant)
+        ):
+            keys.append(node.slice.value)
+    assert "reviews_stored" in keys and "reviews_legacy" in keys
+    assert "stored" not in keys and "legacy" not in keys

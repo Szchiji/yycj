@@ -32,7 +32,7 @@ def test_upgrades():
             s.add(User(user_id=T, role="teacher"))
             for g in (9491, 9492, 9493):
                 s.add(User(user_id=g, role="guest"))
-            s.add(Lamp(lamp_id="U-A", user_id=T, title="a", city="杭州", status="active", created_at=now - timedelta(days=3)))
+            s.add(Lamp(lamp_id="U-A", user_id=T, title="a", city="杭州", status="active", created_at=now - timedelta(days=3), hot_score=100))
             s.add(Lamp(lamp_id="U-B", user_id=T, title="b", city="杭州", status="active", created_at=now - timedelta(days=2)))
             s.add(Lamp(lamp_id="U-C", user_id=T, title="c", city="杭州", status="active", created_at=now - timedelta(days=1),
                        expires_at=now + timedelta(hours=20)))
@@ -56,14 +56,19 @@ def test_upgrades():
             assert [x["review_count"] for x in r["items"]] == [2, 1, 0]
             r = (await c.get("/api/home?city=杭州&limit=20&sort=reviews&q=b", headers=tok(9491))).json()
             assert [x["lamp_id"] for x in r["items"]] == ["U-B"]
-            assert (await c.get("/api/home?sort=hot", headers=tok(9491))).status_code == 422
-            # #4 views: guests count once per day; owner never
-            for uid in (9491, 9491, 9492, T):
-                assert (await c.get("/api/lamps/U-A", headers=tok(uid))).status_code == 200
-            items = {x["lamp_id"]: x for x in (await c.get("/api/me/listings", headers=tok(T))).json()["items"]}
+            # 人气排序合法，且不得被 Filter/首页二次按时间重排打回「最新」
+            r = await c.get("/api/home?city=杭州&limit=20&sort=hot", headers=tok(9491))
+            assert r.status_code == 200, r.text
+            assert r.json()["sort"] == "hot" and [x["lamp_id"] for x in r.json()["items"]] == ["U-A", "U-C", "U-B"]
+            assert (await c.get("/api/home?sort=hot", headers=tok(9491))).status_code == 200
+            # #4 views: same guest + same listing + same Beijing day counts once; owner never
+            assert (await c.get("/api/lamps/U-A", headers=tok(9491))).status_code == 200  # guest 9491 first open
+            assert (await c.get("/api/lamps/U-A", headers=tok(9491))).status_code == 200  # same guest, same day: no extra count
+            assert (await c.get("/api/lamps/U-A", headers=tok(9492))).status_code == 200  # second guest
+            assert (await c.get("/api/lamps/U-A", headers=tok(T))).status_code == 200  # owner: not counted
             await asyncio.sleep(0.3)  # views are counted fire-and-forget
             items = {x["lamp_id"]: x for x in (await c.get("/api/me/listings", headers=tok(T))).json()["items"]}
-            assert items["U-A"]["stats"] == {"views": 3, "views_7d": 3, "favs": 2, "favs_7d": 2, "contacts": 1, "contacts_7d": 1}, items["U-A"]["stats"]
+            assert items["U-A"]["stats"] == {"views": 2, "views_7d": 2, "favs": 2, "favs_7d": 2, "contacts": 1, "contacts_7d": 1}, items["U-A"]["stats"]
             assert items["U-B"]["stats"]["views"] == 0
             # #6 every new review needs 约课凭证 and waits for an admin, even with 评价需审核 off;
             # public photos are no longer accepted, but an old review's photos still show
@@ -96,7 +101,7 @@ def test_upgrades():
             assert (await c.post("/api/admin/reviews/bulk", json={"ids": ["UR0"], "action": "approve"}, headers=tok(9491))).status_code in (401, 403)
             # #7 dashboard
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(SUPER))).json()
-            assert len(d["days"]) == 7 and d["totals"]["杭州"]["listings"] == 3 and d["totals"]["杭州"]["views"] == 4
+            assert len(d["days"]) == 7 and d["totals"]["杭州"]["listings"] == 3 and d["totals"]["杭州"]["views"] == 3
             assert d["totals"]["杭州"]["contacts"] == 1 and d["totals"]["杭州"]["reviews"] == 6, d["totals"]  # the no-凭证 review is refused now
             d = (await c.get("/api/admin/stats/daily?days=7", headers=tok(OP))).json()
             assert set(d["cities"]) <= {"苏州"}

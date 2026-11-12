@@ -239,12 +239,12 @@ async def api_home(
                 shop.sort(key=lambda x: (0 if x.get("feed_pinned") else 1,
                                          int(x.get("feed_pin_order") or 0) if x.get("feed_pinned") else 0,
                                          x["_km"] if x.get("_km") is not None else 1e9))
-            elif sort != "reviews":
+            elif sort not in ("reviews", "hot"):
                 pinned = sorted([x for x in shop if x.get("feed_pinned")], key=lambda x: int(x.get("feed_pin_order") or 0))
                 fresh = sorted([x for x in shop if not x.get("feed_pinned")], key=lambda x: str(x.get("created_at") or ""), reverse=True)
                 shop = pinned + fresh
             items = shop[offset: offset + limit]
-        elif sort != "reviews":
+        elif sort not in ("reviews", "hot"):
             pinned = [x for x in items if x.get("feed_pinned")]
             fresh = [x for x in items if not x.get("feed_pinned")]
             pinned.sort(key=lambda x: int(x.get("feed_pin_order") or 0))
