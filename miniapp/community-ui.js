@@ -33,7 +33,7 @@
   function mount() {
     const home=$('#view-home');if(!home) return;
     if(!$('#hubHomeEntry')) { const b=document.createElement('button');b.id='hubHomeEntry';b.type='button';b.className='top-admin';b.dataset.hub='community';b.textContent='本城社区';const old=$('#topAdmin');if(old)old.replaceWith(b);else $('.topbar')?.prepend(b); }
-    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.textContent='地图';b.setAttribute('aria-pressed','false');const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); b.addEventListener('click',()=>{ if(window.__yycjMapMode) closeMap(); else openMap(); }); }
+    if(!$('#hubMapToggle')) { const b=document.createElement('button');b.id='hubMapToggle';b.className='btn hub-map-toggle';b.type='button';b.innerHTML='<svg class="act-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg><span class="act-lbl">地图</span>';b.setAttribute('aria-pressed','false');const actions=document.querySelector('.search-actions')||document.querySelector('.search-row'); if(actions) actions.appendChild(b); else { const anchor=$('#btnSearch'); if(anchor) anchor.insertAdjacentElement('afterend',b); } b.addEventListener('click',()=>{ if(window.__yycjMapMode) closeMap(); else openMap(); }); }
     ensureFullView();
   }
   function ensureFullView(){
@@ -137,7 +137,7 @@
     $('#hubMapWrap')?.classList.toggle('hidden',!on);
     if(on) $('#btnLoadMore')?.classList.add('hidden');
     const toggle=$('#hubMapToggle');
-    if(toggle){ toggle.textContent=on?'列表':'地图'; toggle.setAttribute('aria-pressed',String(on)); }
+    if(toggle){ const lab=toggle.querySelector('.act-lbl'); if(lab) lab.textContent=on?'列表':'地图'; else toggle.textContent=on?'列表':'地图'; toggle.setAttribute('aria-pressed',String(on)); }
     const leavingDetail=!$('#view-detail')?.classList.contains('hidden');
     const app=$('#app');
     if(app) app.classList.toggle('map-full-open', on && !leavingDetail);
