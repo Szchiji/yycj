@@ -1,0 +1,48 @@
+/* Offline workbench: multi-item announcement editor. No production writes. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
+const {JSDOM,VirtualConsole}=require('jsdom');
+const {createFixture}=require('./workspace_fixture.cjs');
+const ROOT=path.resolve(__dirname,'..');
+const metadata=JSON.parse(cp.execFileSync(process.env.PYTHON||'python3',['tests/workspace_fixture.py'],{cwd:ROOT,env:{...process.env,PYTHONPATH:ROOT},encoding:'utf8'}));
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(fn,msg){for(let i=0;i<100;i++){if(fn())return;await wait(25)}throw Error('timeout: '+msg)}
+(async()=>{
+ const fixture=createFixture(metadata,{}),errors=[];
+ const html=fs.readFileSync(path.join(ROOT,'miniapp/desk.html'),'utf8');
+ const dom=new JSDOM(html,{url:'https://offline.invalid/app/desk.html',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:new VirtualConsole().on('jsdomError',e=>{if(!e.message.includes('navigation'))errors.push(e.message)})});
+ const w=dom.window;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=function(){};w.confirm=()=>true;w.alert=()=>{};w.Response=Response;w.Request=Request;w.URL.createObjectURL=()=>'';
+ w.Telegram={WebApp:{initData:'OFFLINE_FIXTURE',ready(){},expand(){},setHeaderColor(){},initDataUnsafe:{user:{id:1}}}};
+ w.fetch=async(input,opt)=>{const result=await fixture.handle(input,opt);return new Response(JSON.stringify(result.data),{status:result.status,headers:{'Content-Type':'application/json'}})};
+ const names=[...w.document.querySelectorAll('script[src]')].map(s=>s.getAttribute('src').split('?')[0].replace('./','')).filter(n=>n!=='telegram-web-app.js'&&!n.startsWith('https:'));
+ for(const name of names)w.eval(fs.readFileSync(path.join(ROOT,'miniapp',name),'utf8')+'\n//# sourceURL='+name);
+ for(const name of ['admin-chats.js','admin-cta.js'])w.eval(fs.readFileSync(path.join(ROOT,'miniapp',name),'utf8'));
+ await until(()=>w.yycjWorkspace?.ready&&w.document.querySelector('#workspaceView h1'),'authenticated workbench');
+ const $=s=>w.document.querySelector(s);
+ const scope=w.document.querySelector('#workspaceScope');
+ scope.value='__global';
+ scope.dispatchEvent(new w.Event('change',{bubbles:true}));
+ await wait(150);
+ w.document.querySelector('[data-work="settings"]').click();
+ await until(()=>w.document.querySelector('[data-wtab="announcement"]'),'announcement tab');
+ w.document.querySelector('[data-wtab="announcement"]').click();
+ await until(()=>$('#ws_announcement_items'),'announcement editor');
+ assert(!$('#ws_announcement_text'),'legacy single textarea stays hidden');
+ assert($('[data-ann-add]').textContent.includes('添加一条公告'));
+ const first=$('[data-ann-item]');
+ first.value='第一条完整公告';
+ first.dispatchEvent(new w.Event('input',{bubbles:true}));
+ $('[data-ann-add]').click();
+ const areas=[...w.document.querySelectorAll('[data-ann-item]')];
+ assert.equal(areas.length,2);
+ areas[1].value='第二条完整公告';
+ areas[1].dispatchEvent(new w.Event('input',{bubbles:true}));
+ $('#workspaceSave').click();
+ await until(()=>fixture.state.calls.some(x=>x.path==='/api/admin/workspace/config'&&x.method==='POST'),'saved');
+ const save=fixture.state.calls.filter(x=>x.path==='/api/admin/workspace/config'&&x.method==='POST').at(-1);
+ assert.deepEqual(save.body.changes.announcement_items,['第一条完整公告','第二条完整公告']);
+ assert.equal(save.body.section,'announcement');
+ await until(()=>!w.yycjWorkspace.saving,'save finished');
+ await wait(30);
+ w.close();
+ console.log('workspace announce DOM: multi-item editor save PASS');
+})().catch(e=>{console.error(e);process.exit(1)});

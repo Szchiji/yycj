@@ -13,7 +13,7 @@ from bot.api.routes_core_base import (
     _ser_lamp,
     router,
 )
-from bot.services import anti_brush, home_service, search_service, session_service, users
+from bot.services import anti_brush, home_feed, home_service, search_service, session_service, users
 from bot.services.community import district_groups
 from bot.services import pin_query
 from bot.services.extras_store import load_extras, load_extras_bulk
@@ -258,13 +258,7 @@ async def api_home(
             raise HTTPException(status_code=503, detail="地图资料暂时无法加载，请重试") from None
         items = []
 
-    announcement = None
-    if settings.get("announcement_enabled") and settings.get("announcement_text"):
-        announcement = {"text": settings["announcement_text"], "enabled": True}
-    # Per-city announcement (set in 后台 → 城市) replaces the global one for that city only.
-    city_ann = (settings.get("city_announcements") or {}).get(use_city or "")
-    if isinstance(city_ann, dict) and city_ann.get("enabled") and str(city_ann.get("text") or "").strip():
-        announcement = {"text": city_ann["text"], "enabled": True}
+    announcement = home_feed.resolve_home_announcement(settings, use_city)
 
     await _prefill_extras(items)
     safe_items = []

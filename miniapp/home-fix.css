@@ -1,5 +1,5 @@
 #pins {
-  display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory;
+  display:flex; gap:6px; overflow-x:auto; scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch; padding: 2px 0 0; margin: 0;
 }
 #pins .pin-card {

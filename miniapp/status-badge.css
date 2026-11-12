@@ -1,5 +1,5 @@
 /* 首页 / 详情 营业状态：黄铜书签角标（墨绿金）。只改角标本身，不动卡片尺寸。 */
-html body #feed .feed-card .muted.price{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+html body #feed .feed-card .muted.price{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none;}
 html body .st-hours{color:var(--t-muted);}
 html body .badge-open{position:absolute!important;top:7px;left:0;z-index:3;display:inline-flex;align-items:center;padding:1px 8px 1px 6px;border-radius:0 8px 8px 0;font-size:9px;line-height:14px;font-weight:700;letter-spacing:.3px;color:var(--t-open-fg,#13241F);background:var(--t-open-bg,linear-gradient(90deg,#C9A45C,#E3C88A));box-shadow:var(--t-open-glow,0 1px 4px rgba(0,0,0,.35));pointer-events:none;}
 html body .badge-open.st-rest{color:var(--t-rest-fg,#D4D8D0);background:var(--t-rest-bg,rgba(20,32,29,.78));box-shadow:none;font-weight:600;}

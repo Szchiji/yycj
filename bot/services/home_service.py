@@ -96,10 +96,18 @@ async def patch_city_announcement(city: str, changes: Dict[str, Any], *, actor_i
         if not row:
             row=SiteSettings(key=SETTINGS_KEY);s.add(row);await s.flush()
         ops=dict(row.ops_config or {});allc=dict(ops.get('city_announcements') or {});old=dict(allc.get(city) or {})
-        text=str(changes.get('announcement_text',old.get('text','')) or '')[:2000]
         enabled=bool(changes.get('announcement_enabled',old.get('enabled',False)))
-        if text.strip():allc[city]={'text':text,'enabled':enabled}
-        else:allc.pop(city,None)
+        if 'announcement_items' in changes:
+            packed=home_feed.pack_announcement(changes.get('announcement_text'), changes.get('announcement_items'), enabled)
+        elif 'announcement_text' in changes:
+            # Legacy single-field save replaces the list (compat); do not keep stale items.
+            packed=home_feed.pack_announcement(changes.get('announcement_text'), None, enabled)
+        else:
+            packed=home_feed.pack_announcement(old.get('text'), old.get('items'), enabled)
+        if packed['items']:
+            allc[city]=packed
+        else:
+            allc.pop(city,None)
         ops['city_announcements']=allc;row.ops_config=home_feed.merge_ops(ops)
         row.config_revision=(row.config_revision or 0)+1;row.updated_by=actor_id;row.updated_at=datetime.utcnow()
         await s.flush();return _settings_to_dict(row)
@@ -109,6 +117,7 @@ async def update_settings(
     *,
     announcement_text: Optional[str] = None,
     announcement_enabled: Optional[bool] = None,
+    announcement_items: Optional[List[str]] = None,
     enabled_cities: Optional[List[str]] = None,
     ops_config: Optional[Dict[str, Any]] = None,
     actor_id: Optional[int] = None,
@@ -124,16 +133,30 @@ async def update_settings(
             row = SiteSettings(key=SETTINGS_KEY)
             s.add(row)
             await s.flush()
-        if announcement_text is not None:
-            row.announcement_text = announcement_text[:2000]
+        current_ops = dict(getattr(row, "ops_config", None) or {})
+        if announcement_items is not None or announcement_text is not None:
+            if announcement_items is not None:
+                packed = home_feed.pack_announcement(announcement_text, announcement_items, True)
+            else:
+                packed = home_feed.pack_announcement(announcement_text, None, True)
+            row.announcement_text = packed["text"][:2000]
+            current_ops["announcement_items"] = packed["items"]
+        elif announcement_text is not None:
+            row.announcement_text = (announcement_text or "")[:2000]
         if announcement_enabled is not None:
             row.announcement_enabled = bool(announcement_enabled)
         if enabled_cities is not None:
             cleaned = [c.strip()[:32] for c in enabled_cities if (c or "").strip()]
             row.enabled_cities = cleaned[:50] or list(DEFAULT_CITIES)
         if ops_config is not None:
-            merged = home_feed.merge_ops({**(getattr(row, "ops_config", None) or {}), **ops_config})
+            incoming = dict(ops_config)
+            # Prefer an explicit announcement_items argument over a stale ops copy.
+            if announcement_items is not None or announcement_text is not None:
+                incoming.setdefault("announcement_items", current_ops.get("announcement_items") or [])
+            merged = home_feed.merge_ops({**current_ops, **incoming})
             row.ops_config = merged
+        elif announcement_items is not None or announcement_text is not None:
+            row.ops_config = home_feed.merge_ops(current_ops)
         row.config_revision=(row.config_revision or 0)+1
         row.updated_by=actor_id
         row.updated_at = datetime.utcnow()

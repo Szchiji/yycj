@@ -159,16 +159,10 @@
     const load = eager ? "eager" : "lazy";
     return "<img class=\"" + cls + "\" src=\"" + esc(src) + "\" alt=\"\" width=\"400\" height=\"530\" loading=\"" + load + "\" decoding=\"async\"" + (eager ? " fetchpriority=\"high\"" : "") + " />";
   }
-  // Card hours, compact (full label with 次日 stays on the detail page):
-  // "10-22" -> "10–22点", "20:00–次日04:00" -> "20–04点", "9:30~21:00" -> "9:30–21点"; unparsable text is shown as-is.
+  // Show the backend hours_label as-is (e.g. "10:00–22:00", "20:00–次日04:00").
+  // Do not compact to "10–00点" / "10–22点" — the card reserves a dedicated hours row.
   function fmtHours(raw) {
-    const s = String(raw || "").trim().replace(/：/g, ":");
-    if (!s) return "";
-    const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*[-–—~～至到]\s*(?:次日)?\s*(\d{1,2})(?::(\d{2}))?$/);
-    if (!m) return s;
-    const a = m[2] && m[2] !== "00" ? m[1] + ":" + m[2] : m[1];
-    const b = m[4] && m[4] !== "00" ? m[3] + ":" + m[4] : m[3];
-    return a.padStart(2, "0") + "–" + b.padStart(2, "0") + "点";
+    return String(raw || "").trim().replace(/：/g, ":");
   }
   function cardHtml(t, idx) {
     const img = cover(t);
@@ -180,6 +174,7 @@
     // 优惠 (option A): a small 「惠」 pill in the title row, like 置顶 — card size unchanged
     const cpn = t.coupon && window.__yycjCouponMode && window.__yycjCouponMode("badge") ? "<span class=\"badge-cpn\" title=\"" + esc(t.coupon.text || "") + "\">惠</span>" : "";
     const open = t.open_text ? "<span class=\"badge-open st-" + esc(t.open_code || "") + "\">" + esc(t.open_text) + "</span>" : "";
+    const hours = fmtHours(t.hours_text);
     return "<div class=\"feed-card compact cover-card\" data-id=\"" + esc(t.lamp_id) + "\"><div class=\"cover-wrap\">" +
       imgTag(img, "thumb", idx < 3) +
       // 收藏只在详情页；卡片左上角放营业状态书签
@@ -187,7 +182,7 @@
       (loc ? "<span class=\"badge-loc\">" + esc(loc) + "</span>" : "") +
       (tag ? "<span class=\"badge-tag\">" + esc(tag) + "</span>" : "") +
       (n ? "<span class=\"badge-n\">" + n + "图</span>" : "") +
-      "</div><div class=\"body\"><h3>" + pin + cpn + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + (fmtHours(t.hours_text) ? "<span class=\"st-hours\"> · " + esc(fmtHours(t.hours_text)) + "</span>" : "") + "</div></div></div>";
+      "</div><div class=\"body\"><h3>" + pin + cpn + esc(t.title || "") + "</h3><div class=\"muted price\">" + esc(t.price_text || "面议") + "</div><div class=\"st-hours" + (hours ? "" : " is-empty") + "\">" + (hours ? esc(hours) : "&nbsp;") + "</div></div></div>";
   }
   function pinHtml(p, idx) {
     const t = (p && p.lamp) || p || {};
@@ -209,6 +204,72 @@
     }
     if (typeof window.__yycjPaintFav === "function") window.__yycjPaintFav();
   }
+
+  let announceTimer = 0, announceIdx = 0;
+  const ANNOUNCE_FLIP_MS = 4200;
+  function announceItemsOf(data) {
+    const a = data && data.announcement;
+    if (!a || a.enabled === false) return [];
+    const raw = Array.isArray(a.items) ? a.items : [];
+    const items = raw.map((x) => String(x || "").trim()).filter(Boolean);
+    if (items.length) return items;
+    const text = String(a.text || "").trim();
+    return text ? [text] : [];
+  }
+  function stopAnnounce() {
+    if (announceTimer) { clearInterval(announceTimer); announceTimer = 0; }
+  }
+  function paintAnnounce(data) {
+    const ann = $("#announce");
+    if (!ann) return;
+    stopAnnounce();
+    announceIdx = 0;
+    const items = announceItemsOf(data);
+    if (!items.length) {
+      ann.classList.add("hidden");
+      ann.classList.remove("is-flip", "is-static");
+      ann.innerHTML = "";
+      return;
+    }
+    ann.classList.remove("hidden");
+    if (items.length === 1) {
+      ann.classList.add("is-static");
+      ann.classList.remove("is-flip");
+      ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-item\">" + esc(items[0]) + "</div></div>";
+      return;
+    }
+    ann.classList.add("is-flip");
+    ann.classList.remove("is-static");
+    const slides = items.concat([items[0]]);
+    ann.innerHTML = "<div class=\"announce-viewport\"><div class=\"announce-track\">" +
+      slides.map((x) => "<div class=\"announce-item\">" + esc(x) + "</div>").join("") +
+      "</div></div>";
+    const track = ann.querySelector(".announce-track");
+    const viewport = ann.querySelector(".announce-viewport");
+    const vis = ann.querySelectorAll(".announce-track > .announce-item");
+    let max = 0;
+    for (let i = 0; i < items.length; i += 1) max = Math.max(max, vis[i].offsetHeight || 0);
+    if (!max) max = vis[0] ? vis[0].scrollHeight || 22 : 22;
+    for (let i = 0; i < vis.length; i += 1) vis[i].style.minHeight = max + "px";
+    if (viewport) viewport.style.height = max + "px";
+    function go(next) {
+      announceIdx = next;
+      const h = viewport ? viewport.offsetHeight : max;
+      track.style.transition = "transform .45s ease";
+      track.style.transform = "translateY(" + (-announceIdx * h) + "px)";
+      if (announceIdx === items.length) {
+        setTimeout(() => {
+          if (!track.isConnected) return;
+          track.style.transition = "none";
+          track.style.transform = "translateY(0)";
+          announceIdx = 0;
+        }, 480);
+      }
+    }
+    announceTimer = setInterval(() => go(announceIdx + 1), ANNOUNCE_FLIP_MS);
+  }
+  window.__yycjPaintAnnounce = paintAnnounce;
+
   function applyData(data, reset, mapRequest) {
     window.__yycjHomeData = data;
     mapOptions=data.map_filter_options||null;mapOptionsCity=data.city||curCity();
@@ -225,11 +286,7 @@
     paint();
     $("#btnLoadMore")?.classList.toggle("hidden", !!window.__yycjMapMode || !data.has_more);
     const homeEvent=new CustomEvent("yycj:home-data", {detail:data});homeEvent.mapRequest=mapRequest;window.dispatchEvent(homeEvent);
-    const ann = $("#announce");
-    if (ann && data.announcement && data.announcement.text) {
-      ann.classList.remove("hidden");
-      ann.innerHTML = "<span>" + esc(data.announcement.text) + "</span>";
-    }
+    paintAnnounce(data);
   }
   let loadSequence = 0, loadCtl = null, mapBusy = false, mapDirty = false, mapOptions = null, mapOptionsCity = "";
   function cancelLoad(){if(!loadCtl)return;loadCtl.abort();loadCtl=null;++loadSequence;mapBusy=false;window.dispatchEvent(new CustomEvent('yycj:map-cancel'));paintMapFilters();}
@@ -577,7 +634,8 @@
     const pins = $("#pins");
     if (pins && !pins.classList.contains("hidden") && pins.querySelector(".pin-card")) {
       const card = pins.querySelector(".pin-card");
-      const step = card ? card.offsetWidth + 10 : 160;
+      const gap = pins ? (parseFloat(window.getComputedStyle(pins).columnGap || pins.style.gap) || 6) : 6;
+      const step = card ? card.offsetWidth + gap : 160;
       if (pins.scrollLeft + pins.clientWidth >= pins.scrollWidth - 16) pins.scrollLeft = 0;
       else pins.scrollLeft += step;
     }
