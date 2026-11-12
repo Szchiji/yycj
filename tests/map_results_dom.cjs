@@ -28,5 +28,24 @@ function fixture(){
 
  {const f=fixture();try{await f.c.receive(f.data);let expire,cleared;f.w.setTimeout=(fn,ms)=>{assert.equal(ms,10000);expire=fn;return 123};f.w.clearTimeout=id=>cleared=id;const tiles=f.L.tiles[0];tiles.fire('tileerror');f.c.retryTiles();assert(f.c.tileRetrying);expire();assert(!f.c.tileRetrying);assert.equal(tiles.redraws,1,'timeout never automatically retries');assert.equal(f.search.length,0);f.c.retryTiles();assert.equal(tiles.redraws,2);f.c.destroy();assert.equal(cleared,123);cases++;}finally{f.close()}}
  {const f=fixture();try{const tileLayer=f.L.tileLayer;f.L.tileLayer=()=>{throw Error('partial engine init')};await f.c.receive(f.data);assert(f.L.maps[0].removed);assert.equal(f.c.map,null);assert(f.$('#hubMapChooser [data-map-close]'));f.L.tileLayer=tileLayer;await f.c.receive(f.data);assert.equal(f.L.maps.length,2);assert(f.c.mapReady);cases++;}finally{f.close()}}
+ {const f=fixture();try{
+  const wrap=f.w.document.createElement('div');wrap.id='view-map';
+  f.w.document.body.appendChild(wrap);wrap.appendChild(f.c.host);
+  await f.c.receive(f.data);
+  const single=f.c.layer.layers.find(x=>x.opts.icon.className.includes('is-single'));
+  single.fire('click');
+  assert(!f.$('#hubMapSelection').classList.contains('hidden'),'single marker card must remain after dock resize moveend');
+  assert.equal(f.c.selected,'c');
+  const cluster=f.c.layer.layers.find(x=>x.opts.icon.html.includes('2'));
+  cluster.fire('click');
+  assert(!f.$('#hubMapChooser').classList.contains('hidden'),'same-centre cluster list must remain after dock resize moveend');
+  assert.equal(f.$('#hubMapChooser').querySelectorAll('[data-map-select]').length,2);
+  f.$('[data-map-select="b"]').click();
+  assert(!f.$('#hubMapSelection').classList.contains('hidden'));
+  f.$('[data-map-detail="b"]').click();
+  assert.deepEqual(f.details,['b']);
+  f.L.maps[0].fire('moveend');
+  assert(f.$('#hubMapSelection').classList.contains('hidden'),'user pan still dismisses the card');
+  cases++;}finally{f.close()}}
  console.log(`Map results DOM: ${cases} selection/clustering/explicit-search/privacy/race/fallback scenarios passed`);
 })().catch(e=>{console.error(e);process.exitCode=1});

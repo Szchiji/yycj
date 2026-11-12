@@ -4895,7 +4895,9 @@ try {
    const h=panel&&this.fullView()?Math.ceil(panel.getBoundingClientRect().height||panel.offsetHeight||0):0;
    this.host.style.setProperty('--map-dock-h',h+'px');
    this.host.classList.toggle('has-dock',h>0);
-   if(this.map&&this.fullView())this.map.invalidateSize({pan:false});
+   // Full-view dock height changes the map box; Leaflet then fires moveend.
+   // That must not clear the card/chooser that just caused the resize.
+   if(this.map&&this.fullView()){this.layouting=true;try{this.map.invalidateSize({pan:false});}finally{this.layouting=false;}}
   }
   reveal(el){
    this.layoutDock();
@@ -4927,7 +4929,7 @@ try {
      tiles.on('loading',()=>{this.tileLoadFailed=false;});
      tiles.on('tileerror',()=>{this.tileLoadFailed=true;this.tileFailed=true;this.tileNotice();});
      tiles.on('load',()=>{clearTimeout(this.tileRetryTimer);this.tileRetrying=false;this.tileFailed=!!this.tileLoadFailed;this.tileNotice();});
-     this.onMove=()=>{if(this.restoring){this.paint();this.updateSearch();return;}this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());this.mapReady=true;
+     this.onMove=()=>{if(this.restoring||this.layouting){this.paint();this.updateSearch();return;}this.deselect();this.$('#hubMapChooser').classList.add('hidden');this.updateSearch();};this.map.on('moveend zoomend',this.onMove);this.map.on('click',()=>this.deselect());this.mapReady=true;
     }
     this.map.invalidateSize();
     if(!meta.area&&this.all.length)this.map.fitBounds(this.all.map(p=>[p.lat,p.lng]),{padding:[42,42],maxZoom:12,animate:false});
